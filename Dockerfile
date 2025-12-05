@@ -4,8 +4,8 @@ FROM ghcr.io/cirruslabs/flutter:stable AS builder
 
 WORKDIR /app
 
-# Copy pubspec files
-COPY pubspec.yaml pubspec.lock ./
+# Copy pubspec file
+COPY pubspec.yaml ./
 
 # Get dependencies
 RUN flutter pub get
@@ -19,8 +19,9 @@ RUN flutter build web --release --web-renderer canvaskit
 # Stage 2: Serve with dhttpd (Dart HTTP Server)
 FROM dart:stable AS runtime
 
-# Install dhttpd globally
+# Install dhttpd globally and add to PATH
 RUN dart pub global activate dhttpd
+ENV PATH="$PATH:/root/.pub-cache/bin"
 
 # Create app directory
 WORKDIR /app
@@ -37,5 +38,5 @@ EXPOSE 8080
 # Set environment variable for Hive storage
 ENV HIVE_STORAGE_PATH=/app/data
 
-# Run dhttpd server
-CMD ["dart", "pub", "global", "run", "dhttpd", "--host", "0.0.0.0", "--port", "8080", "--path", "/app/web"]
+# Run dhttpd server (now available in PATH)
+CMD ["dhttpd", "--host", "0.0.0.0", "--port", "8080", "--path", "/app/web"]
