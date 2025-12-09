@@ -19,7 +19,7 @@ class AuthApiService {
         final token = data['token'] as String;
         final userData = data['user'] as Map<String, dynamic>;
         
-        _api.setToken(token);
+        await _api.setToken(token);
         
         return AuthResult(
           success: true,
@@ -51,15 +51,15 @@ class AuthApiService {
     try {
       await _api.post('/api/auth/logout');
     } finally {
-      _api.clearToken();
+      await _api.clearToken();
     }
   }
 
   /// Get current user from token
   Future<AppUser?> getCurrentUser() async {
-    _api.restoreToken();
+    await _api.restoreToken();
     
-    if (_api.getStoredToken() == null) {
+    if (_api.getToken() == null) {
       return null;
     }
 
@@ -76,7 +76,7 @@ class AuthApiService {
         createdAt: DateTime.now(),
       );
     } catch (e) {
-      _api.clearToken();
+      await _api.clearToken();
       return null;
     }
   }

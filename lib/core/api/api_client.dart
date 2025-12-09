@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'dart:html' as html;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// API Client for communicating with the backend
 class ApiClient {
@@ -26,39 +26,47 @@ class ApiClient {
 
   /// Get base URL (same origin for production)
   String _getBaseUrl() {
-    // Use current origin for API calls
+    // For mobile, this needs to be configured or passed in.
+    // For now, returning empty string implies relative path (works for web).
+    // TODO: Configure base URL for mobile
     return '';
   }
 
   /// Set authentication token
-  void setToken(String? token) {
+  Future<void> setToken(String? token) async {
     _token = token;
     if (token != null) {
       _dio.options.headers['Authorization'] = 'Bearer $token';
-      // Store in localStorage for persistence
-      html.window.localStorage['auth_token'] = token;
+      // Store in SharedPreferences for persistence
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
     } else {
       _dio.options.headers.remove('Authorization');
-      html.window.localStorage.remove('auth_token');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
     }
   }
 
-  /// Get stored token from localStorage
-  String? getStoredToken() {
-    return html.window.localStorage['auth_token'];
+  /// Get stored token from memory
+  String? getToken() {
+    return _token;
   }
 
-  /// Restore token from localStorage
-  void restoreToken() {
-    final storedToken = getStoredToken();
+  /// Restore token from SharedPreferences
+  Future<void> restoreToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedToken = prefs.getString('auth_token');
     if (storedToken != null) {
-      setToken(storedToken);
+      // We call setToken but avoid the async loop? 
+      // Just set memory and header directly to avoid double SP call
+      _token = storedToken;
+      _dio.options.headers['Authorization'] = 'Bearer $storedToken';
     }
   }
 
   /// Clear token
-  void clearToken() {
-    setToken(null);
+  Future<void> clearToken() async {
+    await setToken(null);
   }
 
   /// GET request
