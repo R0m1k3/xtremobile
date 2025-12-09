@@ -14,7 +14,7 @@ class XtreamServiceMobile {
   
   PlaylistConfig? _currentPlaylist;
 
-  XtreamServiceMobile() {
+  XtreamServiceMobile(String cachePath) {
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
@@ -22,7 +22,7 @@ class XtreamServiceMobile {
 
     // Setup caching for API responses
     _cacheOptions = CacheOptions(
-      store: HiveCacheStore('./cache'),
+      store: HiveCacheStore(cachePath),
       policy: CachePolicy.forceCache,
       maxStale: const Duration(hours: 1),
       priority: CachePriority.high,

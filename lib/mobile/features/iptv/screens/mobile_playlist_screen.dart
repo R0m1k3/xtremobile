@@ -42,11 +42,12 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     );
   }
 
-  void _showAddPlaylistDialog() {
-    final nameController = TextEditingController();
-    final dnsController = TextEditingController();
-    final usernameController = TextEditingController();
-    final passwordController = TextEditingController();
+  void _showPlaylistDialog({PlaylistConfig? playlist}) {
+    final isEditing = playlist != null;
+    final nameController = TextEditingController(text: playlist?.name ?? '');
+    final dnsController = TextEditingController(text: playlist?.dns ?? '');
+    final usernameController = TextEditingController(text: playlist?.username ?? '');
+    final passwordController = TextEditingController(text: playlist?.password ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -80,9 +81,9 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
               const SizedBox(height: 24),
               
               // Title
-              const Text(
-                'Ajouter une playlist',
-                style: TextStyle(
+              Text(
+                isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -140,26 +141,42 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                       return;
                     }
 
-                    await _playlistService.addPlaylist(
-                      name: nameController.text,
-                      dns: dnsController.text,
-                      username: usernameController.text,
-                      password: passwordController.text,
-                    );
+                    // Auto-fix URL scheme
+                    String dns = dnsController.text.trim();
+                    if (!dns.startsWith('http://') && !dns.startsWith('https://')) {
+                      dns = 'http://$dns';
+                    }
+
+                    if (isEditing) {
+                        await _playlistService.updatePlaylist(
+                          id: playlist!.id,
+                          name: nameController.text.trim(),
+                          dns: dns,
+                          username: usernameController.text.trim(),
+                          password: passwordController.text.trim(),
+                        );
+                    } else {
+                        await _playlistService.addPlaylist(
+                          name: nameController.text.trim(),
+                          dns: dns,
+                          username: usernameController.text.trim(),
+                          password: passwordController.text.trim(),
+                        );
+                    }
 
                     if (mounted) {
                       Navigator.pop(context);
                       _refreshPlaylists();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Playlist ajoutée avec succès'),
+                        SnackBar(
+                          content: Text(isEditing ? 'Playlist modifiée' : 'Playlist ajoutée'),
                           backgroundColor: Colors.green,
                         ),
                       );
                     }
                   },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Ajouter'),
+                  icon: Icon(isEditing ? Icons.save : Icons.add),
+                  label: Text(isEditing ? 'Enregistrer' : 'Ajouter'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -202,6 +219,55 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+
+  void _showOptionsSheet(PlaylistConfig playlist) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textTertiary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit, color: AppColors.textPrimary),
+                title: const Text('Modifier', style: TextStyle(color: AppColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showPlaylistDialog(playlist: playlist);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: AppColors.error),
+                title: const Text('Supprimer', style: TextStyle(color: AppColors.error)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteConfirmation(playlist);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -312,7 +378,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     ),
                     const SizedBox(height: 32),
                     FilledButton.icon(
-                      onPressed: _showAddPlaylistDialog,
+                      onPressed: () => _showPlaylistDialog(),
                       icon: const Icon(Icons.add),
                       label: const Text('Ajouter une playlist'),
                       style: FilledButton.styleFrom(
@@ -337,14 +403,14 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                 return _PlaylistCard(
                   playlist: playlist,
                   onTap: () => _navigateToDashboard(playlist),
-                  onLongPress: () => _showDeleteConfirmation(playlist),
+                  onLongPress: () => _showOptionsSheet(playlist),
                 );
               },
             );
           },
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: _showAddPlaylistDialog,
+          onPressed: () => _showPlaylistDialog(),
           backgroundColor: AppColors.primary,
           child: const Icon(Icons.add),
         ),
