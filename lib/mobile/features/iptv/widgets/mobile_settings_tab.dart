@@ -108,7 +108,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Version 1.0.0 (Local)',
+                        'Version 1.0.2',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -136,6 +136,22 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                 color: AppColors.primary),
               value: isDark,
               onChanged: (_) => themeNotifier.toggleTheme(),
+              activeColor: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SwitchListTile(
+              title: const Text('Afficher l\'heure', 
+                style: TextStyle(color: AppColors.textPrimary)),
+              secondary: const Icon(Icons.access_time, 
+                color: AppColors.primary),
+              value: settings.showClock,
+              onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowClock(val),
               activeColor: AppColors.primary,
             ),
           ),

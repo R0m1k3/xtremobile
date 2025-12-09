@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 final mobileXtreamServiceProvider = FutureProvider.family<XtreamServiceMobile, PlaylistConfig>((ref, playlist) async {
   final dir = await getApplicationDocumentsDirectory();
   final service = XtreamServiceMobile(dir.path);
-  service.setPlaylist(playlist);
+  await service.setPlaylistAsync(playlist); // Async to resolve DNS before API calls
   return service;
 });
 

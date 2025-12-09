@@ -28,7 +28,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
   bool _isSearching = false;
   bool _hasMore = true;
   int _currentOffset = 0;
-  static const int _pageSize = 50; // Smaller page size for mobile
+  static const int _pageSize = 500; // Large page size to prevent infinite scroll bugs if offset logic is flawed
   Timer? _searchDebounce;
 
   @override
@@ -106,15 +106,25 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
 
       if (mounted) {
         setState(() {
-          _movies.addAll(newMovies);
-          _currentOffset += _pageSize;
-          _hasMore = newMovies.length == _pageSize;
+          if (newMovies.isEmpty) {
+            _hasMore = false;
+          } else {
+            _movies.addAll(newMovies);
+            _currentOffset += _pageSize;
+            // If we got fewer movies than requested, we reached the end
+            if (newMovies.length < _pageSize) {
+              _hasMore = false;
+            }
+          }
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() { 
+          _isLoading = false; 
+          _hasMore = false; // Stop trying on error to prevent infinite loop
+        }); 
       }
     }
   }
@@ -243,17 +253,18 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
             ),
           
           // Grid
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 80), // Bottom padding for nav
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 columns for mobile
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.65, // Standard poster ratio
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
+          if (displayMovies.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8, 
+                  childAspectRatio: 0.7, 
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
                   if (index >= displayMovies.length) return null;
                   final movie = displayMovies[index];
                   final isWatched = watchHistory.isMovieWatched(movie.streamId);

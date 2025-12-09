@@ -7,22 +7,26 @@ class MobileSettings {
   final List<String> liveTvKeywords;
   final List<String> moviesKeywords;
   final List<String> seriesKeywords;
+  final bool showClock;
 
   const MobileSettings({
     this.liveTvKeywords = const [],
     this.moviesKeywords = const [],
     this.seriesKeywords = const [],
+    this.showClock = false,
   });
 
   MobileSettings copyWith({
     List<String>? liveTvKeywords,
     List<String>? moviesKeywords,
     List<String>? seriesKeywords,
+    bool? showClock,
   }) {
     return MobileSettings(
       liveTvKeywords: liveTvKeywords ?? this.liveTvKeywords,
       moviesKeywords: moviesKeywords ?? this.moviesKeywords,
       seriesKeywords: seriesKeywords ?? this.seriesKeywords,
+      showClock: showClock ?? this.showClock,
     );
   }
 
@@ -68,11 +72,13 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
     final liveTv = _box?.get('liveTvKeywords', defaultValue: <String>[]) as List?;
     final movies = _box?.get('moviesKeywords', defaultValue: <String>[]) as List?;
     final series = _box?.get('seriesKeywords', defaultValue: <String>[]) as List?;
+    final showClock = _box?.get('showClock', defaultValue: false) as bool?;
     
     state = MobileSettings(
       liveTvKeywords: liveTv?.cast<String>() ?? [],
       moviesKeywords: movies?.cast<String>() ?? [],
       seriesKeywords: series?.cast<String>() ?? [],
+      showClock: showClock ?? false,
     );
   }
 
@@ -89,6 +95,11 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void setSeriesKeywords(List<String> keywords) {
     state = state.copyWith(seriesKeywords: keywords);
     _box?.put('seriesKeywords', keywords);
+  }
+
+  void toggleShowClock(bool value) {
+    state = state.copyWith(showClock: value);
+    _box?.put('showClock', value);
   }
 }
 

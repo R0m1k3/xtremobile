@@ -249,10 +249,10 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.65,
+                crossAxisCount: 8, // Reduced size further (was 4)
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.7,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
