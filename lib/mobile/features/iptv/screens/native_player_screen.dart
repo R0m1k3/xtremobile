@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/models/iptv_models.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -43,14 +44,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   late int _currentIndex;
-  late XtreamServiceMobile _xtreamService;
+  XtreamServiceMobile? _xtreamService; // Make nullable to handle async init
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    _xtreamService = XtreamServiceMobile();
-    _xtreamService.setPlaylist(widget.playlist);
     
     // Lock to landscape for video playback
     SystemChrome.setPreferredOrientations([
@@ -59,11 +58,31 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     
-    _initializePlayer();
+    // Initialize service and then player
+    _initializeServiceAndPlayer();
+  }
+
+  Future<void> _initializeServiceAndPlayer() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      _xtreamService = XtreamServiceMobile(dir.path);
+      _xtreamService!.setPlaylist(widget.playlist);
+      
+      await _initializePlayer();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Service Error: $e";
+        });
+      }
+    }
   }
 
   Future<void> _initializePlayer() async {
     try {
+      if (_xtreamService == null) return; // Should not happen if called correctly
+
       setState(() {
         _isLoading = true;
         _errorMessage = null;
@@ -82,13 +101,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       
       if (widget.streamType == StreamType.live) {
         // Live TV - use HLS format for best mobile compatibility
-        streamUrl = _xtreamService.getLiveStreamUrl(currentStreamId);
+        streamUrl = _xtreamService!.getLiveStreamUrl(currentStreamId);
       } else if (widget.streamType == StreamType.vod) {
         // Movies
-        streamUrl = _xtreamService.getVodStreamUrl(currentStreamId, widget.containerExtension);
+        streamUrl = _xtreamService!.getVodStreamUrl(currentStreamId, widget.containerExtension);
       } else {
         // Series
-        streamUrl = _xtreamService.getSeriesStreamUrl(currentStreamId, widget.containerExtension);
+        streamUrl = _xtreamService!.getSeriesStreamUrl(currentStreamId, widget.containerExtension);
       }
 
       debugPrint('NativePlayer: Loading stream: $streamUrl');
@@ -183,13 +202,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     setState(() {
       _currentIndex = index;
     });
-    _initializePlayer();
+    _initializeServiceAndPlayer(); // Re-trigger init purely for player part
   }
 
   @override
   void dispose() {
     _disposeControllers();
-    _xtreamService.dispose();
+    _xtreamService?.dispose();
     
     // Restore normal orientation
     SystemChrome.setPreferredOrientations([

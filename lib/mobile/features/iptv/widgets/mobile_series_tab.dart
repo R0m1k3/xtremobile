@@ -77,7 +77,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     setState(() => _isSearching = true);
     
     try {
-      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
       final results = await service.searchSeries(query);
       
       if (mounted && _searchQuery == query) {
@@ -98,7 +98,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     setState(() => _isLoading = true);
 
     try {
-      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
       final newSeries = await service.getSeriesPaginated(
         offset: _currentOffset,
         limit: _pageSize,

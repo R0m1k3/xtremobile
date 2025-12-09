@@ -51,7 +51,7 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
         _error = null;
       });
 
-      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
       final info = await service.getSeriesInfo(widget.series.seriesId.toString());
 
       if (mounted) {

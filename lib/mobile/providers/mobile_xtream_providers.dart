@@ -7,27 +7,31 @@ import '../../features/iptv/models/xtream_models.dart';
 export '../../features/iptv/models/xtream_models.dart';
 
 /// Mobile-specific Xtream service provider (no dart:html dependency)
-final mobileXtreamServiceProvider = Provider.family<XtreamServiceMobile, PlaylistConfig>((ref, playlist) {
-  final service = XtreamServiceMobile();
+import 'package:path_provider/path_provider.dart';
+
+/// Mobile-specific Xtream service provider (no dart:html dependency)
+final mobileXtreamServiceProvider = FutureProvider.family<XtreamServiceMobile, PlaylistConfig>((ref, playlist) async {
+  final dir = await getApplicationDocumentsDirectory();
+  final service = XtreamServiceMobile(dir.path);
   service.setPlaylist(playlist);
   return service;
 });
 
 /// Mobile-specific live channels provider
 final mobileLiveChannelsProvider = FutureProvider.family<Map<String, List<Channel>>, PlaylistConfig>((ref, playlist) async {
-  final service = ref.read(mobileXtreamServiceProvider(playlist));
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getLiveChannels();
 });
 
 /// Mobile-specific movies pagination provider
 final mobileMoviesProvider = FutureProvider.family<List<Movie>, PlaylistConfig>((ref, playlist) async {
-  final service = ref.read(mobileXtreamServiceProvider(playlist));
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getMoviesPaginated(offset: 0, limit: 100);
 });
 
 /// Mobile-specific series pagination provider
 final mobileSeriesProvider = FutureProvider.family<List<Series>, PlaylistConfig>((ref, playlist) async {
-  final service = ref.read(mobileXtreamServiceProvider(playlist));
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getSeriesPaginated(offset: 0, limit: 100);
 });
 
@@ -56,6 +60,6 @@ class SeriesInfoRequest {
 }
 
 final mobileSeriesInfoByPlaylistProvider = FutureProvider.family<SeriesInfo, SeriesInfoRequest>((ref, request) async {
-  final service = ref.read(mobileXtreamServiceProvider(request.playlist));
+  final service = await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
   return service.getSeriesInfo(request.seriesId);
 });

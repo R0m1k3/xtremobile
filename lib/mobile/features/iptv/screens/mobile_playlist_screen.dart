@@ -493,6 +493,10 @@ class _PlaylistCard extends StatelessWidget {
                   Icons.chevron_right,
                   color: AppColors.textTertiary,
                 ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                  onPressed: onLongPress, // Re-use the options sheet logic
+                ),
               ],
             ),
           ),
