@@ -1,0 +1,206 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+/// Mobile-specific settings (stored locally in Hive)
+/// Simplified version without server API dependencies
+class MobileSettings {
+  final List<String> liveTvKeywords;
+  final List<String> moviesKeywords;
+  final List<String> seriesKeywords;
+
+  const MobileSettings({
+    this.liveTvKeywords = const [],
+    this.moviesKeywords = const [],
+    this.seriesKeywords = const [],
+  });
+
+  MobileSettings copyWith({
+    List<String>? liveTvKeywords,
+    List<String>? moviesKeywords,
+    List<String>? seriesKeywords,
+  }) {
+    return MobileSettings(
+      liveTvKeywords: liveTvKeywords ?? this.liveTvKeywords,
+      moviesKeywords: moviesKeywords ?? this.moviesKeywords,
+      seriesKeywords: seriesKeywords ?? this.seriesKeywords,
+    );
+  }
+
+  /// Check if category matches Live TV filter
+  bool matchesLiveTvFilter(String? category) {
+    if (liveTvKeywords.isEmpty) return true;
+    if (category == null) return true;
+    final lowerCategory = category.toLowerCase();
+    return liveTvKeywords.any((keyword) => 
+        lowerCategory.contains(keyword.toLowerCase()));
+  }
+
+  /// Check if category matches Movies filter
+  bool matchesMoviesFilter(String? category) {
+    if (moviesKeywords.isEmpty) return true;
+    if (category == null) return true;
+    final lowerCategory = category.toLowerCase();
+    return moviesKeywords.any((keyword) => 
+        lowerCategory.contains(keyword.toLowerCase()));
+  }
+
+  /// Check if category matches Series filter
+  bool matchesSeriesFilter(String? category) {
+    if (seriesKeywords.isEmpty) return true;
+    if (category == null) return true;
+    final lowerCategory = category.toLowerCase();
+    return seriesKeywords.any((keyword) => 
+        lowerCategory.contains(keyword.toLowerCase()));
+  }
+}
+
+class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
+  static const String _boxName = 'mobile_settings';
+  Box? _box;
+
+  MobileSettingsNotifier() : super(const MobileSettings()) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _box = await Hive.openBox(_boxName);
+    
+    final liveTv = _box?.get('liveTvKeywords', defaultValue: <String>[]) as List?;
+    final movies = _box?.get('moviesKeywords', defaultValue: <String>[]) as List?;
+    final series = _box?.get('seriesKeywords', defaultValue: <String>[]) as List?;
+    
+    state = MobileSettings(
+      liveTvKeywords: liveTv?.cast<String>() ?? [],
+      moviesKeywords: movies?.cast<String>() ?? [],
+      seriesKeywords: series?.cast<String>() ?? [],
+    );
+  }
+
+  void setLiveTvKeywords(List<String> keywords) {
+    state = state.copyWith(liveTvKeywords: keywords);
+    _box?.put('liveTvKeywords', keywords);
+  }
+
+  void setMoviesKeywords(List<String> keywords) {
+    state = state.copyWith(moviesKeywords: keywords);
+    _box?.put('moviesKeywords', keywords);
+  }
+
+  void setSeriesKeywords(List<String> keywords) {
+    state = state.copyWith(seriesKeywords: keywords);
+    _box?.put('seriesKeywords', keywords);
+  }
+}
+
+final mobileSettingsProvider = StateNotifierProvider<MobileSettingsNotifier, MobileSettings>((ref) {
+  return MobileSettingsNotifier();
+});
+
+/// Watch history for mobile (stored locally)
+class MobileWatchHistory {
+  final Set<String> watchedMovies;
+  final Set<String> watchedEpisodes;
+
+  const MobileWatchHistory({
+    this.watchedMovies = const {},
+    this.watchedEpisodes = const {},
+  });
+
+  MobileWatchHistory copyWith({
+    Set<String>? watchedMovies,
+    Set<String>? watchedEpisodes,
+  }) {
+    return MobileWatchHistory(
+      watchedMovies: watchedMovies ?? this.watchedMovies,
+      watchedEpisodes: watchedEpisodes ?? this.watchedEpisodes,
+    );
+  }
+
+  bool isMovieWatched(String streamId) => watchedMovies.contains(streamId);
+  bool isEpisodeWatched(String episodeKey) => watchedEpisodes.contains(episodeKey);
+
+  static String episodeKey(dynamic seriesId, int season, int episodeNum) {
+    return '$seriesId:$season:$episodeNum';
+  }
+}
+
+class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
+  static const String _boxName = 'mobile_watch_history';
+  Box? _box;
+
+  MobileWatchHistoryNotifier() : super(const MobileWatchHistory()) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _box = await Hive.openBox(_boxName);
+    
+    final movies = _box?.get('watchedMovies', defaultValue: <String>[]) as List?;
+    final episodes = _box?.get('watchedEpisodes', defaultValue: <String>[]) as List?;
+    
+    state = MobileWatchHistory(
+      watchedMovies: movies?.cast<String>().toSet() ?? {},
+      watchedEpisodes: episodes?.cast<String>().toSet() ?? {},
+    );
+  }
+
+  void markMovieWatched(String streamId) {
+    final updated = {...state.watchedMovies, streamId};
+    state = state.copyWith(watchedMovies: updated);
+    _box?.put('watchedMovies', updated.toList());
+  }
+
+  void toggleMovieWatched(String streamId) {
+    final movies = {...state.watchedMovies};
+    if (movies.contains(streamId)) {
+      movies.remove(streamId);
+    } else {
+      movies.add(streamId);
+    }
+    state = state.copyWith(watchedMovies: movies);
+    _box?.put('watchedMovies', movies.toList());
+  }
+
+  void markEpisodeWatched(String episodeKey) {
+    final updated = {...state.watchedEpisodes, episodeKey};
+    state = state.copyWith(watchedEpisodes: updated);
+    _box?.put('watchedEpisodes', updated.toList());
+  }
+}
+
+final mobileWatchHistoryProvider = StateNotifierProvider<MobileWatchHistoryNotifier, MobileWatchHistory>((ref) {
+  return MobileWatchHistoryNotifier();
+});
+
+/// Favorites for mobile (stored locally)
+class MobileFavoritesNotifier extends StateNotifier<Set<String>> {
+  static const String _boxName = 'mobile_favorites';
+  Box? _box;
+
+  MobileFavoritesNotifier() : super({}) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _box = await Hive.openBox(_boxName);
+    final favorites = _box?.get('favorites', defaultValue: <String>[]) as List?;
+    state = favorites?.cast<String>().toSet() ?? {};
+  }
+
+  void toggle(String streamId) {
+    final updated = {...state};
+    if (updated.contains(streamId)) {
+      updated.remove(streamId);
+    } else {
+      updated.add(streamId);
+    }
+    state = updated;
+    _box?.put('favorites', updated.toList());
+  }
+
+  bool isFavorite(String streamId) => state.contains(streamId);
+}
+
+final mobileFavoritesProvider = StateNotifierProvider<MobileFavoritesNotifier, Set<String>>((ref) {
+  return MobileFavoritesNotifier();
+});

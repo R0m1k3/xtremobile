@@ -1,0 +1,437 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/models/playlist_config.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../theme/mobile_theme.dart';
+import '../../../services/local_playlist_service.dart';
+import 'mobile_dashboard_screen.dart';
+
+/// Provider for local playlists
+final localPlaylistsProvider = FutureProvider<List<PlaylistConfig>>((ref) async {
+  final service = LocalPlaylistService();
+  return service.getPlaylists();
+});
+
+/// Mobile playlist selection screen - simplified without auth
+class MobilePlaylistScreen extends ConsumerStatefulWidget {
+  const MobilePlaylistScreen({super.key});
+
+  @override
+  ConsumerState<MobilePlaylistScreen> createState() => _MobilePlaylistScreenState();
+}
+
+class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
+  final LocalPlaylistService _playlistService = LocalPlaylistService();
+
+  @override
+  void initState() {
+    super.initState();
+    _playlistService.init();
+  }
+
+  void _refreshPlaylists() {
+    ref.invalidate(localPlaylistsProvider);
+  }
+
+  void _navigateToDashboard(PlaylistConfig playlist) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MobileDashboardScreen(playlist: playlist),
+      ),
+    );
+  }
+
+  void _showAddPlaylistDialog() {
+    final nameController = TextEditingController();
+    final dnsController = TextEditingController();
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textTertiary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Title
+              const Text(
+                'Ajouter une playlist',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Form fields
+              _buildTextField(
+                controller: nameController,
+                label: 'Nom',
+                hint: 'Ma Playlist IPTV',
+                icon: Icons.label_outline,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: dnsController,
+                label: 'Serveur URL',
+                hint: 'http://example.com:8080',
+                icon: Icons.dns_outlined,
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: usernameController,
+                label: 'Nom d\'utilisateur',
+                hint: 'username',
+                icon: Icons.person_outline,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: passwordController,
+                label: 'Mot de passe',
+                hint: '••••••••',
+                icon: Icons.lock_outline,
+                obscureText: true,
+              ),
+              const SizedBox(height: 32),
+              
+              // Save button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    if (nameController.text.isEmpty ||
+                        dnsController.text.isEmpty ||
+                        usernameController.text.isEmpty ||
+                        passwordController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Veuillez remplir tous les champs'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                      return;
+                    }
+
+                    await _playlistService.addPlaylist(
+                      name: nameController.text,
+                      dns: dnsController.text,
+                      username: usernameController.text,
+                      password: passwordController.text,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(context);
+                      _refreshPlaylists();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Playlist ajoutée avec succès'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Ajouter'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, color: AppColors.textSecondary),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        hintStyle: const TextStyle(color: AppColors.textTertiary),
+        filled: true,
+        fillColor: AppColors.background,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(PlaylistConfig playlist) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Supprimer la playlist ?', 
+          style: TextStyle(color: AppColors.textPrimary)),
+        content: Text('Voulez-vous supprimer "${playlist.name}" ?',
+          style: const TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await _playlistService.deletePlaylist(playlist.id);
+              if (mounted) {
+                Navigator.pop(context);
+                _refreshPlaylists();
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final playlistsAsync = ref.watch(localPlaylistsProvider);
+
+    return Theme(
+      data: MobileTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('XtremFlow'),
+          centerTitle: true,
+          backgroundColor: AppColors.background,
+          elevation: 0,
+        ),
+        body: playlistsAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+          error: (error, stack) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                const SizedBox(height: 16),
+                const Text('Erreur de chargement', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                const SizedBox(height: 8),
+                Text(error.toString(), 
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: _refreshPlaylists,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          ),
+          data: (playlists) {
+            if (playlists.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.playlist_add,
+                        size: 40,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Aucune playlist',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Ajoutez votre première playlist IPTV',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    FilledButton.icon(
+                      onPressed: _showAddPlaylistDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Ajouter une playlist'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: playlists.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final playlist = playlists[index];
+                return _PlaylistCard(
+                  playlist: playlist,
+                  onTap: () => _navigateToDashboard(playlist),
+                  onLongPress: () => _showDeleteConfirmation(playlist),
+                );
+              },
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _showAddPlaylistDialog,
+          backgroundColor: AppColors.primary,
+          child: const Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistCard extends StatelessWidget {
+  final PlaylistConfig playlist;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _PlaylistCard({
+    required this.playlist,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withOpacity(0.3)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.playlist_play,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        playlist.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        Uri.tryParse(playlist.dns)?.host ?? playlist.dns,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textTertiary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

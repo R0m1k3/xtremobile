@@ -4,9 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../features/iptv/models/xtream_models.dart';
-import '../../../../features/iptv/providers/xtream_provider.dart';
-import '../../../../features/iptv/providers/watch_history_provider.dart';
-import 'mobile_player_screen.dart';
+import '../../../providers/mobile_xtream_providers.dart';
+import '../../../providers/mobile_settings_providers.dart';
+import 'native_player_screen.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class MobileSeriesDetailScreen extends ConsumerStatefulWidget {
@@ -51,8 +51,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
         _error = null;
       });
 
-      final service = ref.read(xtreamServiceProvider(widget.playlist));
-      final info = await service.getSeriesInfo(widget.series.seriesId);
+      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
+      final info = await service.getSeriesInfo(widget.series.seriesId.toString());
 
       if (mounted) {
         setState(() {
@@ -254,8 +254,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
   }
 
   Widget _buildEpisodeTile(Episode episode) {
-    final watchHistory = ref.watch(watchHistoryProvider);
-    final episodeKey = WatchHistory.episodeKey(
+    final watchHistory = ref.watch(mobileWatchHistoryProvider);
+    final episodeKey = MobileWatchHistory.episodeKey(
       widget.series.seriesId,
       _selectedSeason,
       episode.episodeNum,
@@ -264,11 +264,11 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
 
     return InkWell(
       onTap: () {
-        ref.read(watchHistoryProvider.notifier).markEpisodeWatched(episodeKey);
+        ref.read(mobileWatchHistoryProvider.notifier).markEpisodeWatched(episodeKey);
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MobilePlayerScreen(
+            builder: (context) => NativePlayerScreen(
               streamId: episode.id,
               title: '${widget.series.name} - ${episode.title}',
               playlist: widget.playlist,

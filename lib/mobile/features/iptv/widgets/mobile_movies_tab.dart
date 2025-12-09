@@ -5,11 +5,10 @@ import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/components/hero_carousel.dart';
 import '../../../../core/widgets/components/ui_components.dart';
-import '../../../../features/iptv/providers/watch_history_provider.dart';
-import '../../../../features/iptv/models/xtream_models.dart';
-import '../../../../features/iptv/providers/xtream_provider.dart';
-import '../../../../features/iptv/providers/settings_provider.dart';
-import '../screens/mobile_player_screen.dart';
+import '../../../providers/mobile_settings_providers.dart';
+import '../../../providers/mobile_xtream_providers.dart';
+import '../../../../features/iptv/services/xtream_service_mobile.dart';
+import '../screens/native_player_screen.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -78,7 +77,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
     setState(() => _isSearching = true);
     
     try {
-      final service = ref.read(xtreamServiceProvider(widget.playlist));
+      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
       final results = await service.searchMovies(query);
       
       if (mounted && _searchQuery == query) {
@@ -99,7 +98,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
     setState(() => _isLoading = true);
 
     try {
-      final service = ref.read(xtreamServiceProvider(widget.playlist));
+      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
       final newMovies = await service.getMoviesPaginated(
         offset: _currentOffset,
         limit: _pageSize,
@@ -129,22 +128,19 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
     return rating;
   }
 
-  /// Proxy HTTP images through backend to avoid CORS/mixed-content issues
-  String _getProxiedImageUrl(String? originalUrl) {
+  /// On mobile, use direct URLs (no proxy needed)
+  String _getImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
-    if (originalUrl.startsWith('http://')) {
-      return '/api/xtream/$originalUrl';
-    }
     return originalUrl;
   }
 
   void _playMovie(Movie movie) {
-    ref.read(watchHistoryProvider.notifier).markMovieWatched(movie.streamId);
+    ref.read(mobileWatchHistoryProvider.notifier).markMovieWatched(movie.streamId);
     
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MobilePlayerScreen(
+        builder: (context) => NativePlayerScreen(
           streamId: movie.streamId,
           title: movie.name,
           playlist: widget.playlist,
@@ -157,8 +153,8 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(iptvSettingsProvider);
-    final watchHistory = ref.watch(watchHistoryProvider);
+    final settings = ref.watch(mobileSettingsProvider);
+    final watchHistory = ref.watch(mobileWatchHistoryProvider);
     
     List<Movie> displayMovies;
     if (_searchQuery.isNotEmpty && _searchResults != null) {
@@ -173,7 +169,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
     final heroItems = displayMovies.take(3).map((m) => HeroItem(
       id: m.streamId,
       title: m.name,
-      imageUrl: _getProxiedImageUrl(m.streamIcon),
+      imageUrl: _getImageUrl(m.streamIcon),
       subtitle: m.rating != null ? '${_formatRating(m.rating)} ★' : null,
       onMoreInfo: () => _playMovie(m),
     )).toList();
@@ -264,14 +260,14 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
                   
                   return MediaCard(
                     title: movie.name,
-                    imageUrl: _getProxiedImageUrl(movie.streamIcon),
+                    imageUrl: _getImageUrl(movie.streamIcon),
 
                     subtitle: movie.rating != null ? '${_formatRating(movie.rating)} ★' : null,
                     rating: _formatRating(movie.rating),
                     isWatched: isWatched,
                     onTap: () => _playMovie(movie),
                     onLongPress: () {
-                      ref.read(watchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
+                      ref.read(mobileWatchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
                     },
                   );
                 },

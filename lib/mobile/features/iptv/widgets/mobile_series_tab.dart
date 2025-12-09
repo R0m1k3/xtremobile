@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
-
 import '../../../../core/widgets/components/hero_carousel.dart';
 import '../../../../core/widgets/components/ui_components.dart';
-import '../../../../features/iptv/models/xtream_models.dart';
-import '../../../../features/iptv/providers/xtream_provider.dart';
-import '../../../../features/iptv/providers/settings_provider.dart';
+import '../../../providers/mobile_settings_providers.dart';
+import '../../../providers/mobile_xtream_providers.dart';
+import '../../../../features/iptv/services/xtream_service_mobile.dart';
 import '../screens/mobile_series_detail_screen.dart';
 
 class MobileSeriesTab extends ConsumerStatefulWidget {
@@ -78,7 +77,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     setState(() => _isSearching = true);
     
     try {
-      final service = ref.read(xtreamServiceProvider(widget.playlist));
+      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
       final results = await service.searchSeries(query);
       
       if (mounted && _searchQuery == query) {
@@ -99,7 +98,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     setState(() => _isLoading = true);
 
     try {
-      final service = ref.read(xtreamServiceProvider(widget.playlist));
+      final service = ref.read(mobileXtreamServiceProvider(widget.playlist));
       final newSeries = await service.getSeriesPaginated(
         offset: _currentOffset,
         limit: _pageSize,
@@ -129,12 +128,9 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     return rating;
   }
 
-  /// Proxy HTTP images through backend to avoid CORS/mixed-content issues
-  String _getProxiedImageUrl(String? originalUrl) {
+  /// On mobile, use direct URLs (no proxy needed)
+  String _getImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
-    if (originalUrl.startsWith('http://')) {
-      return '/api/xtream/$originalUrl';
-    }
     return originalUrl;
   }
 
@@ -152,7 +148,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(iptvSettingsProvider);
+    final settings = ref.watch(mobileSettingsProvider);
     
     List<Series> displaySeries;
     if (_searchQuery.isNotEmpty && _searchResults != null) {
@@ -167,7 +163,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
     final heroItems = displaySeries.take(3).map((s) => HeroItem(
       id: s.seriesId.toString(),
       title: s.name,
-      imageUrl: _getProxiedImageUrl(s.cover),
+      imageUrl: _getImageUrl(s.cover),
       subtitle: s.rating != null ? '${_formatRating(s.rating)} ★' : null,
       onMoreInfo: () => _openSeries(s),
     )).toList();
@@ -265,7 +261,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
                   
                   return MediaCard(
                     title: series.name,
-                    imageUrl: _getProxiedImageUrl(series.cover),
+                    imageUrl: _getImageUrl(series.cover),
 
                     subtitle: series.rating != null ? '${_formatRating(series.rating)} ★' : null,
                     rating: _formatRating(series.rating),

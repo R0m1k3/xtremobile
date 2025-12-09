@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../features/iptv/providers/xtream_provider.dart';
-import '../../../../features/iptv/providers/settings_provider.dart';
-import '../../../../features/iptv/providers/favorites_provider.dart';
-import '../screens/mobile_player_screen.dart';
+import '../../../providers/mobile_xtream_providers.dart';
+import '../../../providers/mobile_settings_providers.dart';
+import '../screens/native_player_screen.dart';
 import '../../../../core/models/iptv_models.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../theme/mobile_theme.dart';
-import '../../../../core/widgets/components/ui_components.dart'; // For images/CachedNetworkImage if needed
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -43,9 +41,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> {
 
   @override
   Widget build(BuildContext context) {
-    final channelsAsync = ref.watch(liveChannelsByPlaylistProvider(widget.playlist));
-    final favorites = ref.watch(favoritesProvider);
-    final settings = ref.watch(iptvSettingsProvider);
+    final channelsAsync = ref.watch(mobileLiveChannelsProvider(widget.playlist));
+    final favorites = ref.watch(mobileFavoritesProvider);
+    final settings = ref.watch(mobileSettingsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -216,7 +214,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> {
   void _playChannel(BuildContext context, Channel channel) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => MobilePlayerScreen(
+        builder: (context) => NativePlayerScreen(
           streamId: channel.streamId,
           title: channel.name,
           playlist: widget.playlist,
@@ -235,8 +233,9 @@ class _MobileChannelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On mobile, use direct URL (no proxy needed)
     final iconUrl = channel.streamIcon.isNotEmpty && channel.streamIcon.startsWith('http') 
-        ? '/api/xtream/${channel.streamIcon}' 
+        ? channel.streamIcon 
         : null;
 
     return InkWell(
