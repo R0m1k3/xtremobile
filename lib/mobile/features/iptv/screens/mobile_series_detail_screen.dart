@@ -293,8 +293,9 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isWatched ? AppColors.primary : Colors.white10,
+                color: isWatched ? AppColors.primary : AppColors.surface,
                 shape: BoxShape.circle,
+                border: isWatched ? null : Border.all(color: AppColors.primary, width: 2),
               ),
               child: Icon(
                 isWatched ? Icons.check : Icons.play_arrow,
@@ -309,8 +310,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                 children: [
                   Text(
                     'E${episode.episodeNum} - ${episode.title}',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: isWatched ? AppColors.textSecondary : AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
