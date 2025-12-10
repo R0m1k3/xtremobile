@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -166,12 +167,24 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
     
     final movies = _box?.get('watchedMovies', defaultValue: <String>[]) as List?;
     final episodes = _box?.get('watchedEpisodes', defaultValue: <String>[]) as List?;
-    final positions = _box?.get('resumePositions', defaultValue: <String, dynamic>{}) as Map?;
+    final positionsRaw = _box?.get('resumePositions');
+    
+    // Safe conversion for resumePositions map
+    Map<String, int> positions = {};
+    if (positionsRaw != null && positionsRaw is Map) {
+      positionsRaw.forEach((key, value) {
+        if (key is String && value is int) {
+          positions[key] = value;
+        } else if (key is String && value is num) {
+          positions[key] = value.toInt();
+        }
+      });
+    }
     
     state = MobileWatchHistory(
       watchedMovies: movies?.cast<String>().toSet() ?? {},
       watchedEpisodes: episodes?.cast<String>().toSet() ?? {},
-      resumePositions: positions?.cast<String, int>() ?? {},
+      resumePositions: positions,
     );
   }
 
@@ -208,12 +221,16 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
   
   /// Save resume position for movie or episode
   void saveResumePosition(String contentId, int positionSeconds) {
-    // Only save if position is meaningful (> 30 seconds and < 95% of typical content)
-    if (positionSeconds < 30) return;
+    // Only save if position is meaningful (> 30 seconds)
+    if (positionSeconds < 30) {
+      debugPrint('[WatchHistory] Position too short ($positionSeconds), skipping save');
+      return;
+    }
     
+    debugPrint('[WatchHistory] Saving position for $contentId: ${positionSeconds}s');
     final positions = {...state.resumePositions, contentId: positionSeconds};
     state = state.copyWith(resumePositions: positions);
-    _box?.put('resumePositions', positions);
+    _box?.put('resumePositions', Map<String, int>.from(positions));
   }
   
   /// Clear resume position (when content finished or user wants to restart)

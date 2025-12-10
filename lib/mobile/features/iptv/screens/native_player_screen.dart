@@ -263,22 +263,31 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   /// Save resume position when exiting player
   void _saveResumePositionOnExit() {
     if (widget.streamType == StreamType.live) return;
-    if (_duration.inSeconds <= 0) return;
     
-    final progress = _position.inSeconds / _duration.inSeconds;
+    debugPrint('MediaKitPlayer: Saving position - pos: ${_position.inSeconds}s, dur: ${_duration.inSeconds}s, contentId: $_contentId');
     
-    // Don't save if almost finished (> 90%) or already marked as watched
-    if (progress > 0.90 || _hasMarkedAsWatched) {
+    // If already marked as watched, clear any saved position
+    if (_hasMarkedAsWatched) {
       ref.read(mobileWatchHistoryProvider.notifier).clearResumePosition(_contentId);
+      debugPrint('MediaKitPlayer: Already watched, clearing position');
       return;
     }
     
-    // Save position
+    // Check if almost finished (> 90%)
+    if (_duration.inSeconds > 0) {
+      final progress = _position.inSeconds / _duration.inSeconds;
+      if (progress > 0.90) {
+        ref.read(mobileWatchHistoryProvider.notifier).clearResumePosition(_contentId);
+        debugPrint('MediaKitPlayer: Almost finished (${(progress * 100).toStringAsFixed(1)}%), clearing position');
+        return;
+      }
+    }
+    
+    // Save position (saveResumePosition handles the 30s minimum check)
     ref.read(mobileWatchHistoryProvider.notifier).saveResumePosition(
       _contentId, 
       _position.inSeconds,
     );
-    debugPrint('MediaKitPlayer: Saved resume position at ${_position.inSeconds}s');
   }
   
   /// Attempt to reconnect a live stream that stopped
