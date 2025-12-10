@@ -240,6 +240,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     _clockTimer?.cancel();
     _controlsTimer?.cancel();
     _liveWatchdog?.cancel();
+    
+    // Stop playback first to prevent audio continuing in background
+    _player.stop();
     _player.dispose();
     _xtreamService?.dispose();
     
