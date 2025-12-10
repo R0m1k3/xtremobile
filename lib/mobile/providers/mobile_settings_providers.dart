@@ -122,24 +122,31 @@ final mobileSettingsProvider = StateNotifierProvider<MobileSettingsNotifier, Mob
 class MobileWatchHistory {
   final Set<String> watchedMovies;
   final Set<String> watchedEpisodes;
+  final Map<String, int> resumePositions; // streamId -> position in seconds
 
   const MobileWatchHistory({
     this.watchedMovies = const {},
     this.watchedEpisodes = const {},
+    this.resumePositions = const {},
   });
 
   MobileWatchHistory copyWith({
     Set<String>? watchedMovies,
     Set<String>? watchedEpisodes,
+    Map<String, int>? resumePositions,
   }) {
     return MobileWatchHistory(
       watchedMovies: watchedMovies ?? this.watchedMovies,
       watchedEpisodes: watchedEpisodes ?? this.watchedEpisodes,
+      resumePositions: resumePositions ?? this.resumePositions,
     );
   }
 
   bool isMovieWatched(String streamId) => watchedMovies.contains(streamId);
   bool isEpisodeWatched(String episodeKey) => watchedEpisodes.contains(episodeKey);
+  
+  /// Get resume position in seconds (0 if none saved)
+  int getResumePosition(String contentId) => resumePositions[contentId] ?? 0;
 
   static String episodeKey(dynamic seriesId, int season, int episodeNum) {
     return '$seriesId:$season:$episodeNum';
@@ -159,17 +166,23 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
     
     final movies = _box?.get('watchedMovies', defaultValue: <String>[]) as List?;
     final episodes = _box?.get('watchedEpisodes', defaultValue: <String>[]) as List?;
+    final positions = _box?.get('resumePositions', defaultValue: <String, dynamic>{}) as Map?;
     
     state = MobileWatchHistory(
       watchedMovies: movies?.cast<String>().toSet() ?? {},
       watchedEpisodes: episodes?.cast<String>().toSet() ?? {},
+      resumePositions: positions?.cast<String, int>() ?? {},
     );
   }
 
   void markMovieWatched(String streamId) {
     final updated = {...state.watchedMovies, streamId};
-    state = state.copyWith(watchedMovies: updated);
+    // Clear resume position when marked as fully watched
+    final positions = {...state.resumePositions};
+    positions.remove(streamId);
+    state = state.copyWith(watchedMovies: updated, resumePositions: positions);
     _box?.put('watchedMovies', updated.toList());
+    _box?.put('resumePositions', positions);
   }
 
   void toggleMovieWatched(String streamId) {
@@ -185,8 +198,30 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
 
   void markEpisodeWatched(String episodeKey) {
     final updated = {...state.watchedEpisodes, episodeKey};
-    state = state.copyWith(watchedEpisodes: updated);
+    // Clear resume position when marked as fully watched
+    final positions = {...state.resumePositions};
+    positions.remove(episodeKey);
+    state = state.copyWith(watchedEpisodes: updated, resumePositions: positions);
     _box?.put('watchedEpisodes', updated.toList());
+    _box?.put('resumePositions', positions);
+  }
+  
+  /// Save resume position for movie or episode
+  void saveResumePosition(String contentId, int positionSeconds) {
+    // Only save if position is meaningful (> 30 seconds and < 95% of typical content)
+    if (positionSeconds < 30) return;
+    
+    final positions = {...state.resumePositions, contentId: positionSeconds};
+    state = state.copyWith(resumePositions: positions);
+    _box?.put('resumePositions', positions);
+  }
+  
+  /// Clear resume position (when content finished or user wants to restart)
+  void clearResumePosition(String contentId) {
+    final positions = {...state.resumePositions};
+    positions.remove(contentId);
+    state = state.copyWith(resumePositions: positions);
+    _box?.put('resumePositions', positions);
   }
 }
 

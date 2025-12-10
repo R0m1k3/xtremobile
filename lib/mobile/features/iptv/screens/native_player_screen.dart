@@ -228,6 +228,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
   @override
   void dispose() {
+    // Save resume position before cleanup (only for VOD/Series)
+    _saveResumePositionOnExit();
+    
     _clockTimer?.cancel();
     _controlsTimer?.cancel();
     _liveWatchdog?.cancel();
@@ -244,6 +247,38 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     
     super.dispose();
+  }
+  
+  /// Get content ID for resume position storage
+  String get _contentId {
+    if (widget.streamType == StreamType.series && 
+        widget.seriesId != null && 
+        widget.season != null && 
+        widget.episodeNum != null) {
+      return MobileWatchHistory.episodeKey(widget.seriesId, widget.season!, widget.episodeNum!);
+    }
+    return widget.streamId;
+  }
+  
+  /// Save resume position when exiting player
+  void _saveResumePositionOnExit() {
+    if (widget.streamType == StreamType.live) return;
+    if (_duration.inSeconds <= 0) return;
+    
+    final progress = _position.inSeconds / _duration.inSeconds;
+    
+    // Don't save if almost finished (> 90%) or already marked as watched
+    if (progress > 0.90 || _hasMarkedAsWatched) {
+      ref.read(mobileWatchHistoryProvider.notifier).clearResumePosition(_contentId);
+      return;
+    }
+    
+    // Save position
+    ref.read(mobileWatchHistoryProvider.notifier).saveResumePosition(
+      _contentId, 
+      _position.inSeconds,
+    );
+    debugPrint('MediaKitPlayer: Saved resume position at ${_position.inSeconds}s');
   }
   
   /// Attempt to reconnect a live stream that stopped
@@ -392,6 +427,20 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       // Start watchdog for live streams
       if (widget.streamType == StreamType.live) {
         _startLiveWatchdog();
+      }
+      
+      // Resume from saved position (VOD/Series only)
+      if (widget.streamType != StreamType.live) {
+        final resumePos = ref.read(mobileWatchHistoryProvider).getResumePosition(_contentId);
+        if (resumePos > 30) {
+          // Wait for player to stabilize, then seek
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted && _isPlaying) {
+              debugPrint('MediaKitPlayer: Resuming from ${resumePos}s');
+              _player.seek(Duration(seconds: resumePos));
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('MediaKitPlayer error: $e');
