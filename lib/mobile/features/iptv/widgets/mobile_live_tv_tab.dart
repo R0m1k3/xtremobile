@@ -370,6 +370,10 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
     final iconUrl = widget.channel.streamIcon.isNotEmpty && widget.channel.streamIcon.startsWith('http') 
         ? widget.channel.streamIcon 
         : null;
+    
+    // Watch favorites state
+    final favorites = ref.watch(mobileFavoritesProvider);
+    final isFavorite = favorites.contains(widget.channel.streamId);
 
     return InkWell(
       onTap: widget.onTap,
@@ -431,6 +435,18 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
                     ),
                 ],
               ),
+            ),
+            // Favorite Button
+            IconButton(
+              icon: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.red : AppColors.textSecondary,
+              ),
+              onPressed: () {
+                ref.read(mobileFavoritesProvider.notifier).toggle(widget.channel.streamId);
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
             ),
             // Play Icon
             const Icon(Icons.play_circle_outline, color: AppColors.primary),
