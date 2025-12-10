@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import '../../../providers/mobile_settings_providers.dart';
+import '../../../widgets/tv_focusable.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../screens/mobile_playlist_selection_screen.dart';
