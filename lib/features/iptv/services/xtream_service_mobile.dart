@@ -23,17 +23,20 @@ class XtreamServiceMobile {
   Map<String, String>? _cachedVodCategories;
   Map<String, String>? _cachedSeriesCategories;
 
+  late final HiveCacheStore _cacheStore;
+
   XtreamServiceMobile(String cachePath) {
+    _cacheStore = HiveCacheStore(cachePath);
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
     ),);
 
-    // Setup caching for API responses
+    // Setup caching for API responses - 24h cache for VOD content
     _cacheOptions = CacheOptions(
-      store: HiveCacheStore(cachePath),
+      store: _cacheStore,
       policy: CachePolicy.forceCache,
-      maxStale: const Duration(hours: 1),
+      maxStale: const Duration(hours: 24), // Cache for 24h as requested
       priority: CachePriority.high,
     );
 
@@ -554,6 +557,21 @@ class XtreamServiceMobile {
     _cachedSeriesRaw = null;
     _cachedVodCategories = null;
     _cachedSeriesCategories = null;
+  }
+
+  /// Force refresh all cached data (clears both memory and Hive HTTP cache)
+  /// This will cause the next API calls to fetch fresh data from the server
+  Future<void> forceRefreshCache() async {
+    // Clear in-memory cache
+    clearCache();
+    
+    // Clear HTTP cache (Hive store)
+    try {
+      await _cacheStore.clean();
+      print('XtreamServiceMobile: Cache cleared successfully');
+    } catch (e) {
+      print('XtreamServiceMobile: Error clearing cache: $e');
+    }
   }
 
   /// Dispose resources

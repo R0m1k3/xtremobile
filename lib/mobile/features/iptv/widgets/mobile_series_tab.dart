@@ -214,17 +214,40 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          // Header & Search
+          // Hero Section (reduced height, moved above search)
+          if (_searchQuery.isEmpty && heroItems.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: SizedBox(
+                   height: 180, // Reduced from 250
+                   child: HeroCarousel(
+                     items: heroItems,
+                     onTap: (item) {
+                       try {
+                         final series = _series.firstWhere((s) => s.seriesId.toString() == item.id);
+                         _openSeries(series);
+                       } catch (e) {
+                         // Fallback logic not critical
+                       }
+                     },
+                   ),
+                ),
+              ),
+            ),
+
+          // Search Bar (moved below carousel)
           SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: GestureDetector(
-                  onTap: () {
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TVFocusable(
+                  onPressed: () {
                     setState(() => _isSearchEditing = true);
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       _searchFocusNode.requestFocus();
                     });
                   },
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
@@ -248,7 +271,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
                               readOnly: !_isSearchEditing,
                               style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
                               decoration: const InputDecoration(
-                                hintText: 'Search Series',
+                                hintText: 'Rechercher une série...',
                                 border: InputBorder.none,
                                 isDense: true,
                                 contentPadding: EdgeInsets.only(bottom: 11),
@@ -274,32 +297,6 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
                 ),
               ),
           ),
-
-          // Hero Section
-          if (_searchQuery.isEmpty && heroItems.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: SizedBox(
-                   height: 250,
-                   child: HeroCarousel(
-                     items: heroItems,
-                     onTap: (item) {
-                       // Find series by title fallback if ID logic differs (Series ID is int usually, Hero is Str)
-                       // But here we rely on passing the correct string ID or using the closure directly if possible.
-                       // HeroCarousel onTap returns HeroItem. 
-                       // We must map it back. 
-                       try {
-                         final series = _series.firstWhere((s) => s.seriesId.toString() == item.id);
-                         _openSeries(series);
-                       } catch (e) {
-                         // Fallback logic not critical for now, assume ID matches
-                       }
-                     },
-                   ),
-                ),
-              ),
-            ),
           
           // Grid
           SliverPadding(

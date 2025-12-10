@@ -437,7 +437,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                        ),
                      ),
                    ),
-                 Text('LITE PLAYER: $title', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                 Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                  const Spacer(),
                  Text(_currentTime, style: const TextStyle(color: Colors.white70)),
               ],
@@ -450,13 +450,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.streamType == StreamType.live) ...[
-                 IconButton(
-                   icon: const Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 40),
-                   onPressed: _playPrevious,
-                 ),
-                 const SizedBox(width: 32),
-              ] else ...[
+              // Replay 10s button only for VOD
+              if (widget.streamType != StreamType.live) ...[
                  IconButton(
                    icon: const Icon(Icons.replay_10, color: Colors.white, size: 40),
                    onPressed: () => _seek(const Duration(seconds: -10)),
@@ -474,13 +469,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                 ),
               ),
 
-              if (widget.streamType == StreamType.live) ...[
-                 const SizedBox(width: 32),
-                 IconButton(
-                   icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 40),
-                   onPressed: _playNext,
-                 ),
-              ] else ...[
+              // Forward 10s button only for VOD
+              if (widget.streamType != StreamType.live) ...[
                  const SizedBox(width: 32),
                  IconButton(
                    icon: const Icon(Icons.forward_10, color: Colors.white, size: 40),

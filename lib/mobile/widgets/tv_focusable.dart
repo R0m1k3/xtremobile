@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -5,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 class TVFocusable extends StatefulWidget {
   final Widget child;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
   final VoidCallback? onFocus;
   final FocusNode? focusNode;
   final bool autofocus;
@@ -12,11 +14,13 @@ class TVFocusable extends StatefulWidget {
   final double borderWidth;
   final Color focusColor;
   final BorderRadius? borderRadius;
+  final Duration longPressDuration;
 
   const TVFocusable({
     super.key,
     required this.child,
     this.onPressed,
+    this.onLongPress,
     this.onFocus,
     this.focusNode,
     this.autofocus = false,
@@ -24,6 +28,7 @@ class TVFocusable extends StatefulWidget {
     this.borderWidth = 3.0,
     this.focusColor = Colors.white,
     this.borderRadius,
+    this.longPressDuration = const Duration(seconds: 3),
   });
 
   @override
@@ -33,6 +38,9 @@ class TVFocusable extends StatefulWidget {
 class _TVFocusableState extends State<TVFocusable> {
   late FocusNode _node;
   bool _isFocused = false;
+  Timer? _longPressTimer;
+  bool _isKeyDown = false;
+  bool _longPressTriggered = false;
 
   @override
   void initState() {
@@ -43,6 +51,7 @@ class _TVFocusableState extends State<TVFocusable> {
 
   @override
   void dispose() {
+    _longPressTimer?.cancel();
     if (widget.focusNode == null) {
       _node.dispose();
     } else {
@@ -66,7 +75,7 @@ class _TVFocusableState extends State<TVFocusable> {
       if (!mounted) return;
       Scrollable.ensureVisible(
         context,
-        alignment: 0.5, // Center the item
+        alignment: 0.5,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -77,27 +86,60 @@ class _TVFocusableState extends State<TVFocusable> {
     widget.onPressed?.call();
   }
 
+  void _handleLongPress() {
+    widget.onLongPress?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Focus(
       focusNode: _node,
       autofocus: widget.autofocus,
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          final key = event.logicalKey;
-          if (key == LogicalKeyboardKey.select ||
-              key == LogicalKeyboardKey.enter ||
-              key == LogicalKeyboardKey.space ||
-              key == LogicalKeyboardKey.gameButtonA ||
-              key == LogicalKeyboardKey.numpadEnter) {
-            _handlePress();
-            return KeyEventResult.handled;
+        final key = event.logicalKey;
+        final isSelectKey = key == LogicalKeyboardKey.select ||
+            key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.space ||
+            key == LogicalKeyboardKey.gameButtonA ||
+            key == LogicalKeyboardKey.numpadEnter;
+
+        if (event is KeyDownEvent && isSelectKey) {
+          if (!_isKeyDown) {
+            _isKeyDown = true;
+            _longPressTriggered = false;
+            
+            // Start long press timer only if onLongPress is defined
+            if (widget.onLongPress != null) {
+              _longPressTimer?.cancel();
+              _longPressTimer = Timer(widget.longPressDuration, () {
+                if (_isKeyDown && mounted) {
+                  _longPressTriggered = true;
+                  _handleLongPress();
+                }
+              });
+            }
           }
+          return KeyEventResult.handled;
         }
+        
+        if (event is KeyUpEvent && isSelectKey) {
+          _longPressTimer?.cancel();
+          
+          // If long press wasn't triggered, it's a normal press
+          if (_isKeyDown && !_longPressTriggered) {
+            _handlePress();
+          }
+          
+          _isKeyDown = false;
+          _longPressTriggered = false;
+          return KeyEventResult.handled;
+        }
+        
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: _handlePress,
+        onLongPress: widget.onLongPress,
         child: TweenAnimationBuilder<double>(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
@@ -111,11 +153,11 @@ class _TVFocusableState extends State<TVFocusable> {
               child: Container(
                 foregroundDecoration: _isFocused
                     ? BoxDecoration(
+                        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
                         border: Border.all(
                           color: widget.focusColor,
                           width: widget.borderWidth,
                         ),
-                        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
                       )
                     : null,
                 child: child,

@@ -441,6 +441,9 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
 
     return TVFocusable(
       onPressed: widget.onTap,
+      onLongPress: () {
+        ref.read(mobileFavoritesProvider.notifier).toggle(widget.channel.streamId);
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -500,18 +503,12 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
                 ],
               ),
             ),
-            // Favorite Button
-            IconButton(
-              icon: Icon(
-                isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? Colors.red : AppColors.textSecondary,
+            // Favorite Indicator (no button, just icon)
+            if (isFavorite)
+              const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Icon(Icons.favorite, color: Colors.red, size: 20),
               ),
-              onPressed: () {
-                ref.read(mobileFavoritesProvider.notifier).toggle(widget.channel.streamId);
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            ),
             // Play Icon
             const Icon(Icons.play_circle_outline, color: AppColors.primary),
           ],

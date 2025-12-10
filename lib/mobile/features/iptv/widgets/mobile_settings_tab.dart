@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -20,6 +22,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   late TextEditingController _moviesController;
   late TextEditingController _seriesController;
   bool _initialized = false;
+  bool _isRefreshingCache = false;
 
   @override
   void initState() {
@@ -161,105 +164,143 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           // Playback Settings
           const _SectionHeader(title: 'Lecture Vidéo'),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
+          
+          // Player Engine
+          TVFocusable(
+            onPressed: () {},
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.rocket_launch, color: AppColors.primary),
+                title: const Text('Moteur Vidéo', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                subtitle: Text(
+                  settings.playerEngine == 'ultra' ? 'Ultra (MPV) - Puissant' : 'Lite (ExoPlayer) - Léger',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                trailing: DropdownButton<String>(
+                  value: settings.playerEngine,
+                  dropdownColor: AppColors.surface,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                  items: const [
+                    DropdownMenuItem(value: 'ultra', child: Text('Ultra', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 'lite', child: Text('Lite', style: TextStyle(color: AppColors.textPrimary))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      ref.read(mobileSettingsProvider.notifier).setPlayerEngine(val);
+                    }
+                  },
+                ),
+              ),
             ),
-            child: Column(
-              children: [
-                 ListTile(
-                  leading: const Icon(Icons.rocket_launch, color: AppColors.primary),
-                  title: const Text('Moteur Vidéo', 
-                    style: TextStyle(color: AppColors.textPrimary)),
-                  subtitle: Text(
-                    settings.playerEngine == 'ultra' ? 'Ultra (MPV) - Puissant' : 'Lite (ExoPlayer) - Léger',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                  trailing: DropdownButton<String>(
-                    value: settings.playerEngine,
-                    dropdownColor: AppColors.surface,
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                    items: const [
-                      DropdownMenuItem(value: 'ultra', child: Text('Ultra', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 'lite', child: Text('Lite', style: TextStyle(color: AppColors.textPrimary))),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        ref.read(mobileSettingsProvider.notifier).setPlayerEngine(val);
-                      }
-                    },
-                  ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Debug Stats
+          TVFocusable(
+            onPressed: () => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!settings.showDebugStats),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SwitchListTile(
+                title: const Text('Stats pour Nerds', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                subtitle: const Text('Infos techniques (FPS, Buffer)',
+                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                secondary: const Icon(Icons.bug_report, color: AppColors.primary),
+                value: settings.showDebugStats,
+                onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(val),
+                activeColor: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Decoder Mode
+          TVFocusable(
+            onPressed: () {},
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.memory, color: AppColors.primary),
+                title: const Text('Décodeur Vidéo', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                subtitle: Text(
+                  settings.decoderMode == 'auto' ? 'Automatique (Recommandé)' : 
+                  settings.decoderMode == 'mediacodec' ? 'Matériel (Hardware)' : 'Logiciel (Software)',
+                  style: const TextStyle(color: AppColors.textSecondary),
                 ),
-                Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.2)),
-                SwitchListTile(
-                  title: const Text('Stats pour Nerds', 
-                    style: TextStyle(color: AppColors.textPrimary)),
-                  subtitle: const Text('Infos techniques (FPS, Buffer)',
-                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                  secondary: const Icon(Icons.bug_report, color: AppColors.primary),
-                  value: settings.showDebugStats,
-                  onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(val),
-                  activeColor: AppColors.primary,
+                trailing: DropdownButton<String>(
+                  value: settings.decoderMode,
+                  dropdownColor: AppColors.surface,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                  items: const [
+                    DropdownMenuItem(value: 'auto', child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 'mediacodec', child: Text('Hardware', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 'no', child: Text('Software', style: TextStyle(color: AppColors.textPrimary))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      ref.read(mobileSettingsProvider.notifier).setDecoderMode(val);
+                    }
+                  },
                 ),
-                Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.2)),
-                ListTile(
-                  leading: const Icon(Icons.memory, color: AppColors.primary),
-                  title: const Text('Décodeur Vidéo', 
-                    style: TextStyle(color: AppColors.textPrimary)),
-                  subtitle: Text(
-                    settings.decoderMode == 'auto' ? 'Automatique (Recommandé)' : 
-                    settings.decoderMode == 'mediacodec' ? 'Matériel (Hardware)' : 'Logiciel (Software)',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                  trailing: DropdownButton<String>(
-                    value: settings.decoderMode,
-                    dropdownColor: AppColors.surface,
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                    items: const [
-                      DropdownMenuItem(value: 'auto', child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 'mediacodec', child: Text('Hardware', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 'no', child: Text('Software', style: TextStyle(color: AppColors.textPrimary))),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        ref.read(mobileSettingsProvider.notifier).setDecoderMode(val);
-                      }
-                    },
-                  ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Buffer Duration
+          TVFocusable(
+            onPressed: () {},
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.speed, color: AppColors.primary),
+                title: const Text('Mise en mémoire tampon (Cache)', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                subtitle: Text(
+                  settings.bufferDuration == 0 
+                    ? 'Auto (Défaut)' 
+                    : '${settings.bufferDuration} secondes',
+                  style: const TextStyle(color: AppColors.textSecondary),
                 ),
-                Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.2)),
-                ListTile(
-                  leading: const Icon(Icons.speed, color: AppColors.primary),
-                  title: const Text('Mise en mémoire tampon (Cache)', 
-                    style: TextStyle(color: AppColors.textPrimary)),
-                  subtitle: Text(
-                    settings.bufferDuration == 0 
-                      ? 'Auto (Défaut)' 
-                      : '${settings.bufferDuration} secondes',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                  trailing: DropdownButton<int>(
-                    value: settings.bufferDuration,
-                    dropdownColor: AppColors.surface,
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                    items: const [
-                      DropdownMenuItem(value: 0, child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 15, child: Text('15s', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 30, child: Text('30s', style: TextStyle(color: AppColors.textPrimary))),
-                      DropdownMenuItem(value: 60, child: Text('60s', style: TextStyle(color: AppColors.textPrimary))),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        ref.read(mobileSettingsProvider.notifier).setBufferDuration(val);
-                      }
-                    },
-                  ),
+                trailing: DropdownButton<int>(
+                  value: settings.bufferDuration,
+                  dropdownColor: AppColors.surface,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 15, child: Text('15s', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 30, child: Text('30s', style: TextStyle(color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 60, child: Text('60s', style: TextStyle(color: AppColors.textPrimary))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      ref.read(mobileSettingsProvider.notifier).setBufferDuration(val);
+                    }
+                  },
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -319,6 +360,85 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             ),
           ),
           const SizedBox(height: 24),
+
+          // Refresh Cache Section
+          const _SectionHeader(title: 'Cache'),
+          InkWell(
+            onTap: _isRefreshingCache ? null : () async {
+              setState(() => _isRefreshingCache = true);
+              
+              try {
+                // Clear the Hive HTTP cache directly
+                final dir = await getApplicationDocumentsDirectory();
+                final cacheStore = HiveCacheStore(dir.path);
+                await cacheStore.clean();
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Cache actualisé ! Relancez l\'application pour charger les nouvelles données.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isRefreshingCache = false);
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  _isRefreshingCache 
+                      ? const SizedBox(
+                          width: 24, 
+                          height: 24, 
+                          child: CircularProgressIndicator(strokeWidth: 2)
+                        )
+                      : const Icon(Icons.refresh, color: AppColors.primary),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Actualiser le cache',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Recharge les films, séries et EPG (cache 24h)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // Change Playlist
           InkWell(

@@ -238,17 +238,40 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
          controller: _scrollController,
          physics: const AlwaysScrollableScrollPhysics(),
          slivers: [
-           // Header & Search
+           // Hero Section (reduced height, moved above search)
+           if (_searchQuery.isEmpty && heroItems.isNotEmpty)
+             SliverToBoxAdapter(
+               child: Padding(
+                 padding: const EdgeInsets.only(top: 8, bottom: 8),
+                 child: SizedBox(
+                    height: 180, // Reduced from 250
+                    child: HeroCarousel(
+                      items: heroItems,
+                      onTap: (item) {
+                        try {
+                          final movie = _movies.firstWhere((element) => element.streamId == item.id);
+                          _playMovie(context, movie);
+                        } catch (e) {
+                          // Fallback ignored
+                        }
+                      },
+                    ),
+                 ),
+               ),
+             ),
+
+           // Search Bar (moved below carousel)
            SliverToBoxAdapter(
                child: Padding(
-                 padding: const EdgeInsets.all(16),
-                 child: GestureDetector(
-                   onTap: () {
+                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                 child: TVFocusable(
+                   onPressed: () {
                      setState(() => _isSearchEditing = true);
                      WidgetsBinding.instance.addPostFrameCallback((_) {
                        _searchFocusNode.requestFocus();
                      });
                    },
+                   borderRadius: BorderRadius.circular(12),
                    child: Container(
                      height: 40,
                      decoration: BoxDecoration(
@@ -272,7 +295,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
                                readOnly: !_isSearchEditing,
                                style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
                                decoration: const InputDecoration(
-                                 hintText: 'Search Movies',
+                                 hintText: 'Rechercher un film...',
                                  border: InputBorder.none,
                                  isDense: true,
                                  contentPadding: EdgeInsets.only(bottom: 11),
@@ -298,28 +321,6 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
                  ),
                ),
            ),
-
-           // Hero Section
-           if (_searchQuery.isEmpty && heroItems.isNotEmpty)
-             SliverToBoxAdapter(
-               child: Padding(
-                 padding: const EdgeInsets.only(bottom: 16),
-                 child: SizedBox(
-                    height: 250,
-                    child: HeroCarousel(
-                      items: heroItems,
-                      onTap: (item) {
-                        try {
-                          final movie = _movies.firstWhere((element) => element.streamId == item.id);
-                          _playMovie(context, movie);
-                        } catch (e) {
-                          // Fallback ignored
-                        }
-                      },
-                    ),
-                 ),
-               ),
-             ),
            
            // Grid
            SliverPadding(

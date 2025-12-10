@@ -36,13 +36,13 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 
-  /// Apple TV Style Background Gradient (Lighter Grey for categories)
+  /// Apple TV Style Background Gradient (Visible gradient)
   static const RadialGradient appleTvGradient = RadialGradient(
     center: Alignment.center,
-    radius: 2.0,
+    radius: 1.5,
     colors: [
-      Color(0xFF3A3A3C), // Lighter Apple Gray
-      Color(0xFF1C1C1E), // Dark Gray (not pure black)
+      Color(0xFF2A2A2C), // Medium Gray center (visible)
+      Color(0xFF0A0A0A), // Near Black edge
     ],
     stops: [0.0, 1.0],
   );
