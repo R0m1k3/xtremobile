@@ -233,14 +233,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Pause when app goes to background
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _player.pause();
-    }
-  }
-
-  @override
   void deactivate() {
     // Stop player when widget is being removed from tree
     _player.stop();
