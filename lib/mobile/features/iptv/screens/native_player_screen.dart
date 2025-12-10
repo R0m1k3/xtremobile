@@ -115,28 +115,32 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
     (_player.platform as dynamic)?.setProperty('hwdec', 'auto');
     
-    // Reverted to Basic Configuration (Stock MPV) for maximum stability
-    // The previous advanced caching was causing streams to cut off after ~30s.
-    // We only enable basic cache and let MPV handle the rest automatically.
+    // ============ OPTIMIZED STREAM STABILITY CONFIGURATION ============
+    // Aggressive buffering and reconnection for stable live TV playback
     
-    // Reliable Network Configuration (Fix for 30s cutoff)
-    // - Increase timeout significantly
-    // - Allow large cache duration (not just bytes)
-    // - Disable SSL verification to prevent handshake drops
-    // - Enable reconnect
-    
-    // Reliable Network Configuration (Fix for stream cutoff)
+    // Large cache for smooth playback
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
-    (_player.platform as dynamic)?.setProperty('cache-secs', '120'); // Cache up to 2 minutes
-    (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '50000000'); // 50MB max buffer
-    (_player.platform as dynamic)?.setProperty('network-timeout', '60'); // 1 minute timeout
+    (_player.platform as dynamic)?.setProperty('cache-secs', '300'); // Cache up to 5 minutes
+    (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB max buffer
+    (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '75000000'); // 75MB back buffer
+    (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes'); // Wait for cache before playing
+    (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3'); // Wait 3s minimum cache
+    
+    // Network resilience
+    (_player.platform as dynamic)?.setProperty('network-timeout', '120'); // 2 minute timeout
+    (_player.platform as dynamic)?.setProperty('stream-timeout', '120'); // 2 minute stream timeout
     (_player.platform as dynamic)?.setProperty('tls-verify', 'no'); // Ignore SSL errors
     (_player.platform as dynamic)?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
     
-    // Additional stability options for live streams
-    (_player.platform as dynamic)?.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5');
+    // Aggressive reconnection for live streams
+    (_player.platform as dynamic)?.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_on_http_error=4xx,reconnect_delay_max=10');
     (_player.platform as dynamic)?.setProperty('force-seekable', 'yes');
-    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o', 'live_start_index=-1');
+    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o', 'live_start_index=-1,analyzeduration=10000000,probesize=10000000');
+    
+    // Prevent stalls
+    (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '60'); // Read 60s ahead
+    (_player.platform as dynamic)?.setProperty('hr-seek', 'yes'); // High-res seeking
+    (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes'); // Drop frames to catch up
     
     _controller = VideoController(_player);
     
