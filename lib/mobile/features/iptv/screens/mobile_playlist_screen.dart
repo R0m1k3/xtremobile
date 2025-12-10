@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -229,37 +230,28 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     TextInputType? keyboardType,
     TextInputAction? textAction,
     VoidCallback? onSubmitted,
-    bool autofocus = false,
-    FocusNode? focusNode,
+    FocusNode? focusNode, // This is now the "navigation" focus
   }) {
-    return TextField(
+    // Create a dedicated internal focus node for the actual TextField
+    // We don't expose this, allowing us to control when the keyboard opens
+    
+    // Since we are inside a stateless method but need state for focus nodes if we want to create them on the fly...
+    // Actually, to avoid State complexity, we will trust the passed 'focusNode' is for NAVIGATION.
+    // And we will use a LayoutBuilder + Stateful wrapper or just a customized Focus widget.
+    
+    return _TVTextField(
       controller: controller,
-      focusNode: focusNode,
+      label: label,
+      hint: hint,
+      icon: icon,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      textInputAction: textAction,
-      onSubmitted: (_) => onSubmitted?.call(),
-      autofocus: autofocus,
-      style: const TextStyle(color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: AppColors.textSecondary),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-        hintStyle: const TextStyle(color: AppColors.textTertiary),
-        filled: true,
-        fillColor: AppColors.background,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary),
-        ),
-      ),
+      textAction: textAction,
+      onSubmitted: onSubmitted,
+      navigationFocus: focusNode,
     );
   }
+
 
   void _showOptionsSheet(PlaylistConfig playlist) {
     showModalBottomSheet(
@@ -538,6 +530,129 @@ class _PlaylistCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TVTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final TextInputAction? textAction;
+  final VoidCallback? onSubmitted;
+  final FocusNode? navigationFocus;
+
+  const _TVTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.obscureText = false,
+    this.keyboardType,
+    this.textAction,
+    this.onSubmitted,
+    this.navigationFocus,
+  });
+
+  @override
+  State<_TVTextField> createState() => _TVTextFieldState();
+}
+
+class _TVTextFieldState extends State<_TVTextField> {
+  late FocusNode _inputFocus;
+  late FocusNode _navFocus;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _inputFocus = FocusNode();
+    _navFocus = widget.navigationFocus ?? FocusNode();
+    
+    // When input loses focus (keyboard closed), return to nav focus
+    _inputFocus.addListener(() {
+      if (!_inputFocus.hasFocus && _isEditing) {
+        setState(() => _isEditing = false);
+        _navFocus.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _inputFocus.dispose();
+    if (widget.navigationFocus == null) _navFocus.dispose();
+    super.dispose();
+  }
+
+  void _activateInput() {
+    setState(() => _isEditing = true);
+    _inputFocus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _navFocus,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.select || 
+              event.logicalKey == LogicalKeyboardKey.enter || 
+              event.logicalKey == LogicalKeyboardKey.space) {
+            _activateInput();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Builder(
+        builder: (context) {
+          final isFocused = Focus.of(context).hasFocus;
+          return GestureDetector(
+            onTap: _activateInput,
+            child: Container(
+              decoration: BoxDecoration(
+                border: isFocused ? Border.all(color: AppColors.primary, width: 2) : null,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _inputFocus,
+                obscureText: widget.obscureText,
+                keyboardType: widget.keyboardType,
+                textInputAction: widget.textAction,
+                onSubmitted: (_) {
+                   setState(() => _isEditing = false);
+                   // Give focus back to nav node first so we can move to next
+                   _navFocus.requestFocus(); 
+                   widget.onSubmitted?.call();
+                },
+                style: const TextStyle(color: AppColors.textPrimary),
+                // Important: Disable standard focus behavior to prevent keyboard popup
+                // unless we explicitly requested it via _activateInput
+                canRequestFocus: _isEditing, 
+                decoration: InputDecoration(
+                  labelText: widget.label,
+                  hintText: widget.hint,
+                  prefixIcon: Icon(widget.icon, color: isFocused ? AppColors.primary : AppColors.textSecondary),
+                  labelStyle: TextStyle(color: isFocused ? AppColors.primary : AppColors.textSecondary),
+                  hintStyle: const TextStyle(color: AppColors.textTertiary),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+          );
+        }
       ),
     );
   }
