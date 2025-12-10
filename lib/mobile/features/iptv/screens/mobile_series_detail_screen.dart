@@ -205,29 +205,36 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
         SliverToBoxAdapter(
           child: SizedBox(
             height: 50,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              itemCount: _seriesInfo!.episodes.keys.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final seasonNum = _seriesInfo!.episodes.keys.elementAt(index);
-                final isSelected = seasonNum == _selectedSeason;
-                return ChoiceChip(
-                  label: Text('Season $seasonNum'),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedSeason = seasonNum);
+            child: Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _seriesInfo!.episodes.keys.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final seasonNum = _seriesInfo!.episodes.keys.elementAt(index);
+                    final isSelected = seasonNum == _selectedSeason;
+                    return ChoiceChip(
+                      label: Text('Season $seasonNum'),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _selectedSeason = seasonNum);
+                      },
+                      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
+                      selectedColor: isDark ? Colors.white : Colors.blue,
+                      labelStyle: TextStyle(
+                        color: isSelected 
+                            ? (isDark ? Colors.black : Colors.white)
+                            : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      showCheckmark: false,
+                      side: BorderSide.none,
+                    );
                   },
-                  backgroundColor: AppColors.surface,
-                  selectedColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  showCheckmark: false,
-                  side: BorderSide.none,
                 );
               },
             ),
