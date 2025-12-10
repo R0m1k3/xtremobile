@@ -49,6 +49,13 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     final usernameController = TextEditingController(text: playlist?.username ?? '');
     final passwordController = TextEditingController(text: playlist?.password ?? '');
 
+    // Focus nodes for TV navigation
+    final nameFocus = FocusNode();
+    final dnsFocus = FocusNode();
+    final usernameFocus = FocusNode();
+    final passwordFocus = FocusNode();
+    final buttonFocus = FocusNode();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -61,85 +68,106 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textTertiary,
-                    borderRadius: BorderRadius.circular(2),
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(), // Ensure logical order
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView( // Ensure scrolling when keyboard/focus moves
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textTertiary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Title
-              Text(
-                isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Form fields
-              _buildTextField(
-                controller: nameController,
-                label: 'Nom',
-                hint: 'Ma Playlist IPTV',
-                icon: Icons.label_outline,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: dnsController,
-                label: 'Serveur URL',
-                hint: 'http://example.com:8080',
-                icon: Icons.dns_outlined,
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: usernameController,
-                label: 'Nom d\'utilisateur',
-                hint: 'username',
-                icon: Icons.person_outline,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: passwordController,
-                label: 'Mot de passe',
-                hint: '••••••••',
-                icon: Icons.lock_outline,
-                obscureText: true,
-              ),
-              const SizedBox(height: 32),
-              
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    if (nameController.text.isEmpty ||
-                        dnsController.text.isEmpty ||
-                        usernameController.text.isEmpty ||
-                        passwordController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Veuillez remplir tous les champs'),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                      return;
-                    }
+                  const SizedBox(height: 24),
+                  
+                  // Title
+                  Text(
+                    isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Form fields
+                  _buildTextField(
+                    controller: nameController,
+                    label: 'Nom',
+                    hint: 'Ma Playlist IPTV',
+                    icon: Icons.label_outline,
+                    textAction: TextInputAction.next,
+                    onSubmitted: () => FocusScope.of(context).requestFocus(dnsFocus),
+                    autofocus: !isEditing, // Auto-focus first field when adding
+                    focusNode: nameFocus,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: dnsController,
+                    label: 'Serveur URL',
+                    hint: 'http://example.com:8080',
+                    icon: Icons.dns_outlined,
+                    keyboardType: TextInputType.url,
+                    textAction: TextInputAction.next,
+                    onSubmitted: () => FocusScope.of(context).requestFocus(usernameFocus),
+                    focusNode: dnsFocus,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: usernameController,
+                    label: 'Nom d\'utilisateur',
+                    hint: 'username',
+                    icon: Icons.person_outline,
+                    textAction: TextInputAction.next,
+                    onSubmitted: () => FocusScope.of(context).requestFocus(passwordFocus),
+                    focusNode: usernameFocus,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: passwordController,
+                    label: 'Mot de passe',
+                    hint: '••••••••',
+                    icon: Icons.lock_outline,
+                    obscureText: true,
+                    textAction: TextInputAction.done,
+                    onSubmitted: () => FocusScope.of(context).requestFocus(buttonFocus),
+                    focusNode: passwordFocus,
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Save button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      focusNode: buttonFocus,
+                      onPressed: () async {
+                        if (nameController.text.isEmpty ||
+                            dnsController.text.isEmpty ||
+                            usernameController.text.isEmpty ||
+                            passwordController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Veuillez remplir tous les champs'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                          return;
+                        }
 
                     // Auto-fix URL scheme
                     String dns = dnsController.text.trim();
@@ -188,6 +216,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
           ),
         ),
       ),
+      ),
+      ),
     );
   }
 
@@ -198,11 +228,19 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     required IconData icon,
     bool obscureText = false,
     TextInputType? keyboardType,
+    TextInputAction? textAction,
+    VoidCallback? onSubmitted,
+    bool autofocus = false,
+    FocusNode? focusNode,
   }) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      textInputAction: textAction,
+      onSubmitted: (_) => onSubmitted?.call(),
+      autofocus: autofocus,
       style: const TextStyle(color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
