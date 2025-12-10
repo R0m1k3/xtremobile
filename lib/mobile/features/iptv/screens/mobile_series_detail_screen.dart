@@ -261,6 +261,14 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
       episode.episodeNum,
     );
     final isWatched = watchHistory.isEpisodeWatched(episodeKey);
+    
+    // Use theme colors for proper light/dark mode support
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final secondaryTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final surfaceColor = isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade200;
+    final primaryColor = isDark ? Colors.white : Colors.blue;
 
     return InkWell(
       onTap: () {
@@ -283,8 +291,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.white10)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
         ),
         child: Row(
           children: [
@@ -293,13 +301,13 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isWatched ? AppColors.primary : AppColors.surface,
+                color: isWatched ? primaryColor : surfaceColor,
                 shape: BoxShape.circle,
-                border: isWatched ? null : Border.all(color: AppColors.primary, width: 2),
+                border: isWatched ? null : Border.all(color: primaryColor, width: 2),
               ),
               child: Icon(
                 isWatched ? Icons.check : Icons.play_arrow,
-                color: isWatched ? Colors.white : AppColors.primary,
+                color: isWatched ? (isDark ? Colors.black : Colors.white) : primaryColor,
                 size: 20,
               ),
             ),
@@ -311,7 +319,7 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                   Text(
                     'E${episode.episodeNum} - ${episode.title}',
                     style: TextStyle(
-                      color: isWatched ? AppColors.textSecondary : AppColors.textPrimary,
+                      color: isWatched ? secondaryTextColor : textColor,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -321,7 +329,7 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                   if (episode.durationSecs != null && episode.durationSecs! > 0)
                     Text(
                       _formatDuration(episode.durationSecs!),
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
                     ),
                 ],
               ),
