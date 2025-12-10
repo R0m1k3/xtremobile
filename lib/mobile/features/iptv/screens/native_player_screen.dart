@@ -51,7 +51,7 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<NativePlayerScreen> createState() => _NativePlayerScreenState();
 }
 
-class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
+class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with WidgetsBindingObserver {
   late final Player _player;
   late final VideoController _controller;
   bool _isLoading = true;
@@ -92,6 +92,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Register lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
+    
     // Register keyboard handler for remote control
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     
@@ -230,7 +233,25 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Pause when app goes to background
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _player.pause();
+    }
+  }
+
+  @override
+  void deactivate() {
+    // Stop player when widget is being removed from tree
+    _player.stop();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+    
     // Unregister keyboard handler
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     
