@@ -109,7 +109,6 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     icon: Icons.label_outline,
                     textAction: TextInputAction.next,
                     onSubmitted: () => FocusScope.of(context).requestFocus(dnsFocus),
-                    autofocus: !isEditing, // Auto-focus first field when adding
                     focusNode: nameFocus,
                   ),
                   
