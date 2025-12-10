@@ -591,7 +591,11 @@ class _TVTextFieldState extends State<_TVTextField> {
 
   void _activateInput() {
     setState(() => _isEditing = true);
-    _inputFocus.requestFocus();
+    // Wait for the widget to rebuild with canRequestFocus: true
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inputFocus.requestFocus();
+      SystemChannels.textInput.invokeMethod('TextInput.show');
+    });
   }
 
   @override
@@ -600,9 +604,12 @@ class _TVTextFieldState extends State<_TVTextField> {
       focusNode: _navFocus,
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.select || 
-              event.logicalKey == LogicalKeyboardKey.enter || 
-              event.logicalKey == LogicalKeyboardKey.space) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select || 
+              key == LogicalKeyboardKey.enter || 
+              key == LogicalKeyboardKey.space ||
+              key == LogicalKeyboardKey.gameButtonA ||
+              key == LogicalKeyboardKey.numpadEnter) {
             _activateInput();
             return KeyEventResult.handled;
           }
