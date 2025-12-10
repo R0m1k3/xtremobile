@@ -18,7 +18,7 @@ class MobileMoviesTab extends ConsumerStatefulWidget {
   ConsumerState<MobileMoviesTab> createState() => _MobileMoviesTabState();
 }
 
-class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
+class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final List<Movie> _movies = [];
@@ -28,7 +28,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
   bool _isSearching = false;
   bool _hasMore = true;
   int _currentOffset = 0;
-  static const int _pageSize = 500; // Large page size to prevent infinite scroll bugs if offset logic is flawed
+  static const int _pageSize = 50; 
   Timer? _searchDebounce;
 
   @override
@@ -99,34 +99,49 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
 
     try {
       final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      
+      // Add timeout to prevent infinite loading state
       final newMovies = await service.getMoviesPaginated(
         offset: _currentOffset,
         limit: _pageSize,
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() {
-          if (newMovies.isEmpty) {
-            _hasMore = false;
-          } else {
-            _movies.addAll(newMovies);
-            _currentOffset += _pageSize;
-            // If we got fewer movies than requested, we reached the end
-            if (newMovies.length < _pageSize) {
-              _hasMore = false;
-            }
-          }
+          _movies.addAll(newMovies);
+          _currentOffset += _pageSize;
+          _hasMore = newMovies.length == _pageSize;
           _isLoading = false;
         });
       }
     } catch (e) {
+      debugPrint('Error loading movies: $e');
       if (mounted) {
-        setState(() { 
-          _isLoading = false; 
-          _hasMore = false; // Stop trying on error to prevent infinite loop
-        }); 
+        setState(() {
+          _isLoading = false;
+          // Do NOT set _hasMore to false on error
+        });
       }
     }
+  }
+
+  Future<void> _refresh() async {
+    // Clear service cache to force fresh data
+    try {
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      service.clearCache();
+    } catch (_) {}
+    
+    setState(() {
+      _movies.clear();
+      _currentOffset = 0;
+      _hasMore = true;
+      _searchResults = null;
+      _searchQuery = '';
+      _searchController.clear();
+      _isLoading = false;
+    });
+    await _loadMoreMovies();
   }
 
   String? _formatRating(String? rating) {
@@ -162,7 +177,11 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final settings = ref.watch(mobileSettingsProvider);
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
     
@@ -186,8 +205,13 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
 
     return SafeArea(
       bottom: false,
-      child: CustomScrollView(
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        child: CustomScrollView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // Header & Search
           SliverToBoxAdapter(
@@ -234,18 +258,22 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
             ),
           ),
 
-          // Hero Section (Only if not searching)
+          // Hero Section
           if (_searchQuery.isEmpty && heroItems.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: SizedBox(
-                   height: 250, // Reduced height for mobile hero
+                   height: 250,
                    child: HeroCarousel(
                      items: heroItems,
                      onTap: (item) {
-                       final movie = _movies.firstWhere((element) => element.streamId == item.id);
-                       _playMovie(movie);
+                       try {
+                         final movie = _movies.firstWhere((element) => element.streamId == item.id);
+                         _playMovie(movie);
+                       } catch (e) {
+                         // Fallback ignored
+                       }
                      },
                    ),
                 ),
@@ -253,18 +281,17 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
             ),
           
           // Grid
-          if (displayMovies.isNotEmpty)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8, 
-                  childAspectRatio: 0.7, 
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 8, 
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.7,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
                   if (index >= displayMovies.length) return null;
                   final movie = displayMovies[index];
                   final isWatched = watchHistory.isMovieWatched(movie.streamId);
@@ -295,6 +322,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

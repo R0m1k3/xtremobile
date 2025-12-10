@@ -17,6 +17,12 @@ class XtreamServiceMobile {
   String? _resolvedIp; // Cached resolved IP for the playlist server
   String? _originalHost; // Original hostname for Host header
 
+  // In-memory cache for pagination performance
+  List<dynamic>? _cachedMoviesRaw;
+  List<dynamic>? _cachedSeriesRaw;
+  Map<String, String>? _cachedVodCategories;
+  Map<String, String>? _cachedSeriesCategories;
+
   XtreamServiceMobile(String cachePath) {
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
@@ -282,25 +288,31 @@ class XtreamServiceMobile {
     }
   }
 
-  /// Get movies with pagination support
+  /// Get movies with pagination support (uses in-memory cache for performance)
   Future<List<xm.Movie>> getMoviesPaginated({int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
-      // Load categories for mapping
-      final categoryMap = await _getVodCategories();
+      // Load from cache or fetch from API
+      if (_cachedMoviesRaw == null) {
+        // First load: fetch from API and cache
+        _cachedVodCategories ??= await _getVodCategories();
 
-      final response = await _dio.get(
-        _effectiveApiBaseUrl,
-        queryParameters: {
-          'username': _currentPlaylist!.username,
-          'password': _currentPlaylist!.password,
-          'action': 'get_vod_streams',
-        },
-        options: _getOptions(),
-      );
+        final response = await _dio.get(
+          _effectiveApiBaseUrl,
+          queryParameters: {
+            'username': _currentPlaylist!.username,
+            'password': _currentPlaylist!.password,
+            'action': 'get_vod_streams',
+          },
+          options: _getOptions(),
+        );
 
-      final List<dynamic> allMovies = response.data as List<dynamic>;
+        _cachedMoviesRaw = response.data as List<dynamic>;
+      }
+
+      final allMovies = _cachedMoviesRaw!;
+      final categoryMap = _cachedVodCategories!;
       
       // Apply pagination
       final endIndex = (offset + limit) > allMovies.length ? allMovies.length : offset + limit;
@@ -309,7 +321,7 @@ class XtreamServiceMobile {
       final paginatedMovies = allMovies.sublist(offset, endIndex);
       
       return paginatedMovies.map((movieData) {
-        final data = movieData as Map<String, dynamic>;
+        final data = Map<String, dynamic>.from(movieData as Map<String, dynamic>);
         final categoryId = data['category_id']?.toString() ?? '';
         data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
         return xm.Movie.fromJson(data);
@@ -359,25 +371,31 @@ class XtreamServiceMobile {
     }
   }
 
-  /// Get series with pagination support (returns flat list)
+  /// Get series with pagination support (uses in-memory cache for performance)
   Future<List<xm.Series>> getSeriesPaginated({int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
-      // Load categories for mapping
-      final categoryMap = await _getSeriesCategories();
+      // Load from cache or fetch from API
+      if (_cachedSeriesRaw == null) {
+        // First load: fetch from API and cache
+        _cachedSeriesCategories ??= await _getSeriesCategories();
 
-      final response = await _dio.get(
-        _effectiveApiBaseUrl,
-        queryParameters: {
-          'username': _currentPlaylist!.username,
-          'password': _currentPlaylist!.password,
-          'action': 'get_series',
-        },
-        options: _getOptions(),
-      );
+        final response = await _dio.get(
+          _effectiveApiBaseUrl,
+          queryParameters: {
+            'username': _currentPlaylist!.username,
+            'password': _currentPlaylist!.password,
+            'action': 'get_series',
+          },
+          options: _getOptions(),
+        );
 
-      final List<dynamic> allSeries = response.data as List<dynamic>;
+        _cachedSeriesRaw = response.data as List<dynamic>;
+      }
+
+      final allSeries = _cachedSeriesRaw!;
+      final categoryMap = _cachedSeriesCategories!;
       
       // Apply pagination
       final endIndex = (offset + limit) > allSeries.length ? allSeries.length : offset + limit;
@@ -386,7 +404,7 @@ class XtreamServiceMobile {
       final paginatedSeries = allSeries.sublist(offset, endIndex);
       
       return paginatedSeries.map((seriesData) {
-        final data = seriesData as Map<String, dynamic>;
+        final data = Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
         final categoryId = data['category_id']?.toString() ?? '';
         data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
         return xm.Series.fromJson(data);
@@ -530,8 +548,17 @@ class XtreamServiceMobile {
     }
   }
 
+  /// Clear in-memory cache (call on refresh)
+  void clearCache() {
+    _cachedMoviesRaw = null;
+    _cachedSeriesRaw = null;
+    _cachedVodCategories = null;
+    _cachedSeriesCategories = null;
+  }
+
   /// Dispose resources
   void dispose() {
+    clearCache();
     _dio.close();
   }
 }

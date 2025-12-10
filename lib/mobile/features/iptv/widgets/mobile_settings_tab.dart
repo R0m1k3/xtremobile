@@ -157,6 +157,48 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           ),
           const SizedBox(height: 24),
 
+          // Playback Settings
+          const _SectionHeader(title: 'Lecture Vidéo'),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.speed, color: AppColors.primary),
+                  title: const Text('Mise en mémoire tampon (Cache)', 
+                    style: TextStyle(color: AppColors.textPrimary)),
+                  subtitle: Text(
+                    settings.bufferDuration == 0 
+                      ? 'Auto (Défaut)' 
+                      : '${settings.bufferDuration} secondes',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  trailing: DropdownButton<int>(
+                    value: settings.bufferDuration,
+                    dropdownColor: AppColors.surface,
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                    items: const [
+                      DropdownMenuItem(value: 0, child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
+                      DropdownMenuItem(value: 15, child: Text('15s', style: TextStyle(color: AppColors.textPrimary))),
+                      DropdownMenuItem(value: 30, child: Text('30s', style: TextStyle(color: AppColors.textPrimary))),
+                      DropdownMenuItem(value: 60, child: Text('60s', style: TextStyle(color: AppColors.textPrimary))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        ref.read(mobileSettingsProvider.notifier).setBufferDuration(val);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
           // Content Filters
           const _SectionHeader(title: 'Filtres de Contenu'),
           Container(

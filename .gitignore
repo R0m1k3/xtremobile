@@ -49,3 +49,5 @@ app.*.map.json
 # Hive data (local development)
 *.hive
 *.lock
+
+releases/

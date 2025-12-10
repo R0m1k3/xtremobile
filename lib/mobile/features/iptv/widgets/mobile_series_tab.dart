@@ -18,7 +18,7 @@ class MobileSeriesTab extends ConsumerStatefulWidget {
   ConsumerState<MobileSeriesTab> createState() => _MobileSeriesTabState();
 }
 
-class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
+class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final List<Series> _series = [];
@@ -99,10 +99,12 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
 
     try {
       final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      
+      // Add timeout to prevent infinite loading state
       final newSeries = await service.getSeriesPaginated(
         offset: _currentOffset,
         limit: _pageSize,
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() {
@@ -113,10 +115,33 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
         });
       }
     } catch (e) {
+      debugPrint('Error loading series: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          // Do NOT set _hasMore to false on error
+        });
       }
     }
+  }
+
+  Future<void> _refresh() async {
+    // Clear service cache to force fresh data
+    try {
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      service.clearCache();
+    } catch (_) {}
+    
+    setState(() {
+      _series.clear();
+      _currentOffset = 0;
+      _hasMore = true;
+      _searchResults = null;
+      _searchQuery = '';
+      _searchController.clear();
+      _isLoading = false;
+    });
+    await _loadMoreSeries();
   }
 
   String? _formatRating(String? rating) {
@@ -147,7 +172,11 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final settings = ref.watch(mobileSettingsProvider);
     
     List<Series> displaySeries;
@@ -170,8 +199,13 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
 
     return SafeArea(
       bottom: false,
-      child: CustomScrollView(
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        child: CustomScrollView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // Header & Search
           SliverToBoxAdapter(
@@ -282,6 +316,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

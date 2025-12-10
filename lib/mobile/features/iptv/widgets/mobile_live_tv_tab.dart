@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../providers/mobile_settings_providers.dart';
@@ -19,7 +20,7 @@ class MobileLiveTVTab extends ConsumerStatefulWidget {
   ConsumerState<MobileLiveTVTab> createState() => _MobileLiveTVTabState();
 }
 
-class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> {
+class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with AutomaticKeepAliveClientMixin {
   String? _selectedCategory;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -44,7 +45,11 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> {
   bool _isCategoryView = true;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final channelsAsync = ref.watch(mobileLiveChannelsProvider(widget.playlist));
     final favorites = ref.watch(mobileFavoritesProvider);
     final settings = ref.watch(mobileSettingsProvider);
@@ -214,7 +219,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 8, // Drastically reduced size as requested
+        crossAxisCount: 6, // Adjusted to 6 columns as requested
         childAspectRatio: 1.0,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
@@ -386,10 +391,11 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: iconUrl != null
-                  ? Image.network(
-                      iconUrl, 
+                  ? CachedNetworkImage(
+                      imageUrl: iconUrl,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.tv, color: Colors.white24),
+                      errorWidget: (_, __, ___) => const Icon(Icons.tv, color: Colors.white24),
+                      placeholder: (_, __) => const Icon(Icons.tv, color: Colors.white24),
                     )
                   : const Icon(Icons.tv, color: Colors.white24),
             ),

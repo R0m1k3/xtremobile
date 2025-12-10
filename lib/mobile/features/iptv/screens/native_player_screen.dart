@@ -55,9 +55,27 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _isSeeking = false;
+  bool _useSoftwareDecoder = false;
 
   Timer? _clockTimer;
+  Timer? _controlsTimer; // Auto-hide timer
   String _currentTime = '';
+
+  void _resetControlsTimer() {
+    _controlsTimer?.cancel();
+    if (_showControls && _isPlaying) {
+      _controlsTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() => _showControls = false);
+        }
+      });
+    }
+  }
+
+  void _onUserInteraction() {
+    setState(() => _showControls = true);
+    _resetControlsTimer();
+  }
 
   @override
   void initState() {
@@ -79,12 +97,40 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
     (_player.platform as dynamic)?.setProperty('hwdec', 'auto');
     
+    // Reverted to Basic Configuration (Stock MPV) for maximum stability
+    // The previous advanced caching was causing streams to cut off after ~30s.
+    // We only enable basic cache and let MPV handle the rest automatically.
+    
+    // Reliable Network Configuration (Fix for 30s cutoff)
+    // - Increase timeout significantly
+    // - Allow large cache duration (not just bytes)
+    // - Disable SSL verification to prevent handshake drops
+    // - Enable reconnect
+    
+    // Reliable Network Configuration (Fix for 30s cutoff)
+    (_player.platform as dynamic)?.setProperty('cache', 'yes');
+    (_player.platform as dynamic)?.setProperty('cache-secs', '120'); // Cache up to 2 minutes
+    (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '50000000'); // 50MB max buffer
+    (_player.platform as dynamic)?.setProperty('network-timeout', '120'); // 2 minutes timeout
+    (_player.platform as dynamic)?.setProperty('tls-verify', 'no'); // Ignore SSL errors
+    (_player.platform as dynamic)?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
+    
     _controller = VideoController(_player);
     
     // Listen to player state
     _player.stream.playing.listen((playing) {
       if (mounted) {
         setState(() => _isPlaying = playing);
+        if (playing) {
+          // Smooth Loading: Hide loading screen 1s AFTER playback actually starts
+          // This masks initial glitches/re-buffering
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted && _isPlaying) {
+               setState(() => _isLoading = false);
+            }
+          });
+          _resetControlsTimer(); // Start auto-hide timer
+        }
       }
     });
 
@@ -100,13 +146,31 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       }
     });
     
-    _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty) {
-        setState(() {
-          _errorMessage = error;
-          _isLoading = false;
-        });
+    _player.stream.error.listen((error) async {
+      if (!mounted) return;
+      
+      // Filter out non-errors or non-fatal messages if necessary
+      if (error.isEmpty) return;
+
+      debugPrint('MediaKitPlayer Error Stream: $error');
+
+      // Smart Retry for Codec/Decoder errors
+      // If we haven't tried SW decoding yet, retry with it enabled.
+      if (!_useSoftwareDecoder) {
+        debugPrint('MediaKitPlayer: Error encountered. Auto-retrying with Software Decoding...');
+        setState(() => _useSoftwareDecoder = true);
+        
+        // Short delay to allow player cleanup
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) _loadStream(); // Retry connection
+        return;
       }
+
+      // If SW decoding was already on or failed too, show error
+      setState(() {
+        _errorMessage = error;
+        _isLoading = false;
+      });
     });
     
     // Lock to landscape for video playback
@@ -137,6 +201,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _controlsTimer?.cancel();
     _player.dispose();
     _xtreamService?.dispose();
     
@@ -211,6 +276,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
       debugPrint('MediaKitPlayer: Loading stream: $streamUrl');
 
+      // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
+      // If we are in fallback mode, force software ('no')
+      (_player.platform as dynamic)?.setProperty('hwdec', _useSoftwareDecoder ? 'no' : 'auto');
+
       await _player.open(
         Media(streamUrl, httpHeaders: {'User-Agent': 'XtremFlow/1.0'}),
         play: true,
@@ -218,9 +287,24 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
       setState(() {
         _isLoading = false;
+        // Reset fallback flag on success? No, keep it if it works to avoid future crashes on same stream
       });
     } catch (e) {
       debugPrint('MediaKitPlayer error: $e');
+      
+      // Automatic Retry with Software Decoding if it fails the first time
+      if (!_useSoftwareDecoder) {
+        debugPrint('MediaKitPlayer: Retrying with Software Decoding forced...');
+        setState(() {
+          _useSoftwareDecoder = true;
+          // _isLoading remains true
+        });
+        // Delay slightly to let player reset state if needed
+        await Future.delayed(const Duration(milliseconds: 500));
+        _loadStream(); // Recursive retry
+        return;
+      }
+
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -264,12 +348,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     } else {
       _player.play();
     }
+    _onUserInteraction();
   }
 
   void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-    });
+    // Always show controls on tap, then start auto-hide timer
+    if (!_showControls) {
+      setState(() => _showControls = true);
+    }
+    _resetControlsTimer();
   }
 
 
@@ -286,14 +373,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
+        onPanDown: (_) => _onUserInteraction(),
+        onPanUpdate: (_) => _onUserInteraction(),
         child: Stack(
           children: [
             // Video Player
             if (_errorMessage != null)
               _buildErrorView()
-            else if (_isLoading)
-              _buildLoadingView()
             else
               Center(
                 child: Video(
@@ -301,6 +389,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
                   controls: NoVideoControls, // We use our own custom controls
                 ),
               ),
+
+             // Loading Overlay (Stays on top until smooth playback starts)
+             // We moved _buildLoadingView out of the if/else chain above to overlay it
+             if (_isLoading && _errorMessage == null)
+               Container(
+                 color: Colors.black,
+                 child: _buildLoadingView(),
+               ),
 
             // Custom controls overlay
             if (_showControls && _errorMessage == null && !_isLoading)
@@ -637,7 +733,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
                 label: const Text('Réessayer'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Colors.black,
                 ),
               ),
             ],
