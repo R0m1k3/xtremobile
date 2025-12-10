@@ -87,7 +87,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     _controlsTimer?.cancel();
     _startClock(); // Ensure clock runs when controls are shown
     if (_showControls && _isPlaying) {
-      _controlsTimer = Timer(const Duration(seconds: 10), () {
+      _controlsTimer = Timer(const Duration(seconds: 5), () {
         if (mounted) {
           setState(() => _showControls = false);
           _stopClock(); // Save CPU when hidden
@@ -651,7 +651,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
       if (_showControls) return false; // Let Focus handle navigation
       
       if (widget.streamType != StreamType.live) {
-        final newPos = _position - const Duration(seconds: 10);
+        final newPos = _position - const Duration(seconds: 5);
         _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
         _onUserInteraction();
       }
@@ -663,7 +663,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
       if (_showControls) return false; // Let Focus handle navigation
 
       if (widget.streamType != StreamType.live) {
-        final newPos = _position + const Duration(seconds: 10);
+        final newPos = _position + const Duration(seconds: 5);
         if (newPos < _duration) {
           _player.seek(newPos);
         }
@@ -868,7 +868,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                       focusNode: _prevFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
-                        _player.seek(pos - const Duration(seconds: 10));
+                        _player.seek(pos - const Duration(seconds: 5));
                         _resetControlsTimer();
                       },
                       onFocus: _resetControlsTimer,
@@ -877,7 +877,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                         icon: const Icon(Icons.replay_10, color: Colors.white, size: 48),
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
-                          _player.seek(pos - const Duration(seconds: 10));
+                          _player.seek(pos - const Duration(seconds: 5));
                         },
                       ),
                     ),
@@ -920,7 +920,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                       focusNode: _nextFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
-                        _player.seek(pos + const Duration(seconds: 10));
+                        _player.seek(pos + const Duration(seconds: 5));
                         _resetControlsTimer();
                       },
                       onFocus: _resetControlsTimer,
@@ -929,7 +929,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                         icon: const Icon(Icons.forward_10, color: Colors.white, size: 48),
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
-                          _player.seek(pos + const Duration(seconds: 10));
+                          _player.seek(pos + const Duration(seconds: 5));
                         },
                       ),
                     ),
@@ -1027,6 +1027,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                               value: _position.inSeconds.toDouble().clamp(0, _duration.inSeconds.toDouble()),
                               min: 0,
                               max: _duration.inSeconds.toDouble(),
+                              // Add divisions for precise seeking (1 step = 10 seconds)
+                              divisions: _duration.inSeconds > 0 ? (_duration.inSeconds / 10).ceil() : null,
                               activeColor: AppColors.primary,
                               inactiveColor: Colors.white24,
                               onChangeStart: (_) => _isSeeking = true,
