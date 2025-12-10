@@ -626,23 +626,26 @@ class _TVTextFieldState extends State<_TVTextField> {
                 border: isFocused ? Border.all(color: AppColors.primary, width: 2) : null,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: TextField(
-                controller: widget.controller,
-                focusNode: _inputFocus,
-                obscureText: widget.obscureText,
-                keyboardType: widget.keyboardType,
-                textInputAction: widget.textAction,
-                onSubmitted: (_) {
-                   setState(() => _isEditing = false);
-                   // Give focus back to nav node first so we can move to next
-                   _navFocus.requestFocus(); 
-                   widget.onSubmitted?.call();
-                },
-                style: const TextStyle(color: AppColors.textPrimary),
-                // Important: Disable standard focus behavior to prevent keyboard popup
-                // unless we explicitly requested it via _activateInput
-                canRequestFocus: _isEditing, 
-                decoration: InputDecoration(
+              // Ignore standard focus traversal to child, only allow programatic focus
+              child: ExcludeFocus(
+                excluding: !_isEditing,
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _inputFocus,
+                  // Prevent keyboard if somehow focused while not editing
+                  readOnly: !_isEditing, 
+                  showCursor: _isEditing,
+                  obscureText: widget.obscureText,
+                  keyboardType: widget.keyboardType,
+                  textInputAction: widget.textAction,
+                  onSubmitted: (_) {
+                     setState(() => _isEditing = false);
+                     // Give focus back to nav node first so we can move to next
+                     _navFocus.requestFocus(); 
+                     widget.onSubmitted?.call();
+                  },
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
                   labelText: widget.label,
                   hintText: widget.hint,
                   prefixIcon: Icon(widget.icon, color: isFocused ? AppColors.primary : AppColors.textSecondary),
@@ -657,6 +660,7 @@ class _TVTextFieldState extends State<_TVTextField> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
               ),
+            ),
             ),
           );
         }
