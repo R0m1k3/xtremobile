@@ -28,6 +28,23 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
   void initState() {
     super.initState();
     _playlistService.init();
+    
+    // Auto-login: if playlists exist, navigate to first one automatically
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoLogin();
+    });
+  }
+
+  Future<void> _checkAutoLogin() async {
+    try {
+      final playlists = await _playlistService.getPlaylists();
+      if (playlists.isNotEmpty && mounted) {
+        // Navigate to first playlist automatically
+        _navigateToDashboard(playlists.first);
+      }
+    } catch (e) {
+      debugPrint('Auto-login check failed: $e');
+    }
   }
 
   void _refreshPlaylists() {
