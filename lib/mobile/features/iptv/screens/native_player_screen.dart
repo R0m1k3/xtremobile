@@ -300,6 +300,17 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       if (_isPlaying && _duration.inSeconds > 0) {
         debugPrint('MediaKitPlayer: Seeking to resume position ${positionSeconds}s (attempt $attempt)');
         _player.seek(Duration(seconds: positionSeconds));
+        
+        // Show visual notification
+        final minutes = positionSeconds ~/ 60;
+        final seconds = positionSeconds % 60;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
       } else {
         debugPrint('MediaKitPlayer: Player not ready, retrying resume seek (attempt $attempt)');
         _seekToResume(positionSeconds, attempt + 1);
