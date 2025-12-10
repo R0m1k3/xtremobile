@@ -124,7 +124,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB max buffer
     (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '75000000'); // 75MB back buffer
     (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes'); // Wait for cache before playing
-    (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3'); // Wait 3s minimum cache
+    (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5'); // Wait 5s minimum cache
     
     // Network resilience
     (_player.platform as dynamic)?.setProperty('network-timeout', '120'); // 2 minute timeout
