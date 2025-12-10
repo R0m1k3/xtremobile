@@ -59,6 +59,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
   Timer? _clockTimer;
   Timer? _controlsTimer; // Auto-hide timer
+  Timer? _liveWatchdog; // Watchdog for live stream reconnection
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
   String _currentTime = '';
 
   void _resetControlsTimer() {
@@ -107,13 +110,18 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     // - Disable SSL verification to prevent handshake drops
     // - Enable reconnect
     
-    // Reliable Network Configuration (Fix for 30s cutoff)
+    // Reliable Network Configuration (Fix for stream cutoff)
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
     (_player.platform as dynamic)?.setProperty('cache-secs', '120'); // Cache up to 2 minutes
     (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '50000000'); // 50MB max buffer
-    (_player.platform as dynamic)?.setProperty('network-timeout', '120'); // 2 minutes timeout
+    (_player.platform as dynamic)?.setProperty('network-timeout', '60'); // 1 minute timeout
     (_player.platform as dynamic)?.setProperty('tls-verify', 'no'); // Ignore SSL errors
     (_player.platform as dynamic)?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
+    
+    // Additional stability options for live streams
+    (_player.platform as dynamic)?.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5');
+    (_player.platform as dynamic)?.setProperty('force-seekable', 'yes');
+    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o', 'live_start_index=-1');
     
     _controller = VideoController(_player);
     
@@ -173,6 +181,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       });
     });
     
+    // Listen for stream completion (live streams shouldn't complete - means it stopped)
+    _player.stream.completed.listen((completed) {
+      if (completed && mounted && widget.streamType == StreamType.live) {
+        debugPrint('MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...');
+        _attemptReconnect();
+      }
+    });
+    
     // Lock to landscape for video playback
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -202,6 +218,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   void dispose() {
     _clockTimer?.cancel();
     _controlsTimer?.cancel();
+    _liveWatchdog?.cancel();
     _player.dispose();
     _xtreamService?.dispose();
     
@@ -215,6 +232,45 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     
     super.dispose();
+  }
+  
+  /// Attempt to reconnect a live stream that stopped
+  void _attemptReconnect() {
+    if (!mounted) return;
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      setState(() {
+        _errorMessage = 'Flux interrompu après plusieurs tentatives';
+        _isLoading = false;
+      });
+      return;
+    }
+    
+    _reconnectAttempts++;
+    debugPrint('MediaKitPlayer: Reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts');
+    
+    // Delay before reconnect to avoid hammering the server
+    Future.delayed(Duration(seconds: 2 * _reconnectAttempts), () {
+      if (mounted) {
+        _loadStream();
+      }
+    });
+  }
+  
+  /// Start watchdog timer for live streams
+  void _startLiveWatchdog() {
+    _liveWatchdog?.cancel();
+    if (widget.streamType != StreamType.live) return;
+    
+    // Check every 30 seconds if stream is still playing
+    _liveWatchdog = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      
+      // If we're supposedly playing but position hasn't changed, reconnect
+      if (!_isPlaying && !_isLoading && _errorMessage == null) {
+        debugPrint('MediaKitPlayer: Watchdog detected stalled stream, reconnecting...');
+        _attemptReconnect();
+      }
+    });
   }
   
   // Update build method to show clock in top bar
@@ -287,8 +343,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
       setState(() {
         _isLoading = false;
-        // Reset fallback flag on success? No, keep it if it works to avoid future crashes on same stream
+        _reconnectAttempts = 0; // Reset reconnect counter on success
       });
+      
+      // Start watchdog for live streams
+      if (widget.streamType == StreamType.live) {
+        _startLiveWatchdog();
+      }
     } catch (e) {
       debugPrint('MediaKitPlayer error: $e');
       
