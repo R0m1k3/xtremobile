@@ -264,7 +264,7 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
 
     return InkWell(
       onTap: () {
-        ref.read(mobileWatchHistoryProvider.notifier).markEpisodeWatched(episodeKey);
+        // Watch progress is tracked in player at 80% completion
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -274,6 +274,9 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
               playlist: widget.playlist,
               streamType: StreamType.series,
               containerExtension: episode.containerExtension ?? 'mkv',
+              seriesId: widget.series.seriesId,
+              season: _selectedSeason,
+              episodeNum: episode.episodeNum,
             ),
           ),
         );

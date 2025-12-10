@@ -160,8 +160,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
   }
 
   void _playMovie(Movie movie) {
-    ref.read(mobileWatchHistoryProvider.notifier).markMovieWatched(movie.streamId);
-    
+    // Watch progress is tracked in player at 80% completion
     Navigator.push(
       context,
       MaterialPageRoute(

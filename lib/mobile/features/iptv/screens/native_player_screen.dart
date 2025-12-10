@@ -27,6 +27,11 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
   final List<Channel>? channels;
   final int initialIndex;
+  
+  // For series episodes (to track watch history)
+  final dynamic seriesId;
+  final int? season;
+  final int? episodeNum;
 
   const NativePlayerScreen({
     super.key,
@@ -37,6 +42,9 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
     this.containerExtension,
     this.channels,
     this.initialIndex = 0,
+    this.seriesId,
+    this.season,
+    this.episodeNum,
   });
 
   @override
@@ -63,6 +71,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   String _currentTime = '';
+  bool _hasMarkedAsWatched = false; // Flag to mark watched only once at 80%
 
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
@@ -145,6 +154,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     _player.stream.position.listen((position) {
       if (mounted && !_isSeeking) {
         setState(() => _position = position);
+        
+        // Check if 80% of content watched (for VOD/Series only)
+        _checkAndMarkWatched(position);
       }
     });
 
@@ -254,6 +266,37 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
         _loadStream();
       }
     });
+  }
+  
+  /// Check if 80% of content watched and mark as watched
+  void _checkAndMarkWatched(Duration position) {
+    // Skip if already marked, live TV, or no duration
+    if (_hasMarkedAsWatched) return;
+    if (widget.streamType == StreamType.live) return;
+    if (_duration.inSeconds <= 0) return;
+    
+    final progress = position.inSeconds / _duration.inSeconds;
+    
+    if (progress >= 0.80) {
+      _hasMarkedAsWatched = true;
+      debugPrint('MediaKitPlayer: 80% reached, marking as watched');
+      
+      if (widget.streamType == StreamType.vod) {
+        // Mark movie as watched
+        ref.read(mobileWatchHistoryProvider.notifier).markMovieWatched(widget.streamId);
+      } else if (widget.streamType == StreamType.series && 
+                 widget.seriesId != null && 
+                 widget.season != null && 
+                 widget.episodeNum != null) {
+        // Mark episode as watched
+        final episodeKey = MobileWatchHistory.episodeKey(
+          widget.seriesId,
+          widget.season!,
+          widget.episodeNum!,
+        );
+        ref.read(mobileWatchHistoryProvider.notifier).markEpisodeWatched(episodeKey);
+      }
+    }
   }
   
   /// Start watchdog timer for live streams
