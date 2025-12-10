@@ -9,7 +9,7 @@ class SettingsApiService {
     // Restore token from localStorage before making the request
     _api.restoreToken();
     
-    if (_api.getStoredToken() == null) {
+    if (_api.getToken() == null) {
       print('[SettingsAPI] getSettings: No auth token found');
       return null;
     }
@@ -38,7 +38,7 @@ class SettingsApiService {
     // Restore token from localStorage before making the request
     _api.restoreToken();
     
-    if (_api.getStoredToken() == null) {
+    if (_api.getToken() == null) {
       print('[SettingsAPI] saveSettings: No auth token found');
       return false;
     }

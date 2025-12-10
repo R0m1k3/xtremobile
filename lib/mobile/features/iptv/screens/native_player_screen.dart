@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:xtremflow/core/models/iptv_models.dart';
 import 'package:xtremflow/core/models/playlist_config.dart';
@@ -54,6 +55,13 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
 class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with WidgetsBindingObserver {
   late final Player _player;
   late final VideoController _controller;
+
+  // Focus Nodes
+  final FocusNode _playPauseFocusNode = FocusNode();
+  final FocusNode _prevFocusNode = FocusNode();
+  final FocusNode _nextFocusNode = FocusNode();
+  final FocusNode _backFocusNode = FocusNode();
+
   bool _isLoading = true;
   String? _errorMessage;
   late int _currentIndex;
@@ -73,12 +81,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
   String _currentTime = '';
   bool _hasMarkedAsWatched = false; // Flag to mark watched only once at 80%
 
+
+
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
+    _startClock(); // Ensure clock runs when controls are shown
     if (_showControls && _isPlaying) {
       _controlsTimer = Timer(const Duration(seconds: 10), () {
         if (mounted) {
           setState(() => _showControls = false);
+          _stopClock(); // Save CPU when hidden
         }
       });
     }
@@ -113,29 +125,37 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     _player = Player(configuration: config);
     
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
-    (_player.platform as dynamic)?.setProperty('hwdec', 'auto');
+    final decoderMode = ref.read(mobileSettingsProvider).decoderMode;
+    (_player.platform as dynamic)?.setProperty('hwdec', decoderMode);
+    debugPrint('MediaKitPlayer: Decoder Mode set to $decoderMode');
     
-    // ============ OPTIMIZED STREAM STABILITY CONFIGURATION ============
-    // Aggressive buffering and reconnection for stable live TV playback
+    // ============ PERFORMANCE 2.0 (LOW MEMORY 1GB PROFILE) ============
+    // Tuned for Low-End Android TV hardware (1GB RAM Sticks)
+    // Goal: Prevent OOM Kills & Crashes
     
-    // Large cache for smooth playback
+    // 50MB Cache = ~1 min of HD stream. Critical for 1GB RAM.
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
-    (_player.platform as dynamic)?.setProperty('cache-secs', '300'); // Cache up to 5 minutes
-    (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB max buffer
-    (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '75000000'); // 75MB back buffer
-    (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes'); // Wait for cache before playing
-    (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5'); // Wait 5s minimum cache
+    (_player.platform as dynamic)?.setProperty('cache-secs', '60'); // 1 minute cache
+    (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '50000000'); // 50MB buffer
+    (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '10000000'); // 10MB back buffer
+    (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
+    (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3'); // Shorter wait to start 
+
+    // Standard Processing (Hardware handles it)
+    (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
+    (_player.platform as dynamic)?.setProperty('interpolation', 'no'); // Keep off for safety
+    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.5'); // Standard audio buffer
     
     // Network resilience
-    (_player.platform as dynamic)?.setProperty('network-timeout', '120'); // 2 minute timeout
-    (_player.platform as dynamic)?.setProperty('stream-timeout', '120'); // 2 minute stream timeout
-    (_player.platform as dynamic)?.setProperty('tls-verify', 'no'); // Ignore SSL errors
+    (_player.platform as dynamic)?.setProperty('network-timeout', '120');
+    (_player.platform as dynamic)?.setProperty('stream-timeout', '120');
+    (_player.platform as dynamic)?.setProperty('tls-verify', 'no');
     (_player.platform as dynamic)?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
     
-    // Aggressive reconnection for live streams
-    (_player.platform as dynamic)?.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_on_http_error=4xx,reconnect_delay_max=10');
+    // Live Stream optimizations
+    (_player.platform as dynamic)?.setProperty('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5');
     (_player.platform as dynamic)?.setProperty('force-seekable', 'yes');
-    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o', 'live_start_index=-1,analyzeduration=10000000,probesize=10000000');
+    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o', 'live_start_index=-1'); // Removed large probesize
     
     // Prevent stalls
     (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '60'); // Read 60s ahead
@@ -223,8 +243,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
   }
 
   void _startClock() {
+    if (_clockTimer != null && _clockTimer!.isActive) return;
     _updateTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
+  }
+
+  void _stopClock() {
+    _clockTimer?.cancel();
+    _clockTimer = null;
   }
 
   void _updateTime() {
@@ -271,6 +297,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    
+    // Dispose focus nodes
+    _playPauseFocusNode.dispose();
+    _prevFocusNode.dispose();
+    _nextFocusNode.dispose();
+    _backFocusNode.dispose();
     
     super.dispose();
   }
@@ -475,7 +507,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
 
       // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
       // If we are in fallback mode, force software ('no')
-      (_player.platform as dynamic)?.setProperty('hwdec', _useSoftwareDecoder ? 'no' : 'auto');
+      String hwdecValue;
+      if (_useSoftwareDecoder) {
+         hwdecValue = 'no';
+      } else {
+         hwdecValue = ref.read(mobileSettingsProvider).decoderMode;
+      }
+      (_player.platform as dynamic)?.setProperty('hwdec', hwdecValue);
 
       await _player.open(
         Media(streamUrl, httpHeaders: {'User-Agent': 'XtremFlow/1.0'}),
@@ -566,6 +604,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     // Always show controls on tap, then start auto-hide timer
     if (!_showControls) {
       setState(() => _showControls = true);
+      // Request focus on Play/Pause button when opening
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // If controls opened, default to Play/Pause
+        _playPauseFocusNode.requestFocus();
+      });
     }
     _resetControlsTimer();
   }
@@ -576,16 +619,37 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     
     final key = event.logicalKey;
     
-    // Space / Enter / Select - Toggle play/pause
+    // Space / Enter / Select
     if (key == LogicalKeyboardKey.space ||
         key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.select) {
-      _togglePlayPause();
-      return true;
+        key == LogicalKeyboardKey.select || 
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.gameButtonA) {
+      // If controls are hidden, toggle them + play/pause
+      if (!_showControls) {
+        _togglePlayPause();
+        _toggleControls();
+        return true;
+      }
+      // If controls are visible, let Focus system handle button press
+      return false;
+    }
+    
+    // Debug Toggle: Long Press Key 'D' or 0 (if mapped) - Simplified to just a secret key combo?
+    // Let's use a long-press logic on Select in _handleKeyEvent?
+    // Actually, handling long press in key down is hard. 
+    // We'll add a 'Debug' button in the settings or just map Key '0' if remote has it.
+    // Debug Toggle: Long Press Key 'D' or 0 (if mapped)
+    if (key == LogicalKeyboardKey.digit0) {
+       final current = ref.read(mobileSettingsProvider).showDebugStats;
+       ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!current);
+       return true;
     }
     
     // Left Arrow - Seek back 10 seconds
     if (key == LogicalKeyboardKey.arrowLeft) {
+      if (_showControls) return false; // Let Focus handle navigation
+      
       if (widget.streamType != StreamType.live) {
         final newPos = _position - const Duration(seconds: 10);
         _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
@@ -596,6 +660,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     
     // Right Arrow - Seek forward 10 seconds
     if (key == LogicalKeyboardKey.arrowRight) {
+      if (_showControls) return false; // Let Focus handle navigation
+
       if (widget.streamType != StreamType.live) {
         final newPos = _position + const Duration(seconds: 10);
         if (newPos < _duration) {
@@ -625,7 +691,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     // Escape / Back - Exit player
     if (key == LogicalKeyboardKey.escape ||
         key == LogicalKeyboardKey.goBack) {
-      Navigator.of(context).pop();
+      // If controls are visible, close them first
+      if (_showControls) {
+        setState(() => _showControls = false);
+      } else {
+        Navigator.of(context).pop();
+      }
       return true;
     }
     
@@ -683,22 +754,33 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                 child: SafeArea(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.8),
-                          Colors.transparent,
-                        ],
-                      ),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54, // Flat color instead of Gradient for performance
                     ),
                     child: Row(
                       children: [
                         // Main Back Button
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
+                        // Main Back Button
+                        TVFocusable(
+                           focusNode: _backFocusNode,
+                           onPressed: () => Navigator.pop(context),
+                           onFocus: _resetControlsTimer,
+                           borderRadius: BorderRadius.circular(50),
+                           child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                        // Hidden Debug Trigger (Invisible InkWell next to back button)
+                        InkWell(
+                          onLongPress: () {
+                             final current = ref.read(mobileSettingsProvider).showDebugStats;
+                             ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!current);
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               SnackBar(content: Text('Debug Mode: ${!current ? "ON" : "OFF"}'), duration: const Duration(seconds: 1)),
+                             );
+                          },
+                           child: const SizedBox(width: 20, height: 40), 
                         ),
                         Expanded(
                           child: Column(
@@ -734,11 +816,19 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                   ),
                 ),
               ),
+
+             // Stats Overlay (Top Left) - Isolated to prevent main rebuilds
+             Positioned(
+               top: 80,
+               left: 16,
+               child: StatsOverlayWidget(player: _player),
+             ),
           ],
         ),
       ),
     );
   }
+
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -763,46 +853,85 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
                 children: [
                   // Prev Channel / Replay 10s
                   if (widget.streamType == StreamType.live && widget.channels != null && widget.channels!.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.skip_previous, color: Colors.white, size: 48),
+                    TVFocusable(
+                      focusNode: _prevFocusNode,
                       onPressed: _playPrevious,
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.skip_previous, color: Colors.white, size: 48),
+                        onPressed: _playPrevious,
+                      ),
                     )
                   else if (widget.streamType != StreamType.live)
-                    IconButton(
-                      icon: const Icon(Icons.replay_10, color: Colors.white, size: 48),
+                    TVFocusable(
+                      focusNode: _prevFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
                         _player.seek(pos - const Duration(seconds: 10));
+                        _resetControlsTimer();
                       },
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.replay_10, color: Colors.white, size: 48),
+                        onPressed: () async {
+                          final pos = await _player.stream.position.first;
+                          _player.seek(pos - const Duration(seconds: 10));
+                        },
+                      ),
                     ),
 
                   const SizedBox(width: 32),
                   
                   // Play/Pause
-                  IconButton(
-                    iconSize: 72,
-                    icon: Icon(
-                      _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                      color: Colors.white,
-                    ),
+                  TVFocusable(
+                    focusNode: _playPauseFocusNode,
                     onPressed: _togglePlayPause,
+                    onFocus: _resetControlsTimer,
+                    scale: 1.1, // Larger scale for main button
+                    borderRadius: BorderRadius.circular(50),
+                    child: IconButton(
+                      iconSize: 72,
+                      icon: Icon(
+                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        color: Colors.white,
+                      ),
+                      onPressed: _togglePlayPause,
+                    ),
                   ),
                   
                   const SizedBox(width: 32),
 
                   // Next Channel / Forward 10s
                   if (widget.streamType == StreamType.live && widget.channels != null && widget.channels!.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.skip_next, color: Colors.white, size: 48),
+                    TVFocusable(
+                      focusNode: _nextFocusNode,
                       onPressed: _playNext,
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.skip_next, color: Colors.white, size: 48),
+                        onPressed: _playNext,
+                      ),
                     )
                   else if (widget.streamType != StreamType.live)
-                    IconButton(
-                      icon: const Icon(Icons.forward_10, color: Colors.white, size: 48),
+                    TVFocusable(
+                      focusNode: _nextFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
                         _player.seek(pos + const Duration(seconds: 10));
+                        _resetControlsTimer();
                       },
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.forward_10, color: Colors.white, size: 48),
+                        onPressed: () async {
+                          final pos = await _player.stream.position.first;
+                          _player.seek(pos + const Duration(seconds: 10));
+                        },
+                      ),
                     ),
                 ],
               ),
@@ -1010,6 +1139,73 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Isolated Stats Widget to prevent rebuilding the entire Video Player on every update
+class StatsOverlayWidget extends ConsumerStatefulWidget {
+  final Player player;
+  const StatsOverlayWidget({super.key, required this.player});
+
+  @override
+  ConsumerState<StatsOverlayWidget> createState() => _StatsOverlayWidgetState();
+}
+
+class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
+  Duration _buffer = Duration.zero;
+  String _decoder = 'Unknown';
+  
+  // Throttling updates
+  Timer? _updateTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Use a periodic timer to poll/update stats instead of listening to every single frequent event
+    // This reduces UI thread load significantly on low-end devices
+    _updateTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
+      if (mounted) {
+         setState(() {
+           _buffer = widget.player.state.buffer;
+           // Accessing nested prop safely just in case
+           final track = widget.player.state.track.video;
+           _decoder = track.decoder ?? 'Auto'; 
+         });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!ref.watch(mobileSettingsProvider).showDebugStats) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('STATS FOR NERDS 🤓', 
+            style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text('Buffer: ${_buffer.inSeconds}s', 
+            style: const TextStyle(color: Colors.white, fontSize: 12)),
+          Text('Decoder: $_decoder', 
+            style: const TextStyle(color: Colors.white, fontSize: 12)),
         ],
       ),
     );

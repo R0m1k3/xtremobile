@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../features/iptv/models/xtream_models.dart';
+import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import 'native_player_screen.dart';
@@ -104,7 +105,7 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
       slivers: [
         // App Bar with Cover
         SliverAppBar(
-          expandedHeight: 400,
+          expandedHeight: 280, // Reduced from 400 for better TV visibility
           pinned: true,
           backgroundColor: AppColors.background,
           leading: Container(
@@ -280,21 +281,41 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
     return InkWell(
       onTap: () {
         // Watch progress is tracked in player at 80% completion
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => NativePlayerScreen(
-              streamId: episode.id,
-              title: '${widget.series.name} - ${episode.title}',
-              playlist: widget.playlist,
-              streamType: StreamType.series,
-              containerExtension: episode.containerExtension ?? 'mkv',
-              seriesId: widget.series.seriesId,
-              season: _selectedSeason,
-              episodeNum: episode.episodeNum,
-            ),
-          ),
-        );
+          final engine = ref.read(mobileSettingsProvider).playerEngine;
+          
+          if (engine == 'lite') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LitePlayerScreen(
+                  streamId: episode.streamId,
+                  title: "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
+                  playlist: widget.playlist,
+                  streamType: StreamType.series,
+                  containerExtension: episode.containerExtension ?? 'mp4',
+                  seriesId: widget.series.seriesId,
+                  season: episode.seasonNum,
+                  episodeNum: episode.episodeNum,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NativePlayerScreen(
+                  streamId: episode.streamId,
+                  title: "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
+                  playlist: widget.playlist,
+                  streamType: StreamType.series,
+                  containerExtension: episode.containerExtension ?? 'mp4',
+                  seriesId: widget.series.seriesId,
+                  season: episode.seasonNum,
+                  episodeNum: episode.episodeNum,
+                ),
+              ),
+            );
+          }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

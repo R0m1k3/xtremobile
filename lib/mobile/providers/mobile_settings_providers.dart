@@ -9,6 +9,9 @@ class MobileSettings {
   final List<String> moviesKeywords;
   final List<String> seriesKeywords;
   final bool showClock;
+  final bool showDebugStats;
+  final String decoderMode; // 'auto', 'mediacodec' (HW), 'no' (SW)
+  final String playerEngine; // 'ultra' (MPV), 'lite' (ExoPlayer)
   final int bufferDuration; // seconds, 0 = auto
 
   const MobileSettings({
@@ -16,6 +19,9 @@ class MobileSettings {
     this.moviesKeywords = const [],
     this.seriesKeywords = const [],
     this.showClock = false,
+    this.showDebugStats = false,
+    this.decoderMode = 'auto',
+    this.playerEngine = 'ultra',
     this.bufferDuration = 0,
   });
 
@@ -24,6 +30,9 @@ class MobileSettings {
     List<String>? moviesKeywords,
     List<String>? seriesKeywords,
     bool? showClock,
+    bool? showDebugStats,
+    String? decoderMode,
+    String? playerEngine,
     int? bufferDuration,
   }) {
     return MobileSettings(
@@ -31,6 +40,9 @@ class MobileSettings {
       moviesKeywords: moviesKeywords ?? this.moviesKeywords,
       seriesKeywords: seriesKeywords ?? this.seriesKeywords,
       showClock: showClock ?? this.showClock,
+      showDebugStats: showDebugStats ?? this.showDebugStats,
+      decoderMode: decoderMode ?? this.decoderMode,
+      playerEngine: playerEngine ?? this.playerEngine,
       bufferDuration: bufferDuration ?? this.bufferDuration,
     );
   }
@@ -78,6 +90,9 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
     final movies = _box?.get('moviesKeywords', defaultValue: <String>[]) as List?;
     final series = _box?.get('seriesKeywords', defaultValue: <String>[]) as List?;
     final showClock = _box?.get('showClock', defaultValue: false) as bool?;
+    final showDebugStats = _box?.get('showDebugStats', defaultValue: false) as bool?;
+    final decoderMode = _box?.get('decoderMode', defaultValue: 'auto') as String?;
+    final playerEngine = _box?.get('playerEngine', defaultValue: 'ultra') as String?;
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
     
     state = MobileSettings(
@@ -85,6 +100,9 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
       moviesKeywords: movies?.cast<String>() ?? [],
       seriesKeywords: series?.cast<String>() ?? [],
       showClock: showClock ?? false,
+      showDebugStats: showDebugStats ?? false,
+      decoderMode: decoderMode ?? 'auto',
+      playerEngine: playerEngine ?? 'ultra',
       bufferDuration: buffer ?? 0,
     );
   }
@@ -107,6 +125,21 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void toggleShowClock(bool value) {
     state = state.copyWith(showClock: value);
     _box?.put('showClock', value);
+  }
+
+  void toggleShowDebugStats(bool value) {
+    state = state.copyWith(showDebugStats: value);
+    _box?.put('showDebugStats', value);
+  }
+
+  void setDecoderMode(String mode) {
+    state = state.copyWith(decoderMode: mode);
+    _box?.put('decoderMode', mode);
+  }
+
+  void setPlayerEngine(String engine) {
+    state = state.copyWith(playerEngine: engine);
+    _box?.put('playerEngine', engine);
   }
 
   void setBufferDuration(int seconds) {

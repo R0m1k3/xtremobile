@@ -46,6 +46,7 @@ dependencies:
   equatable: ^2.0.5
   shared_preferences: ^2.3.2
   path_provider: ^2.1.5
+  video_player: ^2.10.1
   
 
 

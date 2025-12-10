@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/components/hero_carousel.dart';
@@ -21,9 +23,11 @@ class MobileSeriesTab extends ConsumerStatefulWidget {
 class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final List<Series> _series = [];
   List<Series>? _searchResults;
   String _searchQuery = '';
+  bool _isSearchEditing = false;
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasMore = true;
@@ -42,6 +46,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -197,7 +202,9 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
       onMoreInfo: () => _openSeries(s),
     )).toList();
 
-    return SafeArea(
+    return Container(
+      decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
+      child: SafeArea(
       bottom: false,
       child: RefreshIndicator(
         onRefresh: _refresh,
@@ -209,47 +216,63 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
         slivers: [
           // Header & Search
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                        decoration: const InputDecoration(
-                          hintText: 'Search Series',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.only(bottom: 11),
-                        ),
-                        onChanged: _onSearchChanged,
-                      ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _isSearchEditing = true);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _searchFocusNode.requestFocus();
+                    });
+                  },
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: _isSearchEditing 
+                          ? Border.all(color: AppColors.primary)
+                          : Border.all(color: AppColors.border),
                     ),
-                    if (_isSearching)
-                      const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                    if (_searchQuery.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                           _searchController.clear();
-                           _onSearchChanged('');
-                        },
-                        child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
-                      ),
-                  ],
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ExcludeFocus(
+                            excluding: !_isSearchEditing,
+                            child: TextField(
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              readOnly: !_isSearchEditing,
+                              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                              decoration: const InputDecoration(
+                                hintText: 'Search Series',
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.only(bottom: 11),
+                              ),
+                              onChanged: _onSearchChanged,
+                              onSubmitted: (_) => setState(() => _isSearchEditing = false),
+                            ),
+                          ),
+                        ),
+                        if (_isSearching)
+                          const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                        if (_searchQuery.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                               _searchController.clear();
+                               _onSearchChanged('');
+                            },
+                            child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
           ),
 
           // Hero Section
@@ -293,14 +316,17 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
                   if (index >= displaySeries.length) return null;
                   final series = displaySeries[index];
                   
-                  return MediaCard(
-                    title: series.name,
-                    imageUrl: _getImageUrl(series.cover),
-
-                    subtitle: series.rating != null ? '${_formatRating(series.rating)} ★' : null,
-                    rating: _formatRating(series.rating),
-                    placeholderIcon: Icons.tv,
-                    onTap: () => _openSeries(series),
+                  return TVFocusable(
+                    onPressed: () => _openSeries(series),
+                    child: MediaCard(
+                      title: series.name,
+                      imageUrl: _getImageUrl(series.cover),
+  
+                      subtitle: series.rating != null ? '${_formatRating(series.rating)} ★' : null,
+                      rating: _formatRating(series.rating),
+                      placeholderIcon: Icons.tv,
+                      onTap: () => _openSeries(series),
+                    ),
                   );
                 },
                 childCount: displaySeries.length,
@@ -316,6 +342,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
               ),
             ),
         ],
+      ),
       ),
       ),
     );

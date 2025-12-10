@@ -134,6 +134,7 @@ class Season {
 class Episode {
   final String id;
   final int episodeNum;
+  final int seasonNum; // Added field
   final String title;
   final String? containerExtension;
   final String? info;
@@ -143,6 +144,7 @@ class Episode {
   const Episode({
     required this.id,
     required this.episodeNum,
+    this.seasonNum = 0, // Default to 0 if unknown
     required this.title,
     this.containerExtension,
     this.info,
@@ -150,10 +152,11 @@ class Episode {
     this.durationSecs,
   });
 
-  factory Episode.fromJson(Map<String, dynamic> json) {
+  factory Episode.fromJson(Map<String, dynamic> json, {int? season}) { // Accept season param
     return Episode(
       id: json['id']?.toString() ?? '',
       episodeNum: int.tryParse(json['episode_num']?.toString() ?? '1') ?? 1,
+      seasonNum: season ?? int.tryParse(json['season']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'Episode ${json['episode_num'] ?? 1}',
       containerExtension: json['container_extension']?.toString() ?? 'mkv',
       info: json['info']?.toString(),
@@ -161,6 +164,9 @@ class Episode {
       durationSecs: int.tryParse(json['duration_secs']?.toString() ?? '0'),
     );
   }
+  
+  // Getter for compatibility
+  String get streamId => id;
 
   String getStreamUrl(String dns, String username, String password) {
     return '$dns/series/$username/$password/$id.${containerExtension ?? 'mkv'}';
@@ -205,7 +211,7 @@ class SeriesInfo {
     episodesData.forEach((seasonNum, episodesList) {
       final seasonInt = int.tryParse(seasonNum) ?? 1;
       final episodeList = (episodesList as List<dynamic>?)
-          ?.map((e) => Episode.fromJson(e as Map<String, dynamic>))
+          ?.map((e) => Episode.fromJson(e as Map<String, dynamic>, season: seasonInt))
           .toList() ?? [];
       episodes[seasonInt] = episodeList;
     });

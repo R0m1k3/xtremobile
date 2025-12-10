@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
+import 'tv_focusable.dart';
 
 class MobileScaffold extends ConsumerWidget {
   final Widget child;
@@ -17,39 +18,72 @@ class MobileScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      extendBody: true, // Allow content behind nav bar if transparent
       backgroundColor: AppColors.background,
-      body: child,
-      bottomNavigationBar: Container(
+      body: Column(
+        children: [
+          // Top Navigation Bar (TV Friendly)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, 'Live TV', Icons.tv),
+                  _buildNavItem(1, 'Films', Icons.movie),
+                  _buildNavItem(2, 'Séries', Icons.video_library),
+                  _buildNavItem(3, 'Paramètres', Icons.settings),
+                ],
+              ),
+            ),
+          ),
+          
+          // Main Content
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, String label, IconData icon) {
+    final isSelected = currentIndex == index;
+    return TVFocusable(
+      onPressed: () => onIndexChanged(index),
+      scale: 1.1,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.5), width: 0.5)),
+          color: isSelected ? AppColors.primary.withOpacity(0.15) : null,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected ? Border.all(color: AppColors.primary.withOpacity(0.5)) : null,
         ),
-        child: BottomNavigationBar(
-          currentIndex: currentIndex,
-          onTap: onIndexChanged,
-          backgroundColor: AppColors.surface.withOpacity(0.95), // Highly opaque for readability
-          type: BottomNavigationBarType.fixed,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.tv),
-              label: 'Live',
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon, 
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: 20,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.movie_outlined),
-              activeIcon: Icon(Icons.movie),
-              label: 'Movies',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.video_library_outlined),
-              activeIcon: Icon(Icons.video_library),
-              label: 'Series',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 14,
+              ),
             ),
           ],
         ),

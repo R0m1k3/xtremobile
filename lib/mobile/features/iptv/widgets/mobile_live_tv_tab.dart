@@ -11,6 +11,9 @@ import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/api/dns_resolver.dart';
 import '../../../theme/mobile_theme.dart';
+import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
+import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
+import 'package:flutter/services.dart';
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -21,10 +24,13 @@ class MobileLiveTVTab extends ConsumerStatefulWidget {
 }
 
 class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with AutomaticKeepAliveClientMixin {
-  String? _selectedCategory;
+
+
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
+  bool _isSearchEditing = false;
 
   @override
   void initState() {
@@ -39,10 +45,12 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
-  bool _isCategoryView = true;
+
+
 
   @override
   bool get wantKeepAlive => true;
@@ -53,10 +61,30 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
     final channelsAsync = ref.watch(mobileLiveChannelsProvider(widget.playlist));
     final favorites = ref.watch(mobileFavoritesProvider);
     final settings = ref.watch(mobileSettingsProvider);
+    final uiState = ref.watch(mobileLiveTvUiStateProvider);
+    final uiNotifier = ref.read(mobileLiveTvUiStateProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: channelsAsync.when(
+    return Container(
+      decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: PopScope(
+        canPop: uiState.isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly,
+        onPopInvoked: (didPop) {
+          if (didPop) return;
+          
+          if (_searchQuery.isNotEmpty) {
+            setState(() {
+              _searchController.clear();
+              _searchQuery = '';
+            });
+          } else if (_showFavoritesOnly) {
+            setState(() => _showFavoritesOnly = false);
+          } else if (!uiState.isCategoryView) {
+            uiNotifier.state = uiState.copyWith(isCategoryView: true);
+          }
+        },
+        child: channelsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(
           child: Padding(
@@ -80,7 +108,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
           List<Channel> displayedChannels = [];
           
           // Determine mode based on search/favorites/selection
-          bool showGrid = _isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly;
+          bool showGrid = uiState.isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly;
 
           if (!showGrid) {
             if (_searchQuery.isNotEmpty) {
@@ -91,8 +119,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
               displayedChannels = groupedChannels.values.expand((l) => l)
                   .where((c) => favorites.contains(c.streamId))
                   .toList();
-            } else if (_selectedCategory != null) {
-              displayedChannels = groupedChannels[_selectedCategory] ?? [];
+            } else if (uiState.selectedCategory != null) {
+              displayedChannels = groupedChannels[uiState.selectedCategory] ?? [];
             }
           }
 
@@ -106,34 +134,49 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
                   child: Column(
                     children: [
                       // Search Bar
-                      Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, color: AppColors.textSecondary),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                style: const TextStyle(color: AppColors.textPrimary),
-                                decoration: const InputDecoration(
-                                  hintText: 'Rechercher une chaîne...',
-                                  border: InputBorder.none,
-                                  isDense: true,
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _isSearchEditing = true);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _searchFocusNode.requestFocus();
+                          });
+                        },
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: _isSearchEditing ? Border.all(color: AppColors.primary) : null,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search, color: AppColors.textSecondary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ExcludeFocus(
+                                  excluding: !_isSearchEditing,
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    readOnly: !_isSearchEditing,
+                                    style: const TextStyle(color: AppColors.textPrimary),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Rechercher une chaîne...',
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                    onSubmitted: (_) => setState(() => _isSearchEditing = false),
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (_searchQuery.isNotEmpty)
-                              GestureDetector(
-                                onTap: () => _searchController.clear(),
-                                child: const Icon(Icons.close, color: AppColors.textSecondary),
-                              ),
-                          ],
+                              if (_searchQuery.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () => _searchController.clear(),
+                                  child: const Icon(Icons.close, color: AppColors.textSecondary),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                       
@@ -151,7 +194,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
                                 } else if (_showFavoritesOnly) {
                                   setState(() => _showFavoritesOnly = false);
                                 } else {
-                                  setState(() => _isCategoryView = true);
+                                  uiNotifier.state = uiState.copyWith(isCategoryView: true);
                                 }
                               },
                               padding: EdgeInsets.zero,
@@ -164,7 +207,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
                               _searchQuery.isNotEmpty ? 'Résultats de recherche' : 
                               _showFavoritesOnly ? 'Favoris' : 
                               showGrid ? 'Catégories' : 
-                              _selectedCategory ?? 'Chaînes',
+                              uiState.selectedCategory ?? 'Chaînes',
                               style: const TextStyle(
                                 color: AppColors.textPrimary, 
                                 fontWeight: FontWeight.bold,
@@ -181,9 +224,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
                             onPressed: () => setState(() {
                               _showFavoritesOnly = !_showFavoritesOnly;
                               // Reset category view if entering favorites
-                              if (_showFavoritesOnly) _isCategoryView = false;
+                              if (_showFavoritesOnly) uiNotifier.state = uiState.copyWith(isCategoryView: false);
                               // If exiting favorites, default depends on logic (here back to category grid if was previously)
-                              if (!_showFavoritesOnly) _isCategoryView = true;
+                              if (!_showFavoritesOnly) uiNotifier.state = uiState.copyWith(isCategoryView: true);
                             }),
                           ),
                         ],
@@ -202,6 +245,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
             ),
           );
         },
+      ),
+    ),
       ),
     );
   }
@@ -227,12 +272,12 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final category = categories[index];
-        return InkWell(
-          onTap: () {
-            setState(() {
-              _selectedCategory = category;
-              _isCategoryView = false;
-            });
+        return TVFocusable(
+          onPressed: () {
+            ref.read(mobileLiveTvUiStateProvider.notifier).state = LiveTvUiState(
+              selectedCategory: category,
+              isCategoryView: false,
+            );
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
@@ -303,25 +348,44 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
         return _MobileChannelTile(
           channel: channel,
           playlist: widget.playlist,
-          onTap: () => _playChannel(context, channel, channels),
+          onTap: () => _playChannel(context, channel, channels, widget.playlist, index),
         );
       },
     );
   }
 
-  void _playChannel(BuildContext context, Channel channel, List<Channel> channels) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => NativePlayerScreen(
-          streamId: channel.streamId,
-          title: channel.name,
-          playlist: widget.playlist,
-          streamType: StreamType.live,
-          channels: channels,
-          initialIndex: channels.indexOf(channel),
-        ),
-      ),
-    );
+  void _playChannel(BuildContext context, Channel channel, List<Channel> channels, PlaylistConfig playlist, int index) {
+          final engine = ref.read(mobileSettingsProvider).playerEngine;
+          
+          if (engine == 'lite') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LitePlayerScreen(
+                  streamId: channel.streamId,
+                  title: channel.name,
+                  playlist: playlist,
+                  streamType: StreamType.live,
+                  channels: channels, // Pass full channel list for zapping
+                  initialIndex: index,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NativePlayerScreen(
+                  streamId: channel.streamId,
+                  title: channel.name,
+                  playlist: playlist,
+                  streamType: StreamType.live,
+                  channels: channels, // Pass full channel list for zapping
+                  initialIndex: index,
+                ),
+              ),
+            );
+          }
   }
 }
 
@@ -375,8 +439,8 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
     final favorites = ref.watch(mobileFavoritesProvider);
     final isFavorite = favorites.contains(widget.channel.streamId);
 
-    return InkWell(
-      onTap: widget.onTap,
+    return TVFocusable(
+      onPressed: widget.onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(8),

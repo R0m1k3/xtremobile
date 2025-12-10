@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/components/hero_carousel.dart';
@@ -9,6 +11,7 @@ import '../../../providers/mobile_settings_providers.dart';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../../features/iptv/services/xtream_service_mobile.dart';
 import '../screens/native_player_screen.dart';
+import '../screens/lite_player_screen.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -21,9 +24,11 @@ class MobileMoviesTab extends ConsumerStatefulWidget {
 class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final List<Movie> _movies = [];
   List<Movie>? _searchResults;
   String _searchQuery = '';
+  bool _isSearchEditing = false;
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasMore = true;
@@ -42,6 +47,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -159,20 +165,38 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
     return originalUrl;
   }
 
-  void _playMovie(Movie movie) {
-    // Watch progress is tracked in player at 80% completion
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => NativePlayerScreen(
-          streamId: movie.streamId,
-          title: movie.name,
-          playlist: widget.playlist,
-          streamType: StreamType.vod,
-          containerExtension: movie.containerExtension ?? 'mp4',
+  void _playMovie(BuildContext context, Movie movie) {
+    if (widget.playlist == null) return;
+
+    final engine = ref.read(mobileSettingsProvider).playerEngine;
+    
+    if (engine == 'lite') {
+       Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LitePlayerScreen(
+            streamId: movie.streamId,
+            title: movie.name,
+            playlist: widget.playlist!,
+            streamType: StreamType.vod,
+            containerExtension: movie.containerExtension,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NativePlayerScreen(
+            streamId: movie.streamId,
+            title: movie.name,
+            playlist: widget.playlist!,
+            streamType: StreamType.vod,
+            containerExtension: movie.containerExtension,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -198,131 +222,153 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
       id: m.streamId,
       title: m.name,
       imageUrl: _getImageUrl(m.streamIcon),
-      subtitle: m.rating != null ? '${_formatRating(m.rating)} ★' : null,
-      onMoreInfo: () => _playMovie(m),
-    )).toList();
+       subtitle: m.rating != null ? '${_formatRating(m.rating)} ★' : null,
+       onMoreInfo: () => _playMovie(context, m),
+     )).toList();
 
-    return SafeArea(
-      bottom: false,
-      child: RefreshIndicator(
-        onRefresh: _refresh,
-        color: AppColors.primary,
-        backgroundColor: AppColors.surface,
-        child: CustomScrollView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          // Header & Search
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                        decoration: const InputDecoration(
-                          hintText: 'Search Movies',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.only(bottom: 11),
-                        ),
-                        onChanged: _onSearchChanged,
-                      ),
-                    ),
-                    if (_isSearching)
-                      const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                    if (_searchQuery.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                           _searchController.clear();
-                           _onSearchChanged('');
-                        },
-                        child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Hero Section
-          if (_searchQuery.isEmpty && heroItems.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: SizedBox(
-                   height: 250,
-                   child: HeroCarousel(
-                     items: heroItems,
-                     onTap: (item) {
-                       try {
-                         final movie = _movies.firstWhere((element) => element.streamId == item.id);
-                         _playMovie(movie);
-                       } catch (e) {
-                         // Fallback ignored
-                       }
-                     },
+     return Container(
+       decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
+       child: SafeArea(
+       bottom: false,
+       child: RefreshIndicator(
+         onRefresh: _refresh,
+         color: AppColors.primary,
+         backgroundColor: AppColors.surface,
+         child: CustomScrollView(
+         controller: _scrollController,
+         physics: const AlwaysScrollableScrollPhysics(),
+         slivers: [
+           // Header & Search
+           SliverToBoxAdapter(
+               child: Padding(
+                 padding: const EdgeInsets.all(16),
+                 child: GestureDetector(
+                   onTap: () {
+                     setState(() => _isSearchEditing = true);
+                     WidgetsBinding.instance.addPostFrameCallback((_) {
+                       _searchFocusNode.requestFocus();
+                     });
+                   },
+                   child: Container(
+                     height: 40,
+                     decoration: BoxDecoration(
+                       color: AppColors.surface,
+                       borderRadius: BorderRadius.circular(12),
+                       border: _isSearchEditing 
+                           ? Border.all(color: AppColors.primary)
+                           : Border.all(color: AppColors.border),
+                     ),
+                     padding: const EdgeInsets.symmetric(horizontal: 12),
+                     child: Row(
+                       children: [
+                         const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                         const SizedBox(width: 8),
+                         Expanded(
+                           child: ExcludeFocus(
+                             excluding: !_isSearchEditing,
+                             child: TextField(
+                               controller: _searchController,
+                               focusNode: _searchFocusNode,
+                               readOnly: !_isSearchEditing,
+                               style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                               decoration: const InputDecoration(
+                                 hintText: 'Search Movies',
+                                 border: InputBorder.none,
+                                 isDense: true,
+                                 contentPadding: EdgeInsets.only(bottom: 11),
+                               ),
+                               onChanged: _onSearchChanged,
+                               onSubmitted: (_) => setState(() => _isSearchEditing = false),
+                             ),
+                           ),
+                         ),
+                         if (_isSearching)
+                           const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                         if (_searchQuery.isNotEmpty)
+                           GestureDetector(
+                             onTap: () {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                             },
+                             child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                           ),
+                       ],
+                     ),
                    ),
-                ),
-              ),
-            ),
-          
-          // Grid
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 8, 
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 0.7,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  if (index >= displayMovies.length) return null;
-                  final movie = displayMovies[index];
-                  final isWatched = watchHistory.isMovieWatched(movie.streamId);
-                  
-                  return MediaCard(
-                    title: movie.name,
-                    imageUrl: _getImageUrl(movie.streamIcon),
+                 ),
+               ),
+           ),
 
-                    subtitle: movie.rating != null ? '${_formatRating(movie.rating)} ★' : null,
-                    rating: _formatRating(movie.rating),
-                    isWatched: isWatched,
-                    onTap: () => _playMovie(movie),
-                    onLongPress: () {
-                      ref.read(mobileWatchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
-                    },
-                  );
-                },
-                childCount: displayMovies.length,
-              ),
-            ),
-          ),
-          
-          if (_isLoading)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-        ],
-      ),
-      ),
-    );
+           // Hero Section
+           if (_searchQuery.isEmpty && heroItems.isNotEmpty)
+             SliverToBoxAdapter(
+               child: Padding(
+                 padding: const EdgeInsets.only(bottom: 16),
+                 child: SizedBox(
+                    height: 250,
+                    child: HeroCarousel(
+                      items: heroItems,
+                      onTap: (item) {
+                        try {
+                          final movie = _movies.firstWhere((element) => element.streamId == item.id);
+                          _playMovie(context, movie);
+                        } catch (e) {
+                          // Fallback ignored
+                        }
+                      },
+                    ),
+                 ),
+               ),
+             ),
+           
+           // Grid
+           SliverPadding(
+             padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+             sliver: SliverGrid(
+               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                 crossAxisCount: 8, 
+                 crossAxisSpacing: 8,
+                 mainAxisSpacing: 8,
+                 childAspectRatio: 0.7,
+               ),
+               delegate: SliverChildBuilderDelegate(
+                 (context, index) {
+                   if (index >= displayMovies.length) return null;
+                   final movie = displayMovies[index];
+                   final isWatched = watchHistory.isMovieWatched(movie.streamId);
+                   
+                   return TVFocusable(
+                     onPressed: () => _playMovie(context, movie),
+                     child: MediaCard(
+                       title: movie.name,
+                       imageUrl: _getImageUrl(movie.streamIcon),
+                       subtitle: movie.rating != null ? '${_formatRating(movie.rating)} ★' : null,
+                       rating: _formatRating(movie.rating),
+                       isWatched: isWatched,
+                       onTap: () => _playMovie(context, movie),
+                       onLongPress: () {
+                         ref.read(mobileWatchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
+                       },
+                     ),
+                   );
+                 },
+                 childCount: displayMovies.length,
+               ),
+             ),
+           ),
+           
+           if (_isLoading)
+             const SliverToBoxAdapter(
+               child: Padding(
+                 padding: EdgeInsets.all(24),
+                 child: Center(child: CircularProgressIndicator()),
+               ),
+             ),
+         ],
+       ),
+       ),
+       ),
+     );
   }
 }
+

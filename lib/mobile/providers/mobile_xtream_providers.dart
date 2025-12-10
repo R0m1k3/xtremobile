@@ -63,3 +63,20 @@ final mobileSeriesInfoByPlaylistProvider = FutureProvider.family<SeriesInfo, Ser
   final service = await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
   return service.getSeriesInfo(request.seriesId);
 });
+
+// UI State Provider for persistent navigation
+final mobileLiveTvUiStateProvider = StateProvider<LiveTvUiState>((ref) => LiveTvUiState());
+
+class LiveTvUiState {
+  final String? selectedCategory;
+  final bool isCategoryView;
+  
+  LiveTvUiState({this.selectedCategory, this.isCategoryView = true});
+  
+  LiveTvUiState copyWith({String? selectedCategory, bool? isCategoryView}) {
+    return LiveTvUiState(
+      selectedCategory: selectedCategory ?? this.selectedCategory,
+      isCategoryView: isCategoryView ?? this.isCategoryView,
+    );
+  }
+}
