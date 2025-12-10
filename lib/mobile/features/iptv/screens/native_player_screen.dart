@@ -290,6 +290,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     );
   }
   
+  /// Seek to resume position with retry logic
+  void _seekToResume(int positionSeconds, [int attempt = 0]) {
+    if (!mounted || attempt >= 10) return;
+    
+    Future.delayed(Duration(milliseconds: attempt == 0 ? 1500 : 500), () {
+      if (!mounted) return;
+      
+      if (_isPlaying && _duration.inSeconds > 0) {
+        debugPrint('MediaKitPlayer: Seeking to resume position ${positionSeconds}s (attempt $attempt)');
+        _player.seek(Duration(seconds: positionSeconds));
+      } else {
+        debugPrint('MediaKitPlayer: Player not ready, retrying resume seek (attempt $attempt)');
+        _seekToResume(positionSeconds, attempt + 1);
+      }
+    });
+  }
+  
   /// Attempt to reconnect a live stream that stopped
   void _attemptReconnect() {
     if (!mounted) return;
@@ -441,14 +458,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
       // Resume from saved position (VOD/Series only)
       if (widget.streamType != StreamType.live) {
         final resumePos = ref.read(mobileWatchHistoryProvider).getResumePosition(_contentId);
+        debugPrint('MediaKitPlayer: Resume check - contentId: $_contentId, resumePos: $resumePos');
         if (resumePos > 30) {
-          // Wait for player to stabilize, then seek
-          Future.delayed(const Duration(milliseconds: 1500), () {
-            if (mounted && _isPlaying) {
-              debugPrint('MediaKitPlayer: Resuming from ${resumePos}s');
-              _player.seek(Duration(seconds: resumePos));
-            }
-          });
+          _seekToResume(resumePos);
         }
       }
     } catch (e) {
