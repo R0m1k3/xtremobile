@@ -108,7 +108,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Version 1.0.5',
+                        'Version 1.1.0',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,

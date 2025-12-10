@@ -92,6 +92,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Register keyboard handler for remote control
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    
     // Only start clock if setting is enabled (will check in build too, but timer can run)
     _startClock(); 
     _currentIndex = widget.initialIndex;
@@ -228,6 +231,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
 
   @override
   void dispose() {
+    // Unregister keyboard handler
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    
     // Save resume position before cleanup (only for VOD/Series)
     _saveResumePositionOnExit();
     
@@ -544,6 +550,67 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> {
     _resetControlsTimer();
   }
 
+  /// Handle keyboard/remote control events
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    
+    final key = event.logicalKey;
+    
+    // Space / Enter / Select - Toggle play/pause
+    if (key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.select) {
+      _togglePlayPause();
+      return true;
+    }
+    
+    // Left Arrow - Seek back 10 seconds
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (widget.streamType != StreamType.live) {
+        final newPos = _position - const Duration(seconds: 10);
+        _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+        _onUserInteraction();
+      }
+      return true;
+    }
+    
+    // Right Arrow - Seek forward 10 seconds
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (widget.streamType != StreamType.live) {
+        final newPos = _position + const Duration(seconds: 10);
+        if (newPos < _duration) {
+          _player.seek(newPos);
+        }
+        _onUserInteraction();
+      }
+      return true;
+    }
+    
+    // Up Arrow - Previous channel (Live only)
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (widget.streamType == StreamType.live && widget.channels != null) {
+        _playPrevious();
+      }
+      return true;
+    }
+    
+    // Down Arrow - Next channel (Live only)
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (widget.streamType == StreamType.live && widget.channels != null) {
+        _playNext();
+      }
+      return true;
+    }
+    
+    // Escape / Back - Exit player
+    if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack) {
+      Navigator.of(context).pop();
+      return true;
+    }
+    
+    return false;
+  }
 
 
 
