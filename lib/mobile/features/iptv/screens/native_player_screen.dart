@@ -76,7 +76,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
     if (_showControls && _isPlaying) {
-      _controlsTimer = Timer(const Duration(seconds: 4), () {
+      _controlsTimer = Timer(const Duration(seconds: 10), () {
         if (mounted) {
           setState(() => _showControls = false);
         }

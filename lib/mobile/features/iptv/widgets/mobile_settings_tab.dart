@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../providers/mobile_settings_providers.dart';
@@ -108,7 +109,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Version 1.1.10',
+                        'Version 1.1.11',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -312,7 +313,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _FilterInput extends StatelessWidget {
+class _FilterInput extends StatefulWidget {
   final String label;
   final String hint;
   final IconData icon;
@@ -328,43 +329,119 @@ class _FilterInput extends StatelessWidget {
   });
 
   @override
+  State<_FilterInput> createState() => _FilterInputState();
+}
+
+class _FilterInputState extends State<_FilterInput> {
+  late FocusNode _navFocus;
+  late FocusNode _inputFocus;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _navFocus = FocusNode();
+    _inputFocus = FocusNode();
+    
+    _inputFocus.addListener(() {
+      if (!_inputFocus.hasFocus && _isEditing) {
+        setState(() => _isEditing = false);
+        _navFocus.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _navFocus.dispose();
+    _inputFocus.dispose();
+    super.dispose();
+  }
+
+  void _activateInput() {
+    setState(() => _isEditing = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inputFocus.requestFocus();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(label, 
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500, 
-                color: AppColors.textPrimary,
+    return Focus(
+      focusNode: _navFocus,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select || 
+              key == LogicalKeyboardKey.enter || 
+              key == LogicalKeyboardKey.space) {
+            _activateInput();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Builder(
+        builder: (context) {
+          final isFocused = Focus.of(context).hasFocus;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(widget.icon, size: 18, color: isFocused ? AppColors.primary : AppColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(widget.label, 
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500, 
+                      color: isFocused ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: hint,
-            hintStyle: const TextStyle(color: AppColors.textTertiary),
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          onChanged: onChanged,
-        ),
-      ],
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _activateInput,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: isFocused ? Border.all(color: AppColors.primary, width: 2) : null,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ExcludeFocus(
+                    excluding: !_isEditing,
+                    child: TextField(
+                      controller: widget.controller,
+                      focusNode: _inputFocus,
+                      readOnly: !_isEditing,
+                      showCursor: _isEditing,
+                      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: widget.hint,
+                        hintStyle: const TextStyle(color: AppColors.textTertiary),
+                        filled: true,
+                        fillColor: AppColors.background,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: widget.onChanged,
+                      onSubmitted: (_) {
+                        setState(() => _isEditing = false);
+                        _navFocus.requestFocus();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
