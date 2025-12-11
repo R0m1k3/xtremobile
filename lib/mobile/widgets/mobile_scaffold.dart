@@ -116,9 +116,9 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Selected = white bg + black text, Focused = gray border + white text, Normal = white70 text
-    final Color textColor = widget.isSelected ? Colors.black : (_isFocused ? Colors.white : Colors.white70);
-    final Color iconColor = widget.isSelected ? Colors.black : (_isFocused ? Colors.white : Colors.white70);
+    // Selected OR Focused = black text (white bg), Normal = white70 text
+    final Color textColor = (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
+    final Color iconColor = (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
     
     return Focus(
       focusNode: _focusNode,
@@ -141,20 +141,18 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
           decoration: BoxDecoration(
-            // White pill background when selected, transparent otherwise
-            color: widget.isSelected ? Colors.white : Colors.transparent,
+            // White pill when selected OR focused
+            color: widget.isSelected 
+                ? Colors.white 
+                : (_isFocused ? Colors.white.withOpacity(0.9) : Colors.transparent),
             borderRadius: BorderRadius.circular(25),
-            // White border when focused
-            border: _isFocused
-                ? Border.all(color: Colors.white70, width: 2)
-                : null,
-            // Gray shadow when focused (for both selected and not selected)
+            // Strong glow when focused
             boxShadow: _isFocused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.4),
-                      blurRadius: 12,
-                      spreadRadius: 2,
+                      color: Colors.white.withOpacity(0.5),
+                      blurRadius: 16,
+                      spreadRadius: 4,
                     ),
                   ]
                 : null,

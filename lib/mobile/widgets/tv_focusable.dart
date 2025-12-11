@@ -24,7 +24,7 @@ class TVFocusable extends StatefulWidget {
     this.onFocus,
     this.focusNode,
     this.autofocus = false,
-    this.scale = 1.05,
+    this.scale = 1.08, // More visible scale
     this.borderWidth = 3.0,
     this.focusColor = Colors.white,
     this.borderRadius,
@@ -142,7 +142,7 @@ class _TVFocusableState extends State<TVFocusable> {
         onLongPress: widget.onLongPress,
         child: TweenAnimationBuilder<double>(
           duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+          curve: Curves.easeOutCubic, // Apple-like snappy curve
           tween: Tween<double>(
             begin: 1.0,
             end: _isFocused ? widget.scale : 1.0,
