@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
+import 'package:xtremflow/mobile/widgets/mobile_poster_card.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/components/hero_carousel.dart';
@@ -313,17 +314,12 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab> with Automati
                   if (index >= displaySeries.length) return null;
                   final series = displaySeries[index];
                   
-                  return TVFocusable(
-                    onPressed: () => _openSeries(series),
-                    child: MediaCard(
-                      title: series.name,
-                      imageUrl: _getImageUrl(series.cover),
-  
-                      subtitle: series.rating != null ? '${_formatRating(series.rating)} ★' : null,
-                      rating: _formatRating(series.rating),
-                      placeholderIcon: Icons.tv,
-                      onTap: () => _openSeries(series),
-                    ),
+                  return MobilePosterCard(
+                    title: series.name,
+                    imageUrl: _getImageUrl(series.cover),
+                    rating: _formatRating(series.rating),
+                    placeholderIcon: Icons.tv,
+                    onTap: () => _openSeries(series),
                   );
                 },
                 childCount: displaySeries.length,

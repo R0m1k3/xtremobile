@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
+import 'package:xtremflow/mobile/widgets/mobile_poster_card.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/components/hero_carousel.dart';
@@ -338,19 +339,15 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
                    final movie = displayMovies[index];
                    final isWatched = watchHistory.isMovieWatched(movie.streamId);
                    
-                   return TVFocusable(
-                     onPressed: () => _playMovie(context, movie),
-                     child: MediaCard(
-                       title: movie.name,
-                       imageUrl: _getImageUrl(movie.streamIcon),
-                       subtitle: movie.rating != null ? '${_formatRating(movie.rating)} ★' : null,
-                       rating: _formatRating(movie.rating),
-                       isWatched: isWatched,
-                       onTap: () => _playMovie(context, movie),
-                       onLongPress: () {
-                         ref.read(mobileWatchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
-                       },
-                     ),
+                   return MobilePosterCard(
+                     title: movie.name,
+                     imageUrl: _getImageUrl(movie.streamIcon),
+                     rating: _formatRating(movie.rating),
+                     isWatched: isWatched,
+                     onTap: () => _playMovie(context, movie),
+                     onLongPress: () {
+                       ref.read(mobileWatchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
+                     },
                    );
                  },
                  childCount: displayMovies.length,
@@ -372,4 +369,6 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
      );
   }
 }
+
+
 

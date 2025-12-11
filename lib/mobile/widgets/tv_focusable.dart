@@ -147,10 +147,27 @@ class _TVFocusableState extends State<TVFocusable> {
             begin: 1.0,
             end: _isFocused ? widget.scale : 1.0,
           ),
-          builder: (context, scale, child) {
+          builder: (context, double scale, child) {
             return Transform.scale(
               scale: scale,
               child: Container(
+                decoration: _isFocused
+                    ? BoxDecoration(
+                        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5), // Shadow for depth
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: widget.focusColor.withOpacity(0.3), // Glow effect
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      )
+                    : null,
                 foregroundDecoration: _isFocused
                     ? BoxDecoration(
                         borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
