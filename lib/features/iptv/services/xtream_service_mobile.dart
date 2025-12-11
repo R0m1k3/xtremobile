@@ -36,8 +36,20 @@ class XtreamServiceMobile {
     _cacheOptions = CacheOptions(
       store: _cacheStore,
       policy: CachePolicy.forceCache,
-      maxStale: const Duration(hours: 24), // Cache for 24h as requested
+      maxStale: const Duration(hours: 24),
       priority: CachePriority.high,
+      keyBuilder: (request) {
+        // Use the Original Host header if available to generate a stable cache key
+        // regardless of the resolved IP address used for the connection
+        if (request.headers.containsKey('Host')) {
+          final host = request.headers['Host'] as String;
+          final uri = request.uri;
+          // Reconstruct URI with the original hostname
+          final stableUri = uri.replace(host: host);
+          return stableUri.toString();
+        }
+        return request.uri.toString();
+      },
     );
 
     _dio.interceptors.add(DioCacheInterceptor(options: _cacheOptions));

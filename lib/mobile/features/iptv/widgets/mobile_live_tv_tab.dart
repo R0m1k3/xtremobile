@@ -343,13 +343,18 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6,
+        childAspectRatio: 0.85,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
       itemCount: channels.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final channel = channels[index];
-        return _MobileChannelTile(
+        return _MobileChannelCard(
           channel: channel,
           playlist: widget.playlist,
           onTap: () => _playChannel(context, channel, channels, widget.playlist, index),
@@ -398,22 +403,22 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
   }
 }
 
-class _MobileChannelTile extends ConsumerStatefulWidget {
+class _MobileChannelCard extends ConsumerStatefulWidget {
   final Channel channel;
   final VoidCallback onTap;
   final PlaylistConfig playlist;
 
-  const _MobileChannelTile({
+  const _MobileChannelCard({
     required this.channel, 
     required this.onTap,
     required this.playlist,
   });
 
   @override
-  ConsumerState<_MobileChannelTile> createState() => _MobileChannelTileState();
+  ConsumerState<_MobileChannelCard> createState() => _MobileChannelCardState();
 }
 
-class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
+class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
   String? _epgTitle;
   
   @override
@@ -425,7 +430,6 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
   Future<void> _loadEpg() async {
     try {
       final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      // Fetch current program
       final epg = await service.getShortEPG(widget.channel.streamId);
       if (mounted && epg.nowPlaying != null && epg.nowPlaying!.isNotEmpty) {
         setState(() {
@@ -439,12 +443,10 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
 
   @override
   Widget build(BuildContext context) {
-    // On mobile, use direct URL (no proxy needed)
     final iconUrl = widget.channel.streamIcon.isNotEmpty && widget.channel.streamIcon.startsWith('http') 
         ? widget.channel.streamIcon 
         : null;
     
-    // Watch favorites state
     final favorites = ref.watch(mobileFavoritesProvider);
     final isFavorite = favorites.contains(widget.channel.streamId);
 
@@ -455,71 +457,89 @@ class _MobileChannelTileState extends ConsumerState<_MobileChannelTile> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Icon
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: iconUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: iconUrl,
-                      fit: BoxFit.contain,
-                      errorWidget: (_, __, ___) => const Icon(Icons.tv, color: Colors.white24),
-                      placeholder: (_, __) => const Icon(Icons.tv, color: Colors.white24),
-                    )
-                  : const Icon(Icons.tv, color: Colors.white24),
-            ),
-            const SizedBox(width: 12),
-            // Name and EPG
+            // Channel Logo
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.channel.name,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Stack(
+                  children: [
+                    // Logo
+                    Center(
+                      child: iconUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: iconUrl,
+                              fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) => const Icon(Icons.tv, color: Colors.white38, size: 40),
+                              placeholder: (_, __) => const Icon(Icons.tv, color: Colors.white24, size: 40),
+                            )
+                          : const Icon(Icons.tv, color: Colors.white38, size: 40),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_epgTitle != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
+                    // Favorite badge
+                    if (isFavorite)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.favorite, color: Colors.white, size: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            // Channel Name
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.channel.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_epgTitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
                         _epgTitle!,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 12,
+                          fontSize: 9,
                         ),
+                        textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                ],
+                    ],
+                  ],
+                ),
               ),
             ),
-            // Favorite Indicator (no button, just icon)
-            if (isFavorite)
-              const Padding(
-                padding: EdgeInsets.only(right: 8),
-                child: Icon(Icons.favorite, color: Colors.red, size: 20),
-              ),
-            // Play Icon
-            const Icon(Icons.play_circle_outline, color: AppColors.primary),
           ],
         ),
       ),

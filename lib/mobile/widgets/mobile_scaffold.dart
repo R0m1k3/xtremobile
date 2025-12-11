@@ -116,10 +116,9 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Desktop style: selected = white bg + black text, unselected = white70 text
-    final bool showWhiteBg = widget.isSelected || _isFocused;
-    final Color textColor = showWhiteBg ? Colors.black : Colors.white70;
-    final Color iconColor = showWhiteBg ? Colors.black : Colors.white70;
+    // Selected = white bg + black text, Focused = gray border + white text, Normal = white70 text
+    final Color textColor = widget.isSelected ? Colors.black : (_isFocused ? Colors.white : Colors.white70);
+    final Color iconColor = widget.isSelected ? Colors.black : (_isFocused ? Colors.white : Colors.white70);
     
     return Focus(
       focusNode: _focusNode,
@@ -142,16 +141,20 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
           decoration: BoxDecoration(
-            // White pill background when selected OR focused
-            color: showWhiteBg ? Colors.white : Colors.transparent,
+            // White pill background when selected, transparent otherwise
+            color: widget.isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(25),
-            // Subtle glow when focused but not selected
-            boxShadow: _isFocused && !widget.isSelected
+            // White border when focused
+            border: _isFocused
+                ? Border.all(color: Colors.white70, width: 2)
+                : null,
+            // Gray shadow when focused (for both selected and not selected)
+            boxShadow: _isFocused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
+                      color: Colors.white.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
                     ),
                   ]
                 : null,
@@ -165,7 +168,7 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
                 widget.label,
                 style: TextStyle(
                   color: textColor,
-                  fontWeight: showWhiteBg ? FontWeight.w700 : FontWeight.w400,
+                  fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w400,
                   fontSize: 13,
                 ),
               ),
