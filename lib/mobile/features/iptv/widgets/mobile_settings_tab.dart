@@ -10,7 +10,7 @@ import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../screens/mobile_playlist_selection_screen.dart';
 
-/// Simplified mobile settings tab - no auth, local storage only
+/// Simplified mobile settings tab - optimized for TV remote control
 class MobileSettingsTab extends ConsumerStatefulWidget {
   const MobileSettingsTab({super.key});
 
@@ -57,7 +57,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(mobileSettingsProvider);
-    final themeState = ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -71,22 +70,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Text(
-              'Paramètres',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-
-          // App Info
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
+            padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
                 Container(
@@ -100,363 +84,158 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                     color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'XtremFlow Mobile',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'XtremFlow Mobile',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Version 1.1.11',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
+                    ),
+                    Text(
+                      'Version 1.2.0',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // Appearance
-          const _SectionHeader(title: 'Apparence'),
           
-          // Dark Mode
-          TVFocusable(
-            onPressed: () => themeNotifier.toggleTheme(),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SwitchListTile(
-                title: const Text('Mode Sombre', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, 
-                  color: AppColors.primary),
-                value: isDark,
-                onChanged: (_) => themeNotifier.toggleTheme(),
-                activeColor: AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Show Clock
-          TVFocusable(
-            onPressed: () => ref.read(mobileSettingsProvider.notifier).toggleShowClock(!settings.showClock),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SwitchListTile(
-                title: const Text('Afficher l\'heure', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                secondary: const Icon(Icons.access_time, 
-                  color: AppColors.primary),
-                value: settings.showClock,
-                onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowClock(val),
-                activeColor: AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Playback Settings
-          const _SectionHeader(title: 'Lecture Vidéo'),
-          
-          // Player Engine
-          TVFocusable(
-            onPressed: () {},
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.rocket_launch, color: AppColors.primary),
-                title: const Text('Moteur Vidéo', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: Text(
-                  settings.playerEngine == 'ultra' ? 'Ultra (MPV) - Puissant' : 'Lite (ExoPlayer) - Léger',
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                trailing: DropdownButton<String>(
-                  value: settings.playerEngine,
-                  dropdownColor: AppColors.surface,
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                  items: const [
-                    DropdownMenuItem(value: 'ultra', child: Text('Ultra', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 'lite', child: Text('Lite', style: TextStyle(color: AppColors.textPrimary))),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref.read(mobileSettingsProvider.notifier).setPlayerEngine(val);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Debug Stats
-          TVFocusable(
-            onPressed: () => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!settings.showDebugStats),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SwitchListTile(
-                title: const Text('Stats pour Nerds', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: const Text('Infos techniques (FPS, Buffer)',
-                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                secondary: const Icon(Icons.bug_report, color: AppColors.primary),
-                value: settings.showDebugStats,
-                onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(val),
-                activeColor: AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Decoder Mode
-          TVFocusable(
-            onPressed: () {},
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.memory, color: AppColors.primary),
-                title: const Text('Décodeur Vidéo', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: Text(
-                  settings.decoderMode == 'auto' ? 'Automatique (Recommandé)' : 
-                  settings.decoderMode == 'mediacodec' ? 'Matériel (Hardware)' : 'Logiciel (Software)',
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                trailing: DropdownButton<String>(
-                  value: settings.decoderMode,
-                  dropdownColor: AppColors.surface,
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                  items: const [
-                    DropdownMenuItem(value: 'auto', child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 'mediacodec', child: Text('Hardware', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 'no', child: Text('Software', style: TextStyle(color: AppColors.textPrimary))),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref.read(mobileSettingsProvider.notifier).setDecoderMode(val);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Buffer Duration
-          TVFocusable(
-            onPressed: () {},
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.speed, color: AppColors.primary),
-                title: const Text('Mise en mémoire tampon (Cache)', 
-                  style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: Text(
-                  settings.bufferDuration == 0 
-                    ? 'Auto (Défaut)' 
-                    : '${settings.bufferDuration} secondes',
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                trailing: DropdownButton<int>(
-                  value: settings.bufferDuration,
-                  dropdownColor: AppColors.surface,
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('Auto', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 15, child: Text('15s', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 30, child: Text('30s', style: TextStyle(color: AppColors.textPrimary))),
-                    DropdownMenuItem(value: 60, child: Text('60s', style: TextStyle(color: AppColors.textPrimary))),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref.read(mobileSettingsProvider.notifier).setBufferDuration(val);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Content Filters
-          const _SectionHeader(title: 'Filtres de Contenu'),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Utilisez des mots-clés pour filtrer les catégories (séparés par des virgules)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _FilterInput(
-                  label: 'TV en Direct',
-                  hint: 'Ex: FR, HD, SPORT',
-                  icon: Icons.live_tv,
-                  controller: _liveTvController,
-                  onChanged: (val) {
-                    ref.read(mobileSettingsProvider.notifier)
-                        .setLiveTvKeywords(_parseKeywords(val));
-                  },
-                ),
-                const SizedBox(height: 16),
-                _FilterInput(
-                  label: 'Films',
-                  hint: 'Ex: FR, VF, 4K',
-                  icon: Icons.movie,
-                  controller: _moviesController,
-                  onChanged: (val) {
-                    ref.read(mobileSettingsProvider.notifier)
-                        .setMoviesKeywords(_parseKeywords(val));
-                  },
-                ),
-                const SizedBox(height: 16),
-                _FilterInput(
-                  label: 'Séries',
-                  hint: 'Ex: FR, VF',
-                  icon: Icons.tv,
-                  controller: _seriesController,
-                  onChanged: (val) {
-                    ref.read(mobileSettingsProvider.notifier)
-                        .setSeriesKeywords(_parseKeywords(val));
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Refresh Cache Section
-          const _SectionHeader(title: 'Cache'),
-          TVFocusable(
-            onPressed: _isRefreshingCache ? null : () async {
-              setState(() => _isRefreshingCache = true);
-              
-              try {
-                // Clear the Hive HTTP cache directly
-                final dir = await getApplicationDocumentsDirectory();
-                final cacheStore = HiveCacheStore(dir.path);
-                await cacheStore.clean();
-                
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Cache actualisé ! Relancez l\'application pour charger les nouvelles données.'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => _isRefreshingCache = false);
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  _isRefreshingCache 
-                      ? const SizedBox(
-                          width: 24, 
-                          height: 24, 
-                          child: CircularProgressIndicator(strokeWidth: 2)
-                        )
-                      : const Icon(Icons.refresh, color: AppColors.primary),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Actualiser le cache',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Recharge les films, séries et EPG (cache 24h)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
 
-          // Change Playlist
-          TVFocusable(
-            onPressed: () {
-              // Open Playlist Selection in Manage Mode
+          // === APPARENCE ===
+          _buildSectionHeader('Apparence'),
+          
+          _buildSettingItem(
+            icon: isDark ? Icons.dark_mode : Icons.light_mode,
+            title: 'Mode Sombre',
+            value: isDark ? 'Activé' : 'Désactivé',
+            onTap: () => themeNotifier.toggleTheme(),
+          ),
+          
+          _buildSettingItem(
+            icon: Icons.access_time,
+            title: 'Afficher l\'heure',
+            value: settings.showClock ? 'Activé' : 'Désactivé',
+            onTap: () => ref.read(mobileSettingsProvider.notifier).toggleShowClock(!settings.showClock),
+          ),
+          
+          const SizedBox(height: 24),
+
+          // === LECTURE VIDEO ===
+          _buildSectionHeader('Lecture Vidéo'),
+          
+          _buildSettingItem(
+            icon: Icons.rocket_launch,
+            title: 'Moteur Vidéo',
+            subtitle: settings.playerEngine == 'ultra' ? 'Ultra (MPV) - Puissant' : 'Lite (ExoPlayer) - Léger',
+            value: settings.playerEngine == 'ultra' ? 'Ultra' : 'Lite',
+            onTap: () {
+              final newValue = settings.playerEngine == 'ultra' ? 'lite' : 'ultra';
+              ref.read(mobileSettingsProvider.notifier).setPlayerEngine(newValue);
+            },
+          ),
+          
+          _buildSettingItem(
+            icon: Icons.bug_report,
+            title: 'Stats pour Nerds',
+            subtitle: 'Affiche FPS, Buffer, Bitrate',
+            value: settings.showDebugStats ? 'Activé' : 'Désactivé',
+            onTap: () => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!settings.showDebugStats),
+          ),
+          
+          _buildSettingItem(
+            icon: Icons.memory,
+            title: 'Décodeur Vidéo',
+            subtitle: _getDecoderSubtitle(settings.decoderMode),
+            value: _getDecoderValue(settings.decoderMode),
+            onTap: () {
+              final modes = ['auto', 'mediacodec', 'no'];
+              final currentIndex = modes.indexOf(settings.decoderMode);
+              final nextIndex = (currentIndex + 1) % modes.length;
+              ref.read(mobileSettingsProvider.notifier).setDecoderMode(modes[nextIndex]);
+            },
+          ),
+          
+          _buildSettingItem(
+            icon: Icons.speed,
+            title: 'Buffer (Cache)',
+            subtitle: settings.bufferDuration == 0 ? 'Automatique' : '${settings.bufferDuration} secondes',
+            value: settings.bufferDuration == 0 ? 'Auto' : '${settings.bufferDuration}s',
+            onTap: () {
+              final buffers = [0, 15, 30, 60];
+              final currentIndex = buffers.indexOf(settings.bufferDuration);
+              final nextIndex = (currentIndex + 1) % buffers.length;
+              ref.read(mobileSettingsProvider.notifier).setBufferDuration(buffers[nextIndex]);
+            },
+          ),
+          
+          const SizedBox(height: 24),
+
+          // === FILTRES ===
+          _buildSectionHeader('Filtres de Contenu'),
+          
+          _buildFilterInput(
+            label: 'TV en Direct',
+            hint: 'Ex: FR, HD, SPORT',
+            icon: Icons.live_tv,
+            controller: _liveTvController,
+            onChanged: (val) {
+              ref.read(mobileSettingsProvider.notifier).setLiveTvKeywords(_parseKeywords(val));
+            },
+          ),
+          
+          _buildFilterInput(
+            label: 'Films',
+            hint: 'Ex: FR, VF, 4K',
+            icon: Icons.movie,
+            controller: _moviesController,
+            onChanged: (val) {
+              ref.read(mobileSettingsProvider.notifier).setMoviesKeywords(_parseKeywords(val));
+            },
+          ),
+          
+          _buildFilterInput(
+            label: 'Séries',
+            hint: 'Ex: FR, VF',
+            icon: Icons.tv,
+            controller: _seriesController,
+            onChanged: (val) {
+              ref.read(mobileSettingsProvider.notifier).setSeriesKeywords(_parseKeywords(val));
+            },
+          ),
+          
+          const SizedBox(height: 24),
+
+          // === CACHE ===
+          _buildSectionHeader('Cache'),
+          
+          _buildSettingItem(
+            icon: _isRefreshingCache ? Icons.hourglass_empty : Icons.refresh,
+            title: 'Actualiser le cache',
+            subtitle: 'Recharge films, séries et EPG',
+            value: _isRefreshingCache ? '...' : 'Appuyer',
+            onTap: _isRefreshingCache ? null : _refreshCache,
+          ),
+          
+          const SizedBox(height: 24),
+
+          // === PLAYLIST ===
+          _buildSectionHeader('Playlist'),
+          
+          _buildSettingItem(
+            icon: Icons.playlist_play,
+            title: 'Gérer les Playlists',
+            subtitle: 'Ajouter, modifier, supprimer',
+            value: '→',
+            onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -464,185 +243,242 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                 ),
               );
             },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.playlist_play, color: AppColors.textPrimary),
-                  SizedBox(width: 16),
-                  Text(
-                    'Gérer les Playlists',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Spacer(),
-                  Icon(Icons.chevron_right, color: AppColors.textSecondary),
-                ],
-              ),
-            ),
           ),
+          
           const SizedBox(height: 100),
         ],
       ),
     );
   }
-}
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
+  // === HELPER METHODS ===
+  
+  String _getDecoderSubtitle(String mode) {
+    switch (mode) {
+      case 'auto': return 'Automatique (Recommandé)';
+      case 'mediacodec': return 'Matériel (Hardware)';
+      case 'no': return 'Logiciel (Software)';
+      default: return 'Automatique';
+    }
+  }
+  
+  String _getDecoderValue(String mode) {
+    switch (mode) {
+      case 'auto': return 'Auto';
+      case 'mediacodec': return 'HW';
+      case 'no': return 'SW';
+      default: return 'Auto';
+    }
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _refreshCache() async {
+    setState(() => _isRefreshingCache = true);
+    
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final cacheStore = HiveCacheStore(dir.path);
+      await cacheStore.clean();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cache actualisé ! Relancez l\'app pour recharger.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshingCache = false);
+    }
+  }
+
+  // === UI BUILDERS ===
+  
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 8, bottom: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
       child: Text(
-        title,
+        title.toUpperCase(),
         style: GoogleFonts.inter(
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
+          color: AppColors.primary,
+          letterSpacing: 1.2,
         ),
       ),
     );
   }
-}
 
-class _FilterInput extends StatefulWidget {
-  final String label;
-  final String hint;
-  final IconData icon;
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  const _FilterInput({
-    required this.label,
-    required this.hint,
-    required this.icon,
-    required this.controller,
-    required this.onChanged,
-  });
-
-  @override
-  State<_FilterInput> createState() => _FilterInputState();
-}
-
-class _FilterInputState extends State<_FilterInput> {
-  late FocusNode _navFocus;
-  late FocusNode _inputFocus;
-  bool _isEditing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _navFocus = FocusNode();
-    _inputFocus = FocusNode();
-    
-    _inputFocus.addListener(() {
-      if (!_inputFocus.hasFocus && _isEditing) {
-        setState(() => _isEditing = false);
-        _navFocus.requestFocus();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _navFocus.dispose();
-    _inputFocus.dispose();
-    super.dispose();
-  }
-
-  void _activateInput() {
-    setState(() => _isEditing = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _inputFocus.requestFocus();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _navFocus,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          final key = event.logicalKey;
-          if (key == LogicalKeyboardKey.select || 
-              key == LogicalKeyboardKey.enter || 
-              key == LogicalKeyboardKey.space) {
-            _activateInput();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: Builder(
-        builder: (context) {
-          final isFocused = Focus.of(context).hasFocus;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TVFocusable(
+        onPressed: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Icon(widget.icon, size: 18, color: isFocused ? AppColors.primary : AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Text(widget.label, 
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500, 
-                      color: isFocused ? AppColors.primary : AppColors.textPrimary,
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _activateInput,
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: isFocused ? Border.all(color: AppColors.primary, width: 2) : null,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ExcludeFocus(
-                    excluding: !_isEditing,
-                    child: TextField(
-                      controller: widget.controller,
-                      focusNode: _inputFocus,
-                      readOnly: !_isEditing,
-                      showCursor: _isEditing,
-                      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: widget.hint,
-                        hintStyle: const TextStyle(color: AppColors.textTertiary),
-                        filled: true,
-                        fillColor: AppColors.background,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
                         ),
                       ),
-                      onChanged: widget.onChanged,
-                      onSubmitted: (_) {
-                        setState(() => _isEditing = false);
-                        _navFocus.requestFocus();
-                      },
-                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
               ),
             ],
-          );
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterInput({
+    required String label,
+    required String hint,
+    required IconData icon,
+    required TextEditingController controller,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TVFocusable(
+        onPressed: () {
+          // Open keyboard dialog for text input
+          _showKeyboardDialog(label, controller, onChanged);
         },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      controller.text.isEmpty ? hint : controller.text,
+                      style: TextStyle(
+                        color: controller.text.isEmpty 
+                            ? AppColors.textSecondary 
+                            : AppColors.textPrimary,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.edit, color: AppColors.textSecondary, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showKeyboardDialog(String label, TextEditingController controller, ValueChanged<String> onChanged) {
+    final tempController = TextEditingController(text: controller.text);
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Filtres $label', style: const TextStyle(color: AppColors.textPrimary)),
+        content: TextField(
+          controller: tempController,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Séparez par des virgules',
+            hintStyle: const TextStyle(color: AppColors.textSecondary),
+            filled: true,
+            fillColor: AppColors.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              controller.text = tempController.text;
+              onChanged(tempController.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Sauvegarder'),
+          ),
+        ],
       ),
     );
   }
