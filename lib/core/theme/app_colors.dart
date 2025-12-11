@@ -41,8 +41,8 @@ class AppColors {
     center: Alignment.center,
     radius: 1.5,
     colors: [
-      Color(0xFF2A2A2C), // Medium Gray center (visible)
-      Color(0xFF0A0A0A), // Near Black edge
+      Color(0xFF151515), // Deep Dark Grey center (barely visible)
+      Color(0xFF000000), // Pure Black edge
     ],
     stops: [0.0, 1.0],
   );
