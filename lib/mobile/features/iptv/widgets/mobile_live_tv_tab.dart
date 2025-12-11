@@ -25,12 +25,12 @@ class MobileLiveTVTab extends ConsumerStatefulWidget {
 
 class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with AutomaticKeepAliveClientMixin {
 
-
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
   bool _isSearchEditing = false;
+  bool _justReturnedFromPlayer = false; // Flag to prevent PopScope interception after player
 
   @override
   void initState() {
@@ -49,9 +49,6 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
     super.dispose();
   }
 
-
-
-
   @override
   bool get wantKeepAlive => true;
 
@@ -69,9 +66,16 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: PopScope(
+        // Only allow full pop if we're at category view with no filters AND not just returned from player
         canPop: uiState.isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly,
-        onPopInvoked: (didPop) {
+        onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
+          
+          // If just returned from player, reset the flag and do nothing (stay on channel list)
+          if (_justReturnedFromPlayer) {
+            _justReturnedFromPlayer = false;
+            return;
+          }
           
           if (_searchQuery.isNotEmpty) {
             setState(() {
@@ -354,38 +358,43 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
     );
   }
 
-  void _playChannel(BuildContext context, Channel channel, List<Channel> channels, PlaylistConfig playlist, int index) {
-          final engine = ref.read(mobileSettingsProvider).playerEngine;
-          
-          if (engine == 'lite') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LitePlayerScreen(
-                  streamId: channel.streamId,
-                  title: channel.name,
-                  playlist: playlist,
-                  streamType: StreamType.live,
-                  channels: channels, // Pass full channel list for zapping
-                  initialIndex: index,
-                ),
-              ),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NativePlayerScreen(
-                  streamId: channel.streamId,
-                  title: channel.name,
-                  playlist: playlist,
-                  streamType: StreamType.live,
-                  channels: channels, // Pass full channel list for zapping
-                  initialIndex: index,
-                ),
-              ),
-            );
-          }
+  void _playChannel(BuildContext context, Channel channel, List<Channel> channels, PlaylistConfig playlist, int index) async {
+    final engine = ref.read(mobileSettingsProvider).playerEngine;
+    
+    if (engine == 'lite') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LitePlayerScreen(
+            streamId: channel.streamId,
+            title: channel.name,
+            playlist: playlist,
+            streamType: StreamType.live,
+            channels: channels, // Pass full channel list for zapping
+            initialIndex: index,
+          ),
+        ),
+      );
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NativePlayerScreen(
+            streamId: channel.streamId,
+            title: channel.name,
+            playlist: playlist,
+            streamType: StreamType.live,
+            channels: channels, // Pass full channel list for zapping
+            initialIndex: index,
+          ),
+        ),
+      );
+    }
+    
+    // When returning from player, set flag to prevent PopScope from going back to categories
+    if (mounted) {
+      setState(() => _justReturnedFromPlayer = true);
+    }
   }
 }
 

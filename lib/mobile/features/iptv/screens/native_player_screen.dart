@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:xtremflow/core/models/iptv_models.dart';
@@ -109,6 +110,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     
     // Register keyboard handler for remote control
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    
+    // Enable wakelock to prevent screen from turning off during playback
+    WakelockPlus.enable();
     
     // Only start clock if setting is enabled (will check in build too, but timer can run)
     _startClock(); 
@@ -276,6 +280,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen> with Wi
     
     // Unregister keyboard handler
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    
+    // Disable wakelock when leaving player
+    WakelockPlus.disable();
     
     // Save resume position before cleanup (only for VOD/Series)
     _saveResumePositionOnExit();

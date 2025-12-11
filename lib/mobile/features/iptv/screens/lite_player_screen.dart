@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:xtremflow/core/models/iptv_models.dart';
@@ -81,6 +82,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    
+    // Enable wakelock to prevent screen from turning off during playback
+    WakelockPlus.enable();
     
     _currentIndex = widget.initialIndex;
     _startClock();
@@ -350,6 +354,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    
+    // Disable wakelock when leaving player
+    WakelockPlus.disable();
+    
     _controlsTimer?.cancel();
     _clockTimer?.cancel();
     _epgTimer?.cancel();
@@ -445,39 +453,58 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
           ),
         ),
         
-        // Center Controls
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Replay 10s button only for VOD
-              if (widget.streamType != StreamType.live) ...[
-                 IconButton(
-                   icon: const Icon(Icons.replay_10, color: Colors.white, size: 40),
-                   onPressed: () => _seek(const Duration(seconds: -10)),
-                 ),
-                 const SizedBox(width: 32),
-              ],
-              
-              TVFocusable(
-                focusNode: _playPauseFocusNode,
-                onPressed: _togglePlayPause,
-                child: Icon(
-                  _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                  color: AppColors.primary,
-                  size: 64,
-                ),
+        // Center Controls - Positioned lower with transparent background
+        Positioned(
+          bottom: 100, // Lower position (above progress bar area)
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(40),
               ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Replay 10s button only for VOD
+                  if (widget.streamType != StreamType.live) ...[
+                     IconButton(
+                       icon: const Icon(Icons.replay_10, color: Colors.white70, size: 36),
+                       onPressed: () => _seek(const Duration(seconds: -10)),
+                     ),
+                     const SizedBox(width: 24),
+                  ],
+                  
+                  TVFocusable(
+                    focusNode: _playPauseFocusNode,
+                    onPressed: _togglePlayPause,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                    ),
+                  ),
 
-              // Forward 10s button only for VOD
-              if (widget.streamType != StreamType.live) ...[
-                 const SizedBox(width: 32),
-                 IconButton(
-                   icon: const Icon(Icons.forward_10, color: Colors.white, size: 40),
-                   onPressed: () => _seek(const Duration(seconds: 10)),
-                 ),
-              ],
-            ],
+                  // Forward 10s button only for VOD
+                  if (widget.streamType != StreamType.live) ...[
+                     const SizedBox(width: 24),
+                     IconButton(
+                       icon: const Icon(Icons.forward_10, color: Colors.white70, size: 36),
+                       onPressed: () => _seek(const Duration(seconds: 10)),
+                     ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
         

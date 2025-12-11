@@ -130,35 +130,47 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           // Appearance
           const _SectionHeader(title: 'Apparence'),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: SwitchListTile(
-              title: const Text('Mode Sombre', 
-                style: TextStyle(color: AppColors.textPrimary)),
-              secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, 
-                color: AppColors.primary),
-              value: isDark,
-              onChanged: (_) => themeNotifier.toggleTheme(),
-              activeColor: AppColors.primary,
+          
+          // Dark Mode
+          TVFocusable(
+            onPressed: () => themeNotifier.toggleTheme(),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SwitchListTile(
+                title: const Text('Mode Sombre', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, 
+                  color: AppColors.primary),
+                value: isDark,
+                onChanged: (_) => themeNotifier.toggleTheme(),
+                activeColor: AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: SwitchListTile(
-              title: const Text('Afficher l\'heure', 
-                style: TextStyle(color: AppColors.textPrimary)),
-              secondary: const Icon(Icons.access_time, 
-                color: AppColors.primary),
-              value: settings.showClock,
-              onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowClock(val),
-              activeColor: AppColors.primary,
+          
+          // Show Clock
+          TVFocusable(
+            onPressed: () => ref.read(mobileSettingsProvider.notifier).toggleShowClock(!settings.showClock),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SwitchListTile(
+                title: const Text('Afficher l\'heure', 
+                  style: TextStyle(color: AppColors.textPrimary)),
+                secondary: const Icon(Icons.access_time, 
+                  color: AppColors.primary),
+                value: settings.showClock,
+                onChanged: (val) => ref.read(mobileSettingsProvider.notifier).toggleShowClock(val),
+                activeColor: AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -364,8 +376,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           // Refresh Cache Section
           const _SectionHeader(title: 'Cache'),
-          InkWell(
-            onTap: _isRefreshingCache ? null : () async {
+          TVFocusable(
+            onPressed: _isRefreshingCache ? null : () async {
               setState(() => _isRefreshingCache = true);
               
               try {
@@ -442,8 +454,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           const SizedBox(height: 16),
 
           // Change Playlist
-          InkWell(
-            onTap: () {
+          TVFocusable(
+            onPressed: () {
               // Open Playlist Selection in Manage Mode
               Navigator.push(
                 context,
