@@ -18,7 +18,7 @@ import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
 
 /// Lite version of the player using standard video_player (ExoPlayer on Android)
 /// Targeted for 1GB RAM devices with Light engine.
-/// Includes Ratio Toggle to fix Green Border issues manually.
+/// Standard AspectRatio implementation (No manual toggle).
 class LitePlayerScreen extends ConsumerStatefulWidget {
   final String streamId;
   final String title;
@@ -61,10 +61,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   bool _showControls = true;
   bool _isPlaying = false;
   
-  // Aspect Ratio Control
-  BoxFit _videoFit = BoxFit.contain; // Default
-  String _fitName = "Auto";
-
   // EPG
   xm.ShortEPG? _epg;
   Timer? _epgTimer;
@@ -77,7 +73,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   // Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
-  final FocusNode _ratioFocusNode = FocusNode();
 
   Timer? _controlsTimer;
   Timer? _clockTimer;
@@ -249,33 +244,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     _onUserInteraction();
   }
   
-  void _cycleAspectRatio() {
-    setState(() {
-      if (_videoFit == BoxFit.contain) {
-        _videoFit = BoxFit.cover; // Zoom (Fixes Green Border)
-        _fitName = "Zoom";
-      } else if (_videoFit == BoxFit.cover) {
-        _videoFit = BoxFit.fill; // Stretch
-        _fitName = "Stretch";
-      } else {
-        _videoFit = BoxFit.contain; // Normal
-        _fitName = "Auto";
-      }
-    });
-    
-    // Show quick feedback
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Format: $_fitName"),
-        duration: const Duration(seconds: 1),
-        backgroundColor: Colors.black87,
-      ),
-    );
-    
-    _onUserInteraction();
-  }
-  
   void _playNext() {
     if (widget.channels == null || widget.channels!.isEmpty) return;
     final nextIndex = (_currentIndex + 1) % widget.channels!.length;
@@ -387,7 +355,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     _xtreamService?.dispose();
     _playPauseFocusNode.dispose();
     _backFocusNode.dispose();
-    _ratioFocusNode.dispose();
     
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -418,18 +385,12 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
         onTap: _onUserInteraction,
         child: Stack(
           children: [
-            // Video Output with Ratio Control
+            // Video Output - Standard AspectRatio
             Center(
                child: _controller != null && _controller!.value.isInitialized
-                  ? SizedBox.expand(
-                      child: FittedBox(
-                        fit: _videoFit,
-                        child: SizedBox(
-                           width: _controller!.value.size.width,
-                           height: _controller!.value.size.height,
-                           child: VideoPlayer(_controller!),
-                        ),
-                      ),
+                  ? AspectRatio(
+                      aspectRatio: _controller!.value.aspectRatio,
+                      child: VideoPlayer(_controller!),
                     )
                   : const CircularProgressIndicator(color: AppColors.primary),
             ),
@@ -476,18 +437,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                    ),
                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                  const Spacer(),
-                 // Ratio Toggle Button
-                 TVFocusable(
-                   focusNode: _ratioFocusNode,
-                   onPressed: _cycleAspectRatio,
-                   child: Row(
-                     children: [
-                       const Icon(Icons.aspect_ratio, color: Colors.white, size: 20),
-                       const SizedBox(width: 4),
-                       Text(_fitName, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                     ],
-                   ),
-                 ),
+                 // NO RATIO TOGGLE HERE
                  const SizedBox(width: 16),
                  Text(_currentTime, style: const TextStyle(color: Colors.white70)),
               ],
