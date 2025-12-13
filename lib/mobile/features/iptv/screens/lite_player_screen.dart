@@ -17,7 +17,8 @@ import 'package:xtremflow/mobile/features/iptv/screens/native_player_screen.dart
 import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
 
 /// Lite version of the player using standard video_player (ExoPlayer on Android)
-/// Targeted for 1GB RAM devices where MPV is too heavy.
+/// Targeted for 1GB RAM devices with Light engine.
+/// Includes Ratio Toggle to fix Green Border issues manually.
 class LitePlayerScreen extends ConsumerStatefulWidget {
   final String streamId;
   final String title;
@@ -60,6 +61,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   bool _showControls = true;
   bool _isPlaying = false;
   
+  // Aspect Ratio Control
+  BoxFit _videoFit = BoxFit.contain; // Default
+  String _fitName = "Auto";
+
   // EPG
   xm.ShortEPG? _epg;
   Timer? _epgTimer;
@@ -72,6 +77,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   // Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
+  final FocusNode _ratioFocusNode = FocusNode();
 
   Timer? _controlsTimer;
   Timer? _clockTimer;
@@ -83,7 +89,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     
-    // Enable wakelock to prevent screen from turning off during playback
+    // Enable wakelock
     WakelockPlus.enable();
     
     _currentIndex = widget.initialIndex;
@@ -182,7 +188,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
       });
       _resetControlsTimer();
       
-      // Listen for errors and completion via controller listener
+      // Listen for errors and completion
       controller.addListener(_videoListener);
       
     } catch (e) {
@@ -198,13 +204,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   void _videoListener() {
     if (_controller == null || !mounted) return;
     
-    // Update Play/Pause state
     final isPlaying = _controller!.value.isPlaying;
     if (isPlaying != _isPlaying) {
       setState(() => _isPlaying = isPlaying);
     }
     
-    // Update Duration/Position (if not seeking)
     if (!_isSeeking) {
         final pos = _controller!.value.position;
         final dur = _controller!.value.duration;
@@ -245,6 +249,33 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     _onUserInteraction();
   }
   
+  void _cycleAspectRatio() {
+    setState(() {
+      if (_videoFit == BoxFit.contain) {
+        _videoFit = BoxFit.cover; // Zoom (Fixes Green Border)
+        _fitName = "Zoom";
+      } else if (_videoFit == BoxFit.cover) {
+        _videoFit = BoxFit.fill; // Stretch
+        _fitName = "Stretch";
+      } else {
+        _videoFit = BoxFit.contain; // Normal
+        _fitName = "Auto";
+      }
+    });
+    
+    // Show quick feedback
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Format: $_fitName"),
+        duration: const Duration(seconds: 1),
+        backgroundColor: Colors.black87,
+      ),
+    );
+    
+    _onUserInteraction();
+  }
+  
   void _playNext() {
     if (widget.channels == null || widget.channels!.isEmpty) return;
     final nextIndex = (_currentIndex + 1) % widget.channels!.length;
@@ -277,7 +308,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     if (event is! KeyDownEvent) return false;
     final key = event.logicalKey;
     
-    // Media Keys (Remote)
     if (key == LogicalKeyboardKey.mediaPlay || key == LogicalKeyboardKey.mediaPause || key == LogicalKeyboardKey.mediaPlayPause) {
        _togglePlayPause();
        return true;
@@ -288,29 +318,25 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
          _onUserInteraction();
          return true;
        }
-       // If controls visible, let focus system handle it
        return false;
     }
     
-    // Seek / Channel Change
-
     if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.channelDown) {
-      // User requested "Down" => Previous Channel (Index - 1)
       if (widget.streamType == StreamType.live) {
          _playPrevious();
-         _onUserInteraction(); // Show OSD
+         _onUserInteraction(); 
       }
       return true;
     }
 
     if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.channelUp) { 
-        // User requested "Up" => Next Channel (Index + 1)
         if (widget.streamType == StreamType.live) {
            _playNext();
-           _onUserInteraction(); // Show OSD
+           _onUserInteraction(); 
         } 
         return true;
     }
+    
     if (widget.streamType != StreamType.live) {
       if (key == LogicalKeyboardKey.arrowLeft) {
          _seek(const Duration(seconds: -10));
@@ -326,8 +352,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
       if (_showControls) {
         setState(() => _showControls = false); 
       } else {
-        // Force pop completely to return to list, not just playlist selection
-        // Check navigator stack if needed, but standard pop should work if pushed correctly
         Navigator.pop(context);
       }
       return true;
@@ -354,8 +378,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    
-    // Disable wakelock when leaving player
     WakelockPlus.disable();
     
     _controlsTimer?.cancel();
@@ -365,6 +387,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
     _xtreamService?.dispose();
     _playPauseFocusNode.dispose();
     _backFocusNode.dispose();
+    _ratioFocusNode.dispose();
     
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -395,11 +418,18 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
         onTap: _onUserInteraction,
         child: Stack(
           children: [
+            // Video Output with Ratio Control
             Center(
-              child: _controller != null && _controller!.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: _controller!.value.aspectRatio,
-                      child: VideoPlayer(_controller!),
+               child: _controller != null && _controller!.value.isInitialized
+                  ? SizedBox.expand(
+                      child: FittedBox(
+                        fit: _videoFit,
+                        child: SizedBox(
+                           width: _controller!.value.size.width,
+                           height: _controller!.value.size.height,
+                           child: VideoPlayer(_controller!),
+                        ),
+                      ),
                     )
                   : const CircularProgressIndicator(color: AppColors.primary),
             ),
@@ -432,7 +462,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                    child: const Icon(Icons.arrow_back, color: Colors.white),
                  ),
                  const SizedBox(width: 16),
-                 // Icon
                  if (widget.channels != null && widget.channels![_currentIndex].streamIcon.isNotEmpty)
                    Padding(
                      padding: const EdgeInsets.only(right: 12),
@@ -447,71 +476,79 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                    ),
                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                  const Spacer(),
+                 // Ratio Toggle Button
+                 TVFocusable(
+                   focusNode: _ratioFocusNode,
+                   onPressed: _cycleAspectRatio,
+                   child: Row(
+                     children: [
+                       const Icon(Icons.aspect_ratio, color: Colors.white, size: 20),
+                       const SizedBox(width: 4),
+                       Text(_fitName, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                     ],
+                   ),
+                 ),
+                 const SizedBox(width: 16),
                  Text(_currentTime, style: const TextStyle(color: Colors.white70)),
               ],
             ),
           ),
         ),
         
-        // Center Controls - Positioned lower with transparent background
+        // Center Controls
         Positioned(
-          bottom: 100, // Lower position (above progress bar area)
+          bottom: 100,
           left: 0,
           right: 0,
           child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Replay 10s button only for VOD
-                  if (widget.streamType != StreamType.live) ...[
-                     IconButton(
-                       icon: const Icon(Icons.replay_10, color: Colors.white70, size: 36),
-                       onPressed: () => _seek(const Duration(seconds: -10)),
-                     ),
-                     const SizedBox(width: 24),
-                  ],
-                  
-                  TVFocusable(
-                    focusNode: _playPauseFocusNode,
-                    onPressed: _togglePlayPause,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 48,
-                      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.streamType != StreamType.live) ...[
+                   IconButton(
+                     icon: const Icon(Icons.replay_10, color: Colors.white70, size: 36),
+                     onPressed: () => _seek(const Duration(seconds: -10)),
+                   ),
+                   const SizedBox(width: 24),
+                ],
+                
+                // Play/Pause Button
+                TVFocusable(
+                  focusNode: _playPauseFocusNode,
+                  onPressed: _togglePlayPause,
+                  scale: 1.0, 
+                  borderWidth: 0,
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 48,
                     ),
                   ),
+                ),
 
-                  // Forward 10s button only for VOD
-                  if (widget.streamType != StreamType.live) ...[
-                     const SizedBox(width: 24),
-                     IconButton(
-                       icon: const Icon(Icons.forward_10, color: Colors.white70, size: 36),
-                       onPressed: () => _seek(const Duration(seconds: 10)),
-                     ),
-                  ],
+                if (widget.streamType != StreamType.live) ...[
+                   const SizedBox(width: 24),
+                   IconButton(
+                     icon: const Icon(Icons.forward_10, color: Colors.white70, size: 36),
+                     onPressed: () => _seek(const Duration(seconds: 10)),
+                   ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
         
-        // EPG Content (Bottom Left)
+        // EPG Content
         if (widget.streamType == StreamType.live && _epg != null && _epg!.nowPlaying != null)
               Positioned(
-                bottom: 80, // Above progress/bottom bar
+                bottom: 80,
                 left: 24,
                 width: 350, 
                 child: Container(
@@ -547,7 +584,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                                ],
                              ),
                            ),
-                           // LIVE Badge
                            Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               margin: const EdgeInsets.only(left: 8),
@@ -562,7 +598,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                   ),
               ),
 
-        // Progress Bar (Bottom) - Only for VOD
+        // Progress Bar (VOD)
         if (widget.streamType != StreamType.live)
           Positioned(
               bottom: 0, left: 0, right: 0,
@@ -576,7 +612,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen> with Widget
                           child: Slider(
                             value: _position.inSeconds.toDouble().clamp(0, _duration.inSeconds.toDouble()),
                             min: 0,
-                            max: _duration.inSeconds.toDouble(),
+                            max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
                             activeColor: AppColors.primary,
                             inactiveColor: Colors.white24,
                             onChanged: (val) {

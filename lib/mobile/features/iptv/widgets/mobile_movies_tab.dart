@@ -40,8 +40,13 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
   @override
   void initState() {
     super.initState();
-    _loadMoreMovies();
     _scrollController.addListener(_onScroll);
+    // Defer initial load to after first frame to ensure providers are ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _movies.isEmpty) {
+        _loadMoreMovies();
+      }
+    });
   }
 
   @override
@@ -208,6 +213,15 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab> with Automati
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final settings = ref.watch(mobileSettingsProvider);
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
+    
+    // Retry load if movies list is empty (fixes issue where EPG loads but tab needs refresh)
+    if (_movies.isEmpty && !_isLoading && _hasMore) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _movies.isEmpty) {
+          _loadMoreMovies();
+        }
+      });
+    }
     
     List<Movie> displayMovies;
     if (_searchQuery.isNotEmpty && _searchResults != null) {

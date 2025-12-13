@@ -137,14 +137,16 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Column(
                     children: [
-                      // Search Bar
-                      GestureDetector(
-                        onTap: () {
+                      // Search Bar - Wrapped in TVFocusable for remote access
+                      TVFocusable(
+                        onPressed: () {
                           setState(() => _isSearchEditing = true);
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _searchFocusNode.requestFocus();
+                            SystemChannels.textInput.invokeMethod('TextInput.show');
                           });
                         },
+                        borderRadius: BorderRadius.circular(12),
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
@@ -287,11 +289,11 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab> with Automati
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.surface,
-                  AppColors.surface.withOpacity(0.8),
+                  const Color(0xFF4A4A4C), // Lighter grey top
+                  const Color(0xFF2C2C2E), // Medium grey bottom
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
@@ -455,10 +457,16 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
       onLongPress: () {
         ref.read(mobileFavoritesProvider.notifier).toggle(widget.channel.streamId);
       },
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF4A4A4C), // Lighter grey top
+              const Color(0xFF2C2C2E), // Medium grey bottom
+            ],
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -469,9 +477,9 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
               flex: 3,
               child: Container(
                 width: double.infinity,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.black26,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                 ),
                 child: Stack(
                   children: [
