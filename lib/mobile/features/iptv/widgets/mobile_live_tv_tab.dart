@@ -406,11 +406,11 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   void _playChannel(BuildContext context, Channel channel,
       List<Channel> channels, PlaylistConfig playlist, int index) async {
-    // ENFORCE LITE PLAYER FOR LIVE TV
+    // Unified Player Strategy: Use NativePlayer (Ultra) for everything
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LitePlayerScreen(
+        builder: (context) => NativePlayerScreen(
           streamId: channel.streamId,
           title: channel.name,
           playlist: playlist,
