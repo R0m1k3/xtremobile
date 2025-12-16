@@ -63,6 +63,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final FocusNode _prevFocusNode = FocusNode();
   final FocusNode _nextFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
+  final FocusNode _audioFocusNode = FocusNode();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -1024,6 +1025,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   ),
 
                   const SizedBox(width: 32),
+
+                  // Audio Button (VOD Only)
+                  if (widget.streamType != StreamType.live) ...[
+                    TVFocusable(
+                      focusNode: _audioFocusNode,
+                      onPressed: _cycleAudioTrack,
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.audiotrack,
+                            color: Colors.white, size: 32),
+                        onPressed: _cycleAudioTrack,
+                        tooltip: 'Changer Piste Audio',
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                  ],
 
                   // Next Channel / Forward 10s
                   if (widget.streamType == StreamType.live &&
