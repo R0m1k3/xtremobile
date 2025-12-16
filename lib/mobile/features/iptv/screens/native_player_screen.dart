@@ -968,6 +968,20 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // FORCE AUDIO BUTTON (First item)
+                  TVFocusable(
+                    focusNode: _audioFocusNode,
+                    onPressed: _cycleAudioTrack,
+                    onFocus: _resetControlsTimer,
+                    borderRadius: BorderRadius.circular(50),
+                    child: IconButton(
+                      icon: const Icon(Icons.audiotrack,
+                          color: Colors.greenAccent, size: 32),
+                      onPressed: _cycleAudioTrack,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
                   // Prev Channel / Replay 10s
                   if (widget.streamType == StreamType.live &&
                       widget.channels != null &&
@@ -1025,23 +1039,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   ),
 
                   const SizedBox(width: 32),
-
-                  // Audio Button (VOD Only)
-                  if (widget.streamType != StreamType.live) ...[
-                    TVFocusable(
-                      focusNode: _audioFocusNode,
-                      onPressed: _cycleAudioTrack,
-                      onFocus: _resetControlsTimer,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(Icons.audiotrack,
-                            color: Colors.white, size: 32),
-                        onPressed: _cycleAudioTrack,
-                        tooltip: 'Changer Piste Audio',
-                      ),
-                    ),
-                    const SizedBox(width: 32),
-                  ],
 
                   // Next Channel / Forward 10s
                   if (widget.streamType == StreamType.live &&
