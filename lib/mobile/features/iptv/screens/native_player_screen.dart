@@ -186,27 +186,41 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
     // Critical for movies/series with AC3, EAC3, DTS, TrueHD audio
-    (_player.platform as dynamic)?.setProperty(
-        'audio-channels', 'auto-safe'); // Auto-detect audio channels
-    (_player.platform as dynamic)?.setProperty(
-        'audio-normalize-downmix', 'yes'); // Normalize volume when downmixing
-    (_player.platform as dynamic)
-        ?.setProperty('volume', '100'); // Set initial volume
-    (_player.platform as dynamic)
-        ?.setProperty('volume-max', '150'); // Allow boost if needed
-    (_player.platform as dynamic)?.setProperty(
-        'alang', 'fr,fra,fre,en,eng'); // Preferred audio languages
-    (_player.platform as dynamic)
-        ?.setProperty('audio-file-auto', 'fuzzy'); // Auto-load external audio
 
-    // Force software audio decoding for maximum compatibility
-    // (Hardware audio decoding can fail on some devices for AC3/DTS)
-    (_player.platform as dynamic)
-        ?.setProperty('ad', 'lavc:*'); // Use lavcodec for all audio decoders
+    // ESSENTIAL: Ensure audio is NOT muted
+    (_player.platform as dynamic)?.setProperty('mute', 'no');
 
-    // Explicitly select first audio track if detection fails
+    // Audio output configuration
     (_player.platform as dynamic)
-        ?.setProperty('aid', 'auto'); // Auto-select audio track
+        ?.setProperty('ao', 'audiotrack,opensles'); // Android audio outputs
+    (_player.platform as dynamic)?.setProperty(
+        'audio-channels', 'stereo'); // Force stereo for max compatibility
+    (_player.platform as dynamic)?.setProperty(
+        'audio-spdif', ''); // Disable passthrough (decode locally)
+
+    // Volume settings
+    (_player.platform as dynamic)?.setProperty('volume', '100');
+    (_player.platform as dynamic)?.setProperty('volume-max', '200');
+
+    // Audio track selection - force first track
+    (_player.platform as dynamic)
+        ?.setProperty('aid', '1'); // Select first audio track explicitly
+    (_player.platform as dynamic)
+        ?.setProperty('alang', 'fr,fra,fre,en,eng,und'); // Include undefined
+
+    // Audio decoding - force software for all codecs
+    (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
+
+    // Audio sync and buffer
+    (_player.platform as dynamic)
+        ?.setProperty('audio-buffer', '0.5'); // Reduced for faster start
+    (_player.platform as dynamic)?.setProperty('audio-delay', '0'); // No delay
+
+    // Normalize volume when downmixing surround
+    (_player.platform as dynamic)
+        ?.setProperty('audio-normalize-downmix', 'yes');
+
+    debugPrint('MediaKitPlayer: Audio configuration applied');
 
     _controller = VideoController(_player);
 
