@@ -83,6 +83,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   static const int _maxReconnectAttempts = 5;
   String _currentTime = '';
   bool _hasMarkedAsWatched = false; // Flag to mark watched only once at 80%
+  DateTime? _lastSaveTime; // For throttling position saves
 
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
@@ -240,6 +241,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
         // Check if 80% of content watched (for VOD/Series only)
         _checkAndMarkWatched(position);
+
+        // Auto-save position every 10 seconds (resilience against app kill/crash)
+        if (widget.streamType != StreamType.live && !_hasMarkedAsWatched) {
+          final now = DateTime.now();
+          if (_lastSaveTime == null ||
+              now.difference(_lastSaveTime!) > const Duration(seconds: 10)) {
+            _lastSaveTime = now;
+            // Don't save if < 30s or > 95%
+            if (position.inSeconds > 30 &&
+                _duration.inSeconds > 0 &&
+                position.inSeconds / _duration.inSeconds < 0.95) {
+              ref
+                  .read(mobileWatchHistoryProvider.notifier)
+                  .saveResumePosition(_contentId, position.inSeconds);
+            }
+          }
+        }
       }
     });
 
@@ -675,6 +693,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _togglePlayPause() {
     if (_isPlaying) {
       _player.pause();
+      // Save position on pause
+      if (widget.streamType != StreamType.live) {
+        ref
+            .read(mobileWatchHistoryProvider.notifier)
+            .saveResumePosition(_contentId, _position.inSeconds);
+      }
     } else {
       _player.play();
     }
