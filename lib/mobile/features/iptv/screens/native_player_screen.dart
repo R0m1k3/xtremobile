@@ -184,6 +184,30 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('framedrop',
         'decoder+vo'); // Allow frame drops at decoder and video output
 
+    // ============ AUDIO CODEC SUPPORT FOR VOD ============
+    // Critical for movies/series with AC3, EAC3, DTS, TrueHD audio
+    (_player.platform as dynamic)?.setProperty(
+        'audio-channels', 'auto-safe'); // Auto-detect audio channels
+    (_player.platform as dynamic)?.setProperty(
+        'audio-normalize-downmix', 'yes'); // Normalize volume when downmixing
+    (_player.platform as dynamic)
+        ?.setProperty('volume', '100'); // Set initial volume
+    (_player.platform as dynamic)
+        ?.setProperty('volume-max', '150'); // Allow boost if needed
+    (_player.platform as dynamic)?.setProperty(
+        'alang', 'fr,fra,fre,en,eng'); // Preferred audio languages
+    (_player.platform as dynamic)
+        ?.setProperty('audio-file-auto', 'fuzzy'); // Auto-load external audio
+
+    // Force software audio decoding for maximum compatibility
+    // (Hardware audio decoding can fail on some devices for AC3/DTS)
+    (_player.platform as dynamic)
+        ?.setProperty('ad', 'lavc:*'); // Use lavcodec for all audio decoders
+
+    // Explicitly select first audio track if detection fails
+    (_player.platform as dynamic)
+        ?.setProperty('aid', 'auto'); // Auto-select audio track
+
     _controller = VideoController(_player);
 
     // Listen to player state
