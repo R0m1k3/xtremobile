@@ -185,35 +185,34 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         'decoder+vo'); // Allow frame drops at decoder and video output
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
-    // Reverted to safer defaults for Android TV
+    // V3: Explicit LAVC Downmix & Audiotrack
 
     // Ensure audio is NOT muted
     (_player.platform as dynamic)?.setProperty('mute', 'no');
 
-    // Force software audio decoding for maximum compatibility (AC3/DTS/EAC3)
-    // Hardware decoding of audio often fails on Fire TV
-    (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
-
-    // Audio configuration - Safe Stereo
+    // Explicitly enable LAVC downmixing to stereo (Crucial for 5.1/7.1 on Stereo devices)
+    (_player.platform as dynamic)?.setProperty('ad-lavc-downmix', 'yes');
     (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
     (_player.platform as dynamic)
         ?.setProperty('audio-normalize-downmix', 'yes');
 
-    // LET MPV DECIDE OUTPUT (Removing explicit 'ao')
-    // Removing explicit 'aid=1' (Default requires auto)
+    // Force software decoding for audio tracks (Maximum compatibility)
+    (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
 
-    // Track Selection - Auto (Safest)
+    // Use audiotrack (standard Android)
+    (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
+
+    // Track Selection - Auto
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
     (_player.platform as dynamic)?.setProperty('alang', 'fr,fra,fre,en,eng');
 
-    // Volume
+    // Volume & Sync
     (_player.platform as dynamic)?.setProperty('volume', '100');
-
-    // Sync settings
-    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.2');
+    // Slightly larger buffer for software decoding
+    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.25');
     (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
 
-    debugPrint('MediaKitPlayer: Audio SAFE configuration applied');
+    debugPrint('MediaKitPlayer: Audio V3 (Downmix) configuration applied');
 
     _controller = VideoController(_player);
 
@@ -761,10 +760,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       return true;
     }
 
-    // Down Arrow - Next channel (Live only)
+    // Down Arrow - Next channel (Live) or Cycle Audio (VOD)
     if (key == LogicalKeyboardKey.arrowDown) {
       if (widget.streamType == StreamType.live && widget.channels != null) {
         _playNext();
+      } else if (widget.streamType != StreamType.live) {
+        _cycleAudioTrack();
       }
       return true;
     }
@@ -781,6 +782,37 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
 
     return false;
+  }
+
+  Future<void> _cycleAudioTrack() async {
+    final tracks = _player.state.tracks.audio;
+    if (tracks.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Aucune piste audio détectée'),
+              duration: Duration(seconds: 1)),
+        );
+      }
+      return;
+    }
+
+    final current = _player.state.track.audio;
+    int currentIndex = tracks.indexOf(current);
+    int nextIndex = (currentIndex + 1) % tracks.length;
+    final nextTrack = tracks[nextIndex];
+
+    await _player.setAudioTrack(nextTrack);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Audio: ${nextTrack.language ?? "inconnu"} (${nextTrack.title ?? nextTrack.id})'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
