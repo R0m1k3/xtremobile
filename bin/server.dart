@@ -24,7 +24,7 @@ void main(List<String> args) async {
   final parser = ArgParser()
     ..addOption('port', abbr: 'p', defaultsTo: '8089')
     ..addOption('path', defaultsTo: '/app/web');
-  
+
   final result = parser.parse(args);
   final port = int.parse(result['port']);
   final webPath = result['path'];
@@ -45,17 +45,23 @@ void main(List<String> args) async {
     // Auth endpoints (no auth middleware) - full path including /api/
     ..mount('/api/auth', authHandler.router)
     // Playlists endpoints (with auth middleware)
-    ..mount('/api/playlists', Pipeline()
-      .addMiddleware(authMiddleware(db))
-      .addHandler(playlistsHandler.router.call))
+    ..mount(
+        '/api/playlists',
+        Pipeline()
+            .addMiddleware(authMiddleware(db))
+            .addHandler(playlistsHandler.router.call))
     // Users endpoints (with auth middleware)
-    ..mount('/api/users', Pipeline()
-      .addMiddleware(authMiddleware(db))
-      .addHandler(usersHandler.router.call))
+    ..mount(
+        '/api/users',
+        Pipeline()
+            .addMiddleware(authMiddleware(db))
+            .addHandler(usersHandler.router.call))
     // Settings endpoints (with auth middleware)
-    ..mount('/api/settings', Pipeline()
-      .addMiddleware(authMiddleware(db))
-      .addHandler(settingsHandler.router.call));
+    ..mount(
+        '/api/settings',
+        Pipeline()
+            .addMiddleware(authMiddleware(db))
+            .addHandler(settingsHandler.router.call));
 
   // Initialize Cleanup Service
   final cleanupService = CleanupService();
@@ -64,31 +70,33 @@ void main(List<String> args) async {
   // Target local logs/cache if they exist
   cleanupService.addTarget(Directory('/app/data/logs'));
   cleanupService.addTarget(Directory('/app/data/tmp'));
-  
+
   cleanupService.start();
 
   // Admin Routes (protected)
-  apiRouter.mount('/api/admin', Pipeline()
-      .addMiddleware(authMiddleware(db))
-      .addHandler((Request request) {
-        final router = Router();
-        
-        // POST /api/admin/purge
-        router.post('/purge', (Request req) async {
-          final user = req.context['user'] as User?;
-          if (user == null || !user.isAdmin) {
-             return Response.forbidden(jsonEncode({'error': 'Admin access required'}));
-          }
-          
-          final result = await cleanupService.runCleanup();
-          return Response.ok(
-            jsonEncode(result),
-            headers: {'content-type': 'application/json'},
-          );
-        });
-        
-        return router(request);
-      }),);
+  apiRouter.mount(
+    '/api/admin',
+    Pipeline().addMiddleware(authMiddleware(db)).addHandler((Request request) {
+      final router = Router();
+
+      // POST /api/admin/purge
+      router.post('/purge', (Request req) async {
+        final user = req.context['user'] as User?;
+        if (user == null || !user.isAdmin) {
+          return Response.forbidden(
+              jsonEncode({'error': 'Admin access required'}));
+        }
+
+        final result = await cleanupService.runCleanup();
+        return Response.ok(
+          jsonEncode(result),
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      return router(request);
+    }),
+  );
 
   // Create handlers
   // Create static handler
@@ -101,46 +109,46 @@ void main(List<String> args) async {
   // Wrap static handler to enforce cache policies
   Handler staticHandler = (Request request) async {
     final response = await baseStaticHandler(request);
-    
+
     // Disable cache for entry points to ensure updates are seen immediately
     final path = request.url.path;
-    if (path.isEmpty || 
-        path == 'index.html' || 
-        path.endsWith('.js') ||  // Disable cache for ALL JS files (main.dart.js, bootstrap, etc)
-        path.endsWith('.json')) { // version.json etc
+    if (path.isEmpty ||
+        path == 'index.html' ||
+        path.endsWith(
+            '.js') || // Disable cache for ALL JS files (main.dart.js, bootstrap, etc)
+        path.endsWith('.json')) {
+      // version.json etc
       return response.change(headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma': 'no-cache',
         'Expires': '0',
       });
     }
-    
+
     // Allow aggressive caching for hashed assets (images, compiled JS)
     // Flutter web builds usually hash main.dart.js, but let's be safe with 1 day
     return response.change(headers: {
-      'Cache-Control': 'public, max-age=86400', 
+      'Cache-Control': 'public, max-age=86400',
     });
   };
 
   // Main handler with API proxy and FFmpeg streaming
   final handler = Cascade()
-    .add(_createApiHandler(apiRouter))
-    .add(_createStreamHandler())  // FFmpeg streaming endpoint
-    .add(_createXtreamProxyHandler())
-    // .add(_createHlsHandler())  // REMOVED: HLS obsolete with direct stream
-    .add(staticHandler)
-    .handler;
-
-
+      .add(_createApiHandler(apiRouter))
+      .add(_createStreamHandler()) // FFmpeg streaming endpoint
+      .add(_createXtreamProxyHandler())
+      // .add(_createHlsHandler())  // REMOVED: HLS obsolete with direct stream
+      .add(staticHandler)
+      .handler;
 
   // Add middleware
   final pipeline = Pipeline()
-    .addMiddleware(logRequests())
-    .addMiddleware(securityHeadersMiddleware()) // Basic Headers
-    .addMiddleware(honeypotMiddleware())        // Trap Bots
-    .addMiddleware(rateLimitMiddleware())       // Anti-DoS
-    .addMiddleware(_corsMiddleware())
-    .addHandler(handler);
+      .addMiddleware(logRequests())
+      .addMiddleware(securityHeadersMiddleware()) // Basic Headers
+      .addMiddleware(honeypotMiddleware()) // Trap Bots
+      .addMiddleware(rateLimitMiddleware()) // Anti-DoS
+      .addMiddleware(_corsMiddleware())
+      .addHandler(handler);
 
   // Start server
   final server = await shelf_io.serve(
@@ -154,7 +162,7 @@ void main(List<String> args) async {
   print('REST API available at: /api/auth/* and /api/playlists/*');
   print('Xtream proxy available at: /api/xtream/*');
   print('FFmpeg streaming available at: /api/stream/*');
-  
+
   // Clean expired sessions periodically (every hour)
   Timer.periodic(const Duration(hours: 1), (_) {
     db.cleanExpiredSessions();
@@ -166,12 +174,12 @@ void main(List<String> args) async {
 Handler _createApiHandler(Router apiRouter) {
   return (Request request) async {
     final path = request.url.path;
-    
+
     // Only handle /api/* requests (excluding /api/xtream)
     if (path.startsWith('api/') && !path.startsWith('api/xtream/')) {
       return apiRouter(request);
     }
-    
+
     return Response.notFound('Not found');
   };
 }
@@ -213,12 +221,12 @@ Handler _createXtreamProxyHandler() {
       // Format: /api/xtream/http://server:port/path
       // Note: URL might be URL-encoded (e.g., http%3A%2F%2F...)
       String apiPath = path.substring('api/xtream/'.length);
-      
+
       // Decode URL if it's encoded (http%3A%2F%2F -> http://)
       if (apiPath.startsWith('http%3A') || apiPath.startsWith('https%3A')) {
         apiPath = Uri.decodeComponent(apiPath);
       }
-      
+
       // The client will send the full URL after /api/xtream/
       if (!apiPath.startsWith('http://') && !apiPath.startsWith('https://')) {
         return Response.badRequest(
@@ -236,19 +244,20 @@ Handler _createXtreamProxyHandler() {
           fullUrl = '$fullUrl?${request.url.query}';
         }
       }
-      
+
       final targetUrl = Uri.parse(fullUrl);
-      final baseUrl = '${targetUrl.scheme}://${targetUrl.host}${targetUrl.hasPort ? ':${targetUrl.port}' : ''}';
-      
+      final baseUrl =
+          '${targetUrl.scheme}://${targetUrl.host}${targetUrl.hasPort ? ':${targetUrl.port}' : ''}';
+
       // Check if this is a video file that needs streaming
       final lowerPath = targetUrl.path.toLowerCase();
-      final isVideoFile = lowerPath.endsWith('.mp4') || 
-                          lowerPath.endsWith('.mkv') || 
-                          lowerPath.endsWith('.avi') ||
-                          lowerPath.endsWith('.ts') ||
-                          lowerPath.endsWith('.m4v') ||
-                          lowerPath.contains('/movie/') ||
-                          lowerPath.contains('/series/');
+      final isVideoFile = lowerPath.endsWith('.mp4') ||
+          lowerPath.endsWith('.mkv') ||
+          lowerPath.endsWith('.avi') ||
+          lowerPath.endsWith('.ts') ||
+          lowerPath.endsWith('.m4v') ||
+          lowerPath.contains('/movie/') ||
+          lowerPath.contains('/series/');
 
       print('Proxying request to: $targetUrl (video streaming: $isVideoFile)');
 
@@ -271,37 +280,39 @@ Handler _createXtreamProxyHandler() {
       http.Response response;
       if (request.method == 'GET') {
         response = await http.get(targetUrl, headers: proxyHeaders).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => http.Response('Request timeout', 504),
-        );
+              const Duration(seconds: 30),
+              onTimeout: () => http.Response('Request timeout', 504),
+            );
       } else if (request.method == 'POST') {
         final body = await request.readAsString();
-        response = await http.post(targetUrl, headers: proxyHeaders, body: body).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => http.Response('Request timeout', 504),
-        );
+        response = await http
+            .post(targetUrl, headers: proxyHeaders, body: body)
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () => http.Response('Request timeout', 504),
+            );
       } else {
         return Response(405, body: 'Method not allowed');
       }
 
       // Check if this is an M3U8/HLS playlist that needs URL rewriting
       final contentType = response.headers['content-type'] ?? '';
-      final isM3u8 = fullUrl.endsWith('.m3u8') || 
-                     contentType.contains('application/vnd.apple.mpegurl') ||
-                     contentType.contains('application/x-mpegurl') ||
-                     contentType.contains('audio/mpegurl');
+      final isM3u8 = fullUrl.endsWith('.m3u8') ||
+          contentType.contains('application/vnd.apple.mpegurl') ||
+          contentType.contains('application/x-mpegurl') ||
+          contentType.contains('audio/mpegurl');
 
       if (isM3u8 && response.statusCode == 200) {
         // Rewrite URLs in M3U8 playlist to go through proxy
         final rewrittenBody = _rewriteM3u8Urls(
-          response.body, 
-          baseUrl, 
+          response.body,
+          baseUrl,
           targetUrl.path,
           request.requestedUri.origin,
         );
-        
+
         print('Rewrote M3U8 playlist URLs for: $targetUrl');
-        
+
         return Response(
           response.statusCode,
           body: rewrittenBody,
@@ -316,7 +327,8 @@ Handler _createXtreamProxyHandler() {
         response.statusCode,
         body: response.bodyBytes,
         headers: {
-          'content-type': response.headers['content-type'] ?? 'application/json',
+          'content-type':
+              response.headers['content-type'] ?? 'application/json',
           'access-control-allow-origin': '*',
           // Forward cache headers from upstream
           if (response.headers.containsKey('cache-control'))
@@ -345,7 +357,7 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
   final maxRedirects = 5;
   var currentUrl = targetUrl;
   final cookies = <String, String>{}; // Cookie Jar for redirects
-  
+
   print('Stream Request: $targetUrl');
   if (rangeHeader != null) print('Client Requested Range: $rangeHeader');
 
@@ -355,18 +367,19 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
       // Increase timeouts for large video files
       client.connectionTimeout = const Duration(seconds: 60);
       client.idleTimeout = const Duration(minutes: 5);
-      
+
       final req = await client.getUrl(currentUrl);
       req.followRedirects = false; // We handle redirects manually
-      
+
       req.headers.set('User-Agent', 'VLC/3.0.18 LibVLC/3.0.18');
       req.headers.set('Accept', '*/*');
       req.headers.set('Connection', 'keep-alive');
       req.headers.set('Accept-Encoding', 'identity');
-      
+
       // Apply collected cookies
       if (cookies.isNotEmpty) {
-        final cookieHeader = cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+        final cookieHeader =
+            cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
         req.headers.set(HttpHeaders.cookieHeader, cookieHeader);
       }
 
@@ -377,12 +390,12 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
         }
         req.headers.set(HttpHeaders.rangeHeader, rangeHeader);
       }
-      
+
       client.autoUncompress = false;
-      
+
       final response = await req.close();
       print('Upstream Response: ${response.statusCode} (Redirect $i)');
-      
+
       // Collect Cookies from response
       response.cookies.forEach((cookie) {
         cookies[cookie.name] = cookie.value;
@@ -398,10 +411,10 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
           continue; // Loop to next request
         }
       }
-      
+
       // Get content type
       final contentType = response.headers.contentType?.mimeType ?? 'video/mp4';
-      
+
       // Build response headers
       final responseHeaders = <String, String>{
         'content-type': contentType,
@@ -410,74 +423,78 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
         'cache-control': 'no-cache',
         'connection': 'keep-alive',
       };
-      
+
       // Checks for 206 vs 200
       if (response.statusCode == 200 && rangeHeader != null) {
-        print('WARNING: Upstream ignored Range header and returned 200. Seeking might fail.');
+        print(
+            'WARNING: Upstream ignored Range header and returned 200. Seeking might fail.');
       } else if (response.statusCode == 206) {
         print('SUCCESS: Upstream returned 206 Partial Content.');
       }
-      
+
       // Add Content-Length if available
       if (response.contentLength > 0) {
         responseHeaders['content-length'] = response.contentLength.toString();
       }
-      
+
       // Add Content-Range if this is a partial response (206)
-      final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
+      final contentRange =
+          response.headers.value(HttpHeaders.contentRangeHeader);
       if (contentRange != null) {
         responseHeaders[HttpHeaders.contentRangeHeader] = contentRange;
       }
-      
+
       // Propagate Accept-Ranges
       responseHeaders[HttpHeaders.acceptRangesHeader] = 'bytes';
-      
+
       // Return appropriate status code
       return Response(
         response.statusCode,
         body: response,
         headers: responseHeaders,
       );
-      
     } catch (e) {
       print('Video streaming exception: $e');
       if (i == maxRedirects - 1) {
-         return Response.internalServerError(
-           body: jsonEncode({'error': 'Video streaming error', 'message': e.toString()}),
-           headers: {'content-type': 'application/json'},
-         );
+        return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Video streaming error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
       }
     }
   }
-  
+
   return Response.internalServerError(body: 'Too many redirects');
 }
 
 /// Rewrite URLs in M3U8 playlist to go through the proxy
-/// 
+///
 /// Handles both relative and absolute URLs in HLS playlists
-String _rewriteM3u8Urls(String m3u8Content, String baseUrl, String originalPath, String proxyOrigin) {
+String _rewriteM3u8Urls(String m3u8Content, String baseUrl, String originalPath,
+    String proxyOrigin) {
   final lines = m3u8Content.split('\n');
   final rewrittenLines = <String>[];
-  
+
   // Get directory path for relative URL resolution
   final pathSegments = originalPath.split('/');
   pathSegments.removeLast(); // Remove filename
   final basePath = pathSegments.join('/');
-  
+
   for (final line in lines) {
     final trimmedLine = line.trim();
-    
+
     // Skip empty lines and comments (except URI in comments)
     if (trimmedLine.isEmpty) {
       rewrittenLines.add(line);
       continue;
     }
-    
+
     // Handle lines that contain URLs (not starting with #, or EXT-X-KEY/EXT-X-MAP with URI)
     if (!trimmedLine.startsWith('#')) {
       // This is a segment URL
-      final rewrittenUrl = _rewriteUrl(trimmedLine, baseUrl, basePath, proxyOrigin);
+      final rewrittenUrl =
+          _rewriteUrl(trimmedLine, baseUrl, basePath, proxyOrigin);
       rewrittenLines.add(rewrittenUrl);
     } else if (trimmedLine.contains('URI="')) {
       // Handle EXT-X-KEY, EXT-X-MAP, etc. with URI attribute
@@ -494,14 +511,15 @@ String _rewriteM3u8Urls(String m3u8Content, String baseUrl, String originalPath,
       rewrittenLines.add(line);
     }
   }
-  
+
   return rewrittenLines.join('\n');
 }
 
 /// Rewrite a single URL to go through the proxy
-String _rewriteUrl(String url, String baseUrl, String basePath, String proxyOrigin) {
+String _rewriteUrl(
+    String url, String baseUrl, String basePath, String proxyOrigin) {
   String fullUrl;
-  
+
   if (url.startsWith('http://') || url.startsWith('https://')) {
     // Already absolute URL
     fullUrl = url;
@@ -512,7 +530,7 @@ String _rewriteUrl(String url, String baseUrl, String basePath, String proxyOrig
     // Relative path, relative to current directory
     fullUrl = '$baseUrl$basePath/$url';
   }
-  
+
   // Wrap with proxy
   return '$proxyOrigin/api/xtream/$fullUrl';
 }
@@ -525,7 +543,7 @@ String _rewriteUrl(String url, String baseUrl, String basePath, String proxyOrig
 final Map<String, Process> _activeStreams = {};
 
 /// Create handler for FFmpeg streaming
-/// 
+///
 /// This endpoint starts an FFmpeg process that connects to the IPTV server
 /// with proper headers and transcodes the stream to local HLS files.
 Handler _createStreamHandler() {
@@ -543,14 +561,15 @@ Handler _createStreamHandler() {
       if (pathParts.length < 3) {
         return Response.badRequest(body: 'Invalid stream path');
       }
-      
+
       final streamId = pathParts[2];
-      
+
       // Get parameters
       final iptvUrl = request.url.queryParameters['url'];
       final quality = request.url.queryParameters['quality'] ?? 'high';
-      final start = request.url.queryParameters['start']; // Start time in seconds
-      
+      final start =
+          request.url.queryParameters['start']; // Start time in seconds
+
       if (iptvUrl == null || iptvUrl.isEmpty) {
         return Response.badRequest(body: 'Missing url parameter');
       }
@@ -561,27 +580,37 @@ Handler _createStreamHandler() {
       // Setup FFmpeg arguments for fMP4 piping
       // Determine if it's VOD or Live
       final isVod = streamId.startsWith('vod_'); // Or use extension check
-      
+
       final ffmpegArgs = <String>[
         '-hide_banner',
-        '-loglevel', 'error', // Minimize logs, only errors
+        '-loglevel', 'warning', // Show warnings too for debugging long streams
         '-user_agent', 'VLC/3.0.18 LibVLC/3.0.18',
-        '-headers', 'Accept: */*\r\nConnection: keep-alive\r\n',
-        
-        // Input resilience flags
+        '-headers',
+        'Accept: */*\r\nConnection: keep-alive\r\nIcy-MetaData: 0\r\n',
+
+        // ENHANCED Input resilience flags for LONG streaming
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '10',
+        '-reconnect_delay_max',
+        '30', // Increased to 30s max delay between reconnects
         '-reconnect_on_network_error', '1',
         '-reconnect_on_http_error', '4xx,5xx',
-        '-rw_timeout', '15000000', // 15s timeout
-        
+        '-reconnect_at_eof',
+        '1', // Reconnect at stream end (some streams reset)
+        '-rw_timeout', '30000000', // 30s timeout (doubled)
+        '-timeout', '60000000', // 60s global timeout
+
+        // Keep TCP connection alive
+        '-tcp_nodelay', '1',
+
         // Probing settings to ensure stream detection
-        '-analyzeduration', '20000000', // 20s
-        '-probesize', '10000000',      // 10MB
-        
+        '-analyzeduration', '30000000', // 30s (increased)
+        '-probesize', '20000000', // 20MB (doubled)
+        '-fflags',
+        '+discardcorrupt', // Skip corrupted frames instead of failing
+
         '-i', iptvUrl,
-        
+
         // Output format: MPEG-TS for streaming (compatible with mpegts.js)
         '-f', 'mpegts',
       ];
@@ -614,21 +643,28 @@ Handler _createStreamHandler() {
         if (quality == 'low') {
           // Low: ~480p, 800k
           ffmpegArgs.addAll([
-            '-vf', 'scale=-2:480',
-            '-b:v', '800k',
-            '-maxrate', '800k',
-            '-bufsize', '1600k',
+            '-vf',
+            'scale=-2:480',
+            '-b:v',
+            '800k',
+            '-maxrate',
+            '800k',
+            '-bufsize',
+            '1600k',
           ]);
         } else {
           // Medium: Original res (or cap at 720p?), 2500k
           ffmpegArgs.addAll([
-            '-b:v', '2500k',
-            '-maxrate', '2500k',
-            '-bufsize', '5000k',
+            '-b:v',
+            '2500k',
+            '-maxrate',
+            '2500k',
+            '-bufsize',
+            '5000k',
           ]);
         }
       }
-      
+
       // Audio: Transcode to AAC is SAFEST for browsers
       // (Many IPTV streams typically use MP2/AC3 which browsers hate)
       ffmpegArgs.addAll([
@@ -636,22 +672,22 @@ Handler _createStreamHandler() {
         '-b:a', '128k',
         '-ar', '44100',
         '-ac', '2',
-        
+
         // Fix for MPEG-TS timestamps
         '-fflags', '+genpts',
-        
+
         // Output to stdout pipe
         'pipe:1',
       ]);
 
       // Start the process
       final process = await Process.start('ffmpeg', ffmpegArgs);
-      
+
       // Manage process lifecycle
       // We use a StreamController to pipe stdout to the response
       // AND detect when the client disconnects to kill the process.
       final controller = StreamController<List<int>>();
-      
+
       // Pipe stdout to controller
       process.stdout.listen(
         (data) {
@@ -690,16 +726,14 @@ Handler _createStreamHandler() {
           'Connection': 'keep-alive',
         },
       );
-
     } catch (e, stackTrace) {
       print('Stream setup error: $e');
       print(stackTrace);
       return Response.internalServerError(
-        body: jsonEncode({'error': 'Stream setup error', 'message': e.toString()}),
+        body: jsonEncode(
+            {'error': 'Stream setup error', 'message': e.toString()}),
         headers: {'content-type': 'application/json'},
       );
     }
   };
 }
-
-

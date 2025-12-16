@@ -315,29 +315,30 @@
                 return false;
             }
 
-            // Optimized HLS.js configuration for stable live streaming
+            // Optimized HLS.js configuration for LONG stable live streaming
             const hls = new Hls({
-                // Increase buffer for smoother playback
-                maxBufferLength: 30,           // Max 30 seconds of buffer
-                maxMaxBufferLength: 60,        // Allow up to 60 seconds in stressed conditions
-                maxBufferSize: 60 * 1000000,   // 60MB max buffer size
-                maxBufferHole: 0.5,            // Tolerate 0.5s gaps in buffer
+                // INCREASED buffer for longer playback stability
+                maxBufferLength: 60,           // Max 60 seconds of buffer (doubled)
+                maxMaxBufferLength: 120,       // Allow up to 2 minutes in stressed conditions
+                maxBufferSize: 120 * 1000000,  // 120MB max buffer size
+                maxBufferHole: 1.0,            // Tolerate 1s gaps in buffer
 
-                // Low latency settings (balanced)
-                liveSyncDurationCount: 3,      // Sync to 3 segments behind live
-                liveMaxLatencyDurationCount: 6, // Max 6 segments behind before seeking
+                // Live streaming settings (more tolerant)
+                liveSyncDurationCount: 4,      // Sync to 4 segments behind live
+                liveMaxLatencyDurationCount: 10, // Max 10 segments behind before seeking
                 liveDurationInfinity: true,    // Treat live streams as infinite
+                liveBackBufferLength: 60,      // Keep 60s of back buffer
 
-                // Faster recovery from errors
-                manifestLoadingTimeOut: 15000,  // 15s timeout for manifest
-                manifestLoadingMaxRetry: 4,     // Retry manifest 4 times
-                manifestLoadingRetryDelay: 1000, // 1s between retries
-                levelLoadingTimeOut: 15000,     // 15s for level playlist
-                levelLoadingMaxRetry: 4,
-                levelLoadingRetryDelay: 1000,
-                fragLoadingTimeOut: 20000,      // 20s for fragments
-                fragLoadingMaxRetry: 6,         // Retry fragments 6 times
-                fragLoadingRetryDelay: 1000,
+                // MORE AGGRESSIVE recovery from errors
+                manifestLoadingTimeOut: 30000,  // 30s timeout for manifest
+                manifestLoadingMaxRetry: 10,    // Retry manifest 10 times
+                manifestLoadingRetryDelay: 2000, // 2s between retries
+                levelLoadingTimeOut: 30000,     // 30s for level playlist
+                levelLoadingMaxRetry: 10,
+                levelLoadingRetryDelay: 2000,
+                fragLoadingTimeOut: 60000,      // 60s for fragments (long timeout)
+                fragLoadingMaxRetry: 10,        // Retry fragments 10 times
+                fragLoadingRetryDelay: 2000,
 
                 // Better quality selection
                 startLevel: -1,                 // Auto-select start level
@@ -353,12 +354,15 @@
             });
 
             window.hlsInstance = hls; // Expose for external control (audio tracks)
+            let hlsRetryCount = 0;
+            const maxHlsRetries = 3;
 
             hls.loadSource(url);
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 log('HLS manifest parsed, starting playback');
+                hlsRetryCount = 0; // Reset retry counter on success
                 hideLoading();
                 video.play().catch(e => {
                     log('Autoplay prevented: ' + e);
@@ -366,7 +370,7 @@
                 });
             });
 
-            // Better error recovery
+            // IMPROVED error recovery with automatic restart
             hls.on(Hls.Events.ERROR, (event, data) => {
                 log('HLS Error: ' + data.type + ' - ' + data.details);
 
@@ -374,15 +378,38 @@
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
                             log('Network error, attempting recovery...');
-                            hls.startLoad(); // Try to recover network errors
+                            // Try startLoad first
+                            hls.startLoad();
+                            // If still failing after 5s, try full restart
+                            setTimeout(() => {
+                                if (video.paused || video.readyState < 2) {
+                                    if (hlsRetryCount < maxHlsRetries) {
+                                        hlsRetryCount++;
+                                        log('Auto-restarting stream (attempt ' + hlsRetryCount + ')...');
+                                        showLoading('Reconnecting...');
+                                        hls.destroy();
+                                        playWithHLS(url);
+                                    } else {
+                                        showError('Connection lost - tap to retry');
+                                    }
+                                }
+                            }, 5000);
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
                             log('Media error, attempting recovery...');
                             hls.recoverMediaError(); // Try to recover media errors
                             break;
                         default:
-                            showError('HLS Error: ' + data.details);
-                            hls.destroy();
+                            if (hlsRetryCount < maxHlsRetries) {
+                                hlsRetryCount++;
+                                log('Fatal error, restarting stream (attempt ' + hlsRetryCount + ')...');
+                                showLoading('Restarting stream...');
+                                hls.destroy();
+                                setTimeout(() => playWithHLS(url), 2000);
+                            } else {
+                                showError('Stream error: ' + data.details);
+                                hls.destroy();
+                            }
                             break;
                     }
                 }
@@ -390,6 +417,10 @@
 
             return true;
         }
+
+        let mpegtsRetryCount = 0;
+        const maxMpegtsRetries = 3;
+        let currentMpegtsPlayer = null;
 
         async function playWithMpegTS(url) {
             log('Trying mpegts.js with: ' + url);
@@ -404,6 +435,13 @@
                 mpegts.getLoggingControl().enableError = true;
             }
 
+            // Cleanup previous player if exists
+            if (currentMpegtsPlayer) {
+                try {
+                    currentMpegtsPlayer.destroy();
+                } catch (e) { }
+            }
+
             const player = mpegts.createPlayer({
                 type: 'mpegts',
                 isLive: true,
@@ -411,19 +449,30 @@
             }, {
                 enableWorker: true,
                 enableStashBuffer: true,
-                stashInitialSize: 384 * 1024,
+                stashInitialSize: 1024 * 1024,    // 1MB initial stash (increased)
                 autoCleanupSourceBuffer: true,
-                // Make the player more resilient to timestamp gaps without spamming
+                autoCleanupMaxBackwardDuration: 120, // Keep 2 minutes back buffer
+                autoCleanupMinBackwardDuration: 60,  // Min 1 minute
+                // Make the player more resilient to timestamp gaps
                 fixAudioTimestampGap: true,
-                lazyLoadMaxDuration: 3 * 60,
+                lazyLoadMaxDuration: 10 * 60,     // 10 minutes lazy load (increased)
                 seekType: 'range',
+                // Longer timeouts for stability
+                deferLoadAfterSourceOpen: false,
+                liveBufferLatencyChasing: true,
+                liveBufferLatencyMaxLatency: 30,  // Max 30s latency
+                liveBufferLatencyMinRemain: 5,    // Min 5s buffer
             });
+
+            currentMpegtsPlayer = player;
+            window.mpegtsPlayer = player; // Expose for debugging
 
             player.attachMediaElement(video);
             player.load();
 
             video.addEventListener('canplay', () => {
                 log('MPEG-TS stream ready');
+                mpegtsRetryCount = 0; // Reset on success
                 hideLoading();
                 video.play().catch(e => {
                     log('Autoplay prevented: ' + e);
@@ -432,12 +481,38 @@
             });
 
             video.addEventListener('error', (e) => {
-                showError('Video error: ' + (video.error?.message || 'Unknown error'));
-            });
+                const errorMsg = video.error?.message || 'Unknown error';
+                log('Video element error: ' + errorMsg);
+                // Don't show error immediately, try recovery first
+                if (mpegtsRetryCount < maxMpegtsRetries) {
+                    mpegtsRetryCount++;
+                    log('Attempting stream restart (attempt ' + mpegtsRetryCount + ')...');
+                    showLoading('Reconnecting...');
+                    setTimeout(() => {
+                        player.destroy();
+                        playWithMpegTS(url);
+                    }, 3000);
+                } else {
+                    showError('Video error: ' + errorMsg);
+                }
+            }, { once: true });
 
             player.on(mpegts.Events.ERROR, (errType, errDetail, errInfo) => {
                 log('mpegts error: ' + errType + ' - ' + errDetail);
-                showError('Stream error: ' + errDetail);
+                // Auto-retry on network errors
+                if (errType === mpegts.ErrorTypes.NETWORK_ERROR && mpegtsRetryCount < maxMpegtsRetries) {
+                    mpegtsRetryCount++;
+                    log('Network error, restarting stream (attempt ' + mpegtsRetryCount + ')...');
+                    showLoading('Reconnecting...');
+                    setTimeout(() => {
+                        player.destroy();
+                        playWithMpegTS(url);
+                    }, 3000);
+                } else if (mpegtsRetryCount >= maxMpegtsRetries) {
+                    showError('Connection lost - tap to retry');
+                } else {
+                    showError('Stream error: ' + errDetail);
+                }
             });
 
             return true;
