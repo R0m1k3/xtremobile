@@ -185,42 +185,35 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         'decoder+vo'); // Allow frame drops at decoder and video output
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
-    // Critical for movies/series with AC3, EAC3, DTS, TrueHD audio
+    // Reverted to safer defaults for Android TV
 
-    // ESSENTIAL: Ensure audio is NOT muted
+    // Ensure audio is NOT muted
     (_player.platform as dynamic)?.setProperty('mute', 'no');
 
-    // Audio output configuration
-    (_player.platform as dynamic)
-        ?.setProperty('ao', 'audiotrack,opensles'); // Android audio outputs
-    (_player.platform as dynamic)?.setProperty(
-        'audio-channels', 'stereo'); // Force stereo for max compatibility
-    (_player.platform as dynamic)?.setProperty(
-        'audio-spdif', ''); // Disable passthrough (decode locally)
-
-    // Volume settings
-    (_player.platform as dynamic)?.setProperty('volume', '100');
-    (_player.platform as dynamic)?.setProperty('volume-max', '200');
-
-    // Audio track selection - force first track
-    (_player.platform as dynamic)
-        ?.setProperty('aid', '1'); // Select first audio track explicitly
-    (_player.platform as dynamic)
-        ?.setProperty('alang', 'fr,fra,fre,en,eng,und'); // Include undefined
-
-    // Audio decoding - force software for all codecs
+    // Force software audio decoding for maximum compatibility (AC3/DTS/EAC3)
+    // Hardware decoding of audio often fails on Fire TV
     (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
 
-    // Audio sync and buffer
-    (_player.platform as dynamic)
-        ?.setProperty('audio-buffer', '0.5'); // Reduced for faster start
-    (_player.platform as dynamic)?.setProperty('audio-delay', '0'); // No delay
-
-    // Normalize volume when downmixing surround
+    // Audio configuration - Safe Stereo
+    (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
     (_player.platform as dynamic)
         ?.setProperty('audio-normalize-downmix', 'yes');
 
-    debugPrint('MediaKitPlayer: Audio configuration applied');
+    // LET MPV DECIDE OUTPUT (Removing explicit 'ao')
+    // Removing explicit 'aid=1' (Default requires auto)
+
+    // Track Selection - Auto (Safest)
+    (_player.platform as dynamic)?.setProperty('aid', 'auto');
+    (_player.platform as dynamic)?.setProperty('alang', 'fr,fra,fre,en,eng');
+
+    // Volume
+    (_player.platform as dynamic)?.setProperty('volume', '100');
+
+    // Sync settings
+    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.2');
+    (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
+
+    debugPrint('MediaKitPlayer: Audio SAFE configuration applied');
 
     _controller = VideoController(_player);
 
