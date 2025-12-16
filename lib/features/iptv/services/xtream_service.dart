@@ -4,22 +4,24 @@ import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_stor
 import '../../../core/models/playlist_config.dart';
 import '../../../core/models/iptv_models.dart';
 import '../models/xtream_models.dart' as xm;
-import 'dart:html' as html;
+import '../../../core/utils/platform_utils.dart' as platform;
 
 /// Xtream Codes API Service
-/// 
+///
 /// Handles all communication with Xtream API servers
 class XtreamService {
   late final Dio _dio;
   late final CacheOptions _cacheOptions;
-  
+
   PlaylistConfig? _currentPlaylist;
 
   XtreamService() {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-    ),);
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
 
     // Setup caching for API responses
     _cacheOptions = CacheOptions(
@@ -34,14 +36,14 @@ class XtreamService {
 
   /// Check if we're running on HTTPS (production)
   bool get _isHttps {
-    return html.window.location.protocol == 'https:';
+    return platform.isHttps();
   }
 
   /// Wrap URL with proxy if needed (for HTTPS to HTTP bridge)
   String _wrapWithProxy(String url) {
     // If we're on HTTPS and the target URL is HTTP, use the proxy
     if (_isHttps && url.startsWith('http://')) {
-      final baseUrl = html.window.location.origin;
+      final baseUrl = platform.getWindowOrigin();
       return '$baseUrl/api/xtream/$url';
     }
     return url;
@@ -53,17 +55,18 @@ class XtreamService {
   }
 
   /// Generate stream URL for live TV via FFmpeg transcoding
-  /// 
+  ///
   /// Returns the start URL for FFmpeg transcoding endpoint.
   /// The endpoint will start FFmpeg and return the local HLS URL.
   String getLiveStreamUrl(String streamId) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     // Use .ts format for direct MPEG-TS streaming (FFmpeg handles this better)
-    final iptvUrl = '${_currentPlaylist!.dns}/live/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.ts';
-    
+    final iptvUrl =
+        '${_currentPlaylist!.dns}/live/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.ts';
+
     // Use FFmpeg transcoding endpoint
-    final baseUrl = html.window.location.origin;
+    final baseUrl = platform.getWindowOrigin();
     final encodedUrl = Uri.encodeComponent(iptvUrl);
     return '$baseUrl/api/stream/$streamId?url=$encodedUrl';
   }
@@ -71,16 +74,18 @@ class XtreamService {
   /// Generate stream URL for VOD (movies)
   String getVodStreamUrl(String streamId, String containerExtension) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
-    final url = '${_currentPlaylist!.dns}/movie/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
+
+    final url =
+        '${_currentPlaylist!.dns}/movie/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
     return _wrapWithProxy(url);
   }
 
   /// Generate stream URL for series episodes
   String getSeriesStreamUrl(String streamId, String containerExtension) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
-    final url = '${_currentPlaylist!.dns}/series/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
+
+    final url =
+        '${_currentPlaylist!.dns}/series/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
     return _wrapWithProxy(url);
   }
 
@@ -138,7 +143,7 @@ class XtreamService {
   }
 
   /// Get all live TV channels grouped by category
-  /// 
+  ///
   /// Returns a Map where key is category name and value is list of channels
   Future<Map<String, List<Channel>>> getLiveChannels() async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
@@ -165,10 +170,10 @@ class XtreamService {
         // Get category name from our mapping using category_id
         final categoryId = data['category_id']?.toString() ?? '';
         final categoryName = categoryMap[categoryId] ?? 'Uncategorized';
-        
+
         // Inject category_name into data before parsing
         data['category_name'] = categoryName;
-        
+
         final channel = Channel.fromJson(data);
 
         if (!groupedChannels.containsKey(categoryName)) {
@@ -326,7 +331,8 @@ class XtreamService {
   }
 
   /// Get movies with pagination support
-  Future<List<xm.Movie>> getMoviesPaginated({int offset = 0, int limit = 100}) async {
+  Future<List<xm.Movie>> getMoviesPaginated(
+      {int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -344,13 +350,15 @@ class XtreamService {
       );
 
       final List<dynamic> allMovies = response.data as List<dynamic>;
-      
+
       // Apply pagination
-      final endIndex = (offset + limit) > allMovies.length ? allMovies.length : offset + limit;
+      final endIndex = (offset + limit) > allMovies.length
+          ? allMovies.length
+          : offset + limit;
       if (offset >= allMovies.length) return [];
-      
+
       final paginatedMovies = allMovies.sublist(offset, endIndex);
-      
+
       return paginatedMovies.map((movieData) {
         final data = movieData as Map<String, dynamic>;
         final categoryId = data['category_id']?.toString() ?? '';
@@ -382,7 +390,7 @@ class XtreamService {
 
       final List<dynamic> allMovies = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
-      
+
       // Filter by search query
       return allMovies
           .where((m) {
@@ -403,7 +411,8 @@ class XtreamService {
   }
 
   /// Get series with pagination support (returns flat list)
-  Future<List<xm.Series>> getSeriesPaginated({int offset = 0, int limit = 100}) async {
+  Future<List<xm.Series>> getSeriesPaginated(
+      {int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -421,13 +430,15 @@ class XtreamService {
       );
 
       final List<dynamic> allSeries = response.data as List<dynamic>;
-      
+
       // Apply pagination
-      final endIndex = (offset + limit) > allSeries.length ? allSeries.length : offset + limit;
+      final endIndex = (offset + limit) > allSeries.length
+          ? allSeries.length
+          : offset + limit;
       if (offset >= allSeries.length) return [];
-      
+
       final paginatedSeries = allSeries.sublist(offset, endIndex);
-      
+
       return paginatedSeries.map((seriesData) {
         final data = seriesData as Map<String, dynamic>;
         final categoryId = data['category_id']?.toString() ?? '';
@@ -459,7 +470,7 @@ class XtreamService {
 
       final List<dynamic> allSeries = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
-      
+
       // Filter by search query
       return allSeries
           .where((s) {
@@ -502,7 +513,7 @@ class XtreamService {
   }
 
   /// Get short EPG for a specific stream
-  /// 
+  ///
   /// Returns "Now" and "Next" program info
   Future<List<EpgEntry>> getShortEpg(String streamId) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
@@ -529,7 +540,8 @@ class XtreamService {
         return [];
       }
 
-      final List<dynamic> epgData = response.data['epg_listings'] as List<dynamic>;
+      final List<dynamic> epgData =
+          response.data['epg_listings'] as List<dynamic>;
       return epgData
           .map((entry) => EpgEntry.fromJson(entry as Map<String, dynamic>))
           .toList();
