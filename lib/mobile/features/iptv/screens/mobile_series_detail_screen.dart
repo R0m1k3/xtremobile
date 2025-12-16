@@ -21,10 +21,12 @@ class MobileSeriesDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<MobileSeriesDetailScreen> createState() => _MobileSeriesDetailScreenState();
+  ConsumerState<MobileSeriesDetailScreen> createState() =>
+      _MobileSeriesDetailScreenState();
 }
 
-class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScreen> {
+class _MobileSeriesDetailScreenState
+    extends ConsumerState<MobileSeriesDetailScreen> {
   SeriesInfo? _seriesInfo;
   bool _isLoading = true;
   String? _error;
@@ -52,8 +54,10 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
         _error = null;
       });
 
-      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final info = await service.getSeriesInfo(widget.series.seriesId.toString());
+      final service =
+          await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      final info =
+          await service.getSeriesInfo(widget.series.seriesId.toString());
 
       if (mounted) {
         setState(() {
@@ -85,10 +89,15 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: AppColors.error),
                       const SizedBox(height: 16),
-                      Text('Error: $_error', style: const TextStyle(color: AppColors.textSecondary)),
-                      TextButton(onPressed: _loadSeriesInfo, child: const Text('Retry')),
+                      Text('Error: $_error',
+                          style:
+                              const TextStyle(color: AppColors.textSecondary)),
+                      TextButton(
+                          onPressed: _loadSeriesInfo,
+                          child: const Text('Retry')),
                     ],
                   ),
                 )
@@ -128,7 +137,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                   CachedNetworkImage(
                     imageUrl: _seriesInfo!.cover!,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(color: Colors.grey.shade900),
+                    errorWidget: (_, __, ___) =>
+                        Container(color: Colors.grey.shade900),
                   ),
                 // Gradient Overlay
                 Container(
@@ -166,17 +176,20 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                       Row(
                         children: [
                           if (_seriesInfo!.rating != null) ...[
-                            const Icon(Icons.star, size: 16, color: Colors.amber),
+                            const Icon(Icons.star,
+                                size: 16, color: Colors.amber),
                             const SizedBox(width: 4),
                             Text(
                               _formatRating(_seriesInfo!.rating!)!,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary, fontSize: 13),
                             ),
                             const SizedBox(width: 16),
                           ],
                           Text(
                             '${_seriesInfo!.episodes.keys.length} Seasons',
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            style: const TextStyle(
+                                color: AppColors.textSecondary, fontSize: 13),
                           ),
                         ],
                       ),
@@ -195,7 +208,8 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 _seriesInfo!.plot!,
-                style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, height: 1.4),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -215,23 +229,31 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
                   itemCount: _seriesInfo!.episodes.keys.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    final seasonNum = _seriesInfo!.episodes.keys.elementAt(index);
+                    final seasonNum =
+                        _seriesInfo!.episodes.keys.elementAt(index);
                     final isSelected = seasonNum == _selectedSeason;
                     return ChoiceChip(
                       label: Text('Season $seasonNum'),
                       selected: isSelected,
                       onSelected: (selected) {
-                        if (selected) setState(() => _selectedSeason = seasonNum);
+                        if (selected)
+                          setState(() => _selectedSeason = seasonNum);
                       },
-                      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
+                      backgroundColor: isDark
+                          ? const Color(0xFF1C1C1E)
+                          : Colors.grey.shade300,
                       selectedColor: isDark ? Colors.white : Colors.blue,
                       labelStyle: TextStyle(
-                        color: isSelected 
+                        color: isSelected
                             ? (isDark ? Colors.black : Colors.white)
-                            : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            : (isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade700),
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
                       ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                       showCheckmark: false,
                       side: BorderSide.none,
                     );
@@ -269,58 +291,45 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
       episode.episodeNum,
     );
     final isWatched = watchHistory.isEpisodeWatched(episodeKey);
-    
+
     // Use theme colors for proper light/dark mode support
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
-    final secondaryTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final surfaceColor = isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade200;
+    final secondaryTextColor =
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final surfaceColor =
+        isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade200;
     final primaryColor = isDark ? Colors.white : Colors.blue;
 
     return InkWell(
       onTap: () {
         // Watch progress is tracked in player at 80% completion
-          final engine = ref.read(mobileSettingsProvider).playerEngine;
-          
-          if (engine == 'lite') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LitePlayerScreen(
-                  streamId: episode.streamId,
-                  title: "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
-                  playlist: widget.playlist,
-                  streamType: StreamType.series,
-                  containerExtension: episode.containerExtension ?? 'mp4',
-                  seriesId: widget.series.seriesId,
-                  season: episode.seasonNum,
-                  episodeNum: episode.episodeNum,
-                ),
-              ),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NativePlayerScreen(
-                  streamId: episode.streamId,
-                  title: "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
-                  playlist: widget.playlist,
-                  streamType: StreamType.series,
-                  containerExtension: episode.containerExtension ?? 'mp4',
-                  seriesId: widget.series.seriesId,
-                  season: episode.seasonNum,
-                  episodeNum: episode.episodeNum,
-                ),
-              ),
-            );
-          }
+
+        // Enforce Native Player for Series (VOD)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NativePlayerScreen(
+              streamId: episode.streamId,
+              title:
+                  "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
+              playlist: widget.playlist,
+              streamType: StreamType.series,
+              containerExtension: episode.containerExtension ?? 'mp4',
+              seriesId: widget.series.seriesId,
+              season: episode.seasonNum,
+              episodeNum: episode.episodeNum,
+            ),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
+          border: Border(
+              bottom:
+                  BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
         ),
         child: Row(
           children: [
@@ -331,11 +340,15 @@ class _MobileSeriesDetailScreenState extends ConsumerState<MobileSeriesDetailScr
               decoration: BoxDecoration(
                 color: isWatched ? primaryColor : surfaceColor,
                 shape: BoxShape.circle,
-                border: isWatched ? null : Border.all(color: primaryColor, width: 2),
+                border: isWatched
+                    ? null
+                    : Border.all(color: primaryColor, width: 2),
               ),
               child: Icon(
                 isWatched ? Icons.check : Icons.play_arrow,
-                color: isWatched ? (isDark ? Colors.black : Colors.white) : primaryColor,
+                color: isWatched
+                    ? (isDark ? Colors.black : Colors.white)
+                    : primaryColor,
                 size: 20,
               ),
             ),

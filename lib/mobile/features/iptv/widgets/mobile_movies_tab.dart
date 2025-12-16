@@ -181,7 +181,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
   void _playMovie(BuildContext context, Movie movie) {
     if (widget.playlist == null) return;
 
-    // DEBUG: FORCE NATIVE PLAYER (Ignoring settings)
+    // Enforce Native Player for Movies (VOD)
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -311,7 +311,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                 style: const TextStyle(
                                     fontSize: 14, color: AppColors.textPrimary),
                                 decoration: const InputDecoration(
-                                  hintText: 'Rechercher (DEBUG V3)...',
+                                  hintText: 'Rechercher un film...',
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.only(bottom: 11),

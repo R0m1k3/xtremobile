@@ -51,7 +51,11 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   }
 
   List<String> _parseKeywords(String text) {
-    return text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    return text
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   @override
@@ -59,7 +63,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     final settings = ref.watch(mobileSettingsProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_initialized) _syncControllers(settings);
     });
@@ -80,8 +84,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                     color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.play_circle_filled, 
-                    color: AppColors.primary, size: 28),
+                  child: const Icon(Icons.play_circle_filled,
+                      color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Column(
@@ -107,50 +111,43 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
 
           // === APPARENCE ===
           _buildSectionHeader('Apparence'),
-          
+
           _buildSettingItem(
             icon: isDark ? Icons.dark_mode : Icons.light_mode,
             title: 'Mode Sombre',
             value: isDark ? 'Activé' : 'Désactivé',
             onTap: () => themeNotifier.toggleTheme(),
           ),
-          
+
           _buildSettingItem(
             icon: Icons.access_time,
             title: 'Afficher l\'heure',
             value: settings.showClock ? 'Activé' : 'Désactivé',
-            onTap: () => ref.read(mobileSettingsProvider.notifier).toggleShowClock(!settings.showClock),
+            onTap: () => ref
+                .read(mobileSettingsProvider.notifier)
+                .toggleShowClock(!settings.showClock),
           ),
-          
+
           const SizedBox(height: 24),
 
           // === LECTURE VIDEO ===
           _buildSectionHeader('Lecture Vidéo'),
-          
-          _buildSettingItem(
-            icon: Icons.rocket_launch,
-            title: 'Moteur Vidéo',
-            subtitle: settings.playerEngine == 'ultra' ? 'Ultra (MPV) - Puissant' : 'Lite (ExoPlayer) - Léger',
-            value: settings.playerEngine == 'ultra' ? 'Ultra' : 'Lite',
-            onTap: () {
-              final newValue = settings.playerEngine == 'ultra' ? 'lite' : 'ultra';
-              ref.read(mobileSettingsProvider.notifier).setPlayerEngine(newValue);
-            },
-          ),
-          
+
           _buildSettingItem(
             icon: Icons.bug_report,
             title: 'Stats pour Nerds',
             subtitle: 'Affiche FPS, Buffer, Bitrate',
             value: settings.showDebugStats ? 'Activé' : 'Désactivé',
-            onTap: () => ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!settings.showDebugStats),
+            onTap: () => ref
+                .read(mobileSettingsProvider.notifier)
+                .toggleShowDebugStats(!settings.showDebugStats),
           ),
-          
+
           _buildSettingItem(
             icon: Icons.memory,
             title: 'Décodeur Vidéo',
@@ -160,63 +157,77 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
               final modes = ['auto', 'mediacodec', 'no'];
               final currentIndex = modes.indexOf(settings.decoderMode);
               final nextIndex = (currentIndex + 1) % modes.length;
-              ref.read(mobileSettingsProvider.notifier).setDecoderMode(modes[nextIndex]);
+              ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setDecoderMode(modes[nextIndex]);
             },
           ),
-          
+
           _buildSettingItem(
             icon: Icons.speed,
             title: 'Buffer (Cache)',
-            subtitle: settings.bufferDuration == 0 ? 'Automatique' : '${settings.bufferDuration} secondes',
-            value: settings.bufferDuration == 0 ? 'Auto' : '${settings.bufferDuration}s',
+            subtitle: settings.bufferDuration == 0
+                ? 'Automatique'
+                : '${settings.bufferDuration} secondes',
+            value: settings.bufferDuration == 0
+                ? 'Auto'
+                : '${settings.bufferDuration}s',
             onTap: () {
               final buffers = [0, 15, 30, 60];
               final currentIndex = buffers.indexOf(settings.bufferDuration);
               final nextIndex = (currentIndex + 1) % buffers.length;
-              ref.read(mobileSettingsProvider.notifier).setBufferDuration(buffers[nextIndex]);
+              ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setBufferDuration(buffers[nextIndex]);
             },
           ),
-          
+
           const SizedBox(height: 24),
 
           // === FILTRES ===
           _buildSectionHeader('Filtres de Contenu'),
-          
+
           _buildFilterInput(
             label: 'TV en Direct',
             hint: 'Ex: FR, HD, SPORT',
             icon: Icons.live_tv,
             controller: _liveTvController,
             onChanged: (val) {
-              ref.read(mobileSettingsProvider.notifier).setLiveTvKeywords(_parseKeywords(val));
+              ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setLiveTvKeywords(_parseKeywords(val));
             },
           ),
-          
+
           _buildFilterInput(
             label: 'Films',
             hint: 'Ex: FR, VF, 4K',
             icon: Icons.movie,
             controller: _moviesController,
             onChanged: (val) {
-              ref.read(mobileSettingsProvider.notifier).setMoviesKeywords(_parseKeywords(val));
+              ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setMoviesKeywords(_parseKeywords(val));
             },
           ),
-          
+
           _buildFilterInput(
             label: 'Séries',
             hint: 'Ex: FR, VF',
             icon: Icons.tv,
             controller: _seriesController,
             onChanged: (val) {
-              ref.read(mobileSettingsProvider.notifier).setSeriesKeywords(_parseKeywords(val));
+              ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setSeriesKeywords(_parseKeywords(val));
             },
           ),
-          
+
           const SizedBox(height: 24),
 
           // === CACHE ===
           _buildSectionHeader('Cache'),
-          
+
           _buildSettingItem(
             icon: _isRefreshingCache ? Icons.hourglass_empty : Icons.refresh,
             title: 'Actualiser le cache',
@@ -224,12 +235,12 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             value: _isRefreshingCache ? '...' : 'Appuyer',
             onTap: _isRefreshingCache ? null : _refreshCache,
           ),
-          
+
           const SizedBox(height: 24),
 
           // === PLAYLIST ===
           _buildSectionHeader('Playlist'),
-          
+
           _buildSettingItem(
             icon: Icons.playlist_play,
             title: 'Gérer les Playlists',
@@ -239,12 +250,13 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MobilePlaylistSelectionScreen(manageMode: true),
+                  builder: (_) =>
+                      const MobilePlaylistSelectionScreen(manageMode: true),
                 ),
               );
             },
           ),
-          
+
           const SizedBox(height: 100),
         ],
       ),
@@ -252,33 +264,41 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   }
 
   // === HELPER METHODS ===
-  
+
   String _getDecoderSubtitle(String mode) {
     switch (mode) {
-      case 'auto': return 'Automatique (Recommandé)';
-      case 'mediacodec': return 'Matériel (Hardware)';
-      case 'no': return 'Logiciel (Software)';
-      default: return 'Automatique';
+      case 'auto':
+        return 'Automatique (Recommandé)';
+      case 'mediacodec':
+        return 'Matériel (Hardware)';
+      case 'no':
+        return 'Logiciel (Software)';
+      default:
+        return 'Automatique';
     }
   }
-  
+
   String _getDecoderValue(String mode) {
     switch (mode) {
-      case 'auto': return 'Auto';
-      case 'mediacodec': return 'HW';
-      case 'no': return 'SW';
-      default: return 'Auto';
+      case 'auto':
+        return 'Auto';
+      case 'mediacodec':
+        return 'HW';
+      case 'no':
+        return 'SW';
+      default:
+        return 'Auto';
     }
   }
 
   Future<void> _refreshCache() async {
     setState(() => _isRefreshingCache = true);
-    
+
     try {
       final dir = await getApplicationDocumentsDirectory();
       final cacheStore = HiveCacheStore(dir.path);
       await cacheStore.clean();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -300,7 +320,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   }
 
   // === UI BUILDERS ===
-  
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
@@ -362,7 +382,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -423,8 +444,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                     Text(
                       controller.text.isEmpty ? hint : controller.text,
                       style: TextStyle(
-                        color: controller.text.isEmpty 
-                            ? AppColors.textSecondary 
+                        color: controller.text.isEmpty
+                            ? AppColors.textSecondary
                             : AppColors.textPrimary,
                         fontSize: 12,
                       ),
@@ -442,14 +463,16 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     );
   }
 
-  void _showKeyboardDialog(String label, TextEditingController controller, ValueChanged<String> onChanged) {
+  void _showKeyboardDialog(String label, TextEditingController controller,
+      ValueChanged<String> onChanged) {
     final tempController = TextEditingController(text: controller.text);
-    
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Filtres $label', style: const TextStyle(color: AppColors.textPrimary)),
+        title: Text('Filtres $label',
+            style: const TextStyle(color: AppColors.textPrimary)),
         content: TextField(
           controller: tempController,
           autofocus: true,
