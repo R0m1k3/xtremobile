@@ -987,104 +987,109 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           children: [
             // Removed Duplicate Back Button (Top Left) - handled by Top Bar now
 
-            // Center Controls
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Prev Channel / Replay 10s
-                  if (widget.streamType == StreamType.live &&
-                      widget.channels != null &&
-                      widget.channels!.isNotEmpty)
-                    TVFocusable(
-                      focusNode: _prevFocusNode,
-                      onPressed: _playPrevious,
-                      onFocus: _resetControlsTimer,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(Icons.skip_previous,
-                            color: Colors.white, size: 48),
+            // Bottom Controls (Aligned with EPG)
+            Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Prev Channel / Replay 10s
+                    if (widget.streamType == StreamType.live &&
+                        widget.channels != null &&
+                        widget.channels!.isNotEmpty)
+                      TVFocusable(
+                        focusNode: _prevFocusNode,
                         onPressed: _playPrevious,
-                      ),
-                    )
-                  else if (widget.streamType != StreamType.live)
-                    TVFocusable(
-                      focusNode: _prevFocusNode,
-                      onPressed: () async {
-                        final pos = await _player.stream.position.first;
-                        _player.seek(pos - const Duration(seconds: 5));
-                        _resetControlsTimer();
-                      },
-                      onFocus: _resetControlsTimer,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(Icons.replay_10,
-                            color: Colors.white, size: 48),
+                        onFocus: _resetControlsTimer,
+                        borderRadius: BorderRadius.circular(50),
+                        child: IconButton(
+                          icon: const Icon(Icons.skip_previous,
+                              color: Colors.white, size: 48),
+                          onPressed: _playPrevious,
+                        ),
+                      )
+                    else if (widget.streamType != StreamType.live)
+                      TVFocusable(
+                        focusNode: _prevFocusNode,
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
                           _player.seek(pos - const Duration(seconds: 5));
+                          _resetControlsTimer();
                         },
+                        onFocus: _resetControlsTimer,
+                        borderRadius: BorderRadius.circular(50),
+                        child: IconButton(
+                          icon: const Icon(Icons.replay_10,
+                              color: Colors.white, size: 48),
+                          onPressed: () async {
+                            final pos = await _player.stream.position.first;
+                            _player.seek(pos - const Duration(seconds: 5));
+                          },
+                        ),
                       ),
-                    ),
 
-                  const SizedBox(width: 32),
+                    const SizedBox(width: 32),
 
-                  // Play/Pause
-                  TVFocusable(
-                    focusNode: _playPauseFocusNode,
-                    onPressed: _togglePlayPause,
-                    onFocus: _resetControlsTimer,
-                    scale: 1.1, // Larger scale for main button
-                    borderRadius: BorderRadius.circular(50),
-                    child: IconButton(
-                      iconSize: 72,
-                      icon: Icon(
-                        _isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_filled,
-                        color: Colors.white,
-                      ),
+                    // Play/Pause
+                    TVFocusable(
+                      focusNode: _playPauseFocusNode,
                       onPressed: _togglePlayPause,
-                    ),
-                  ),
-
-                  const SizedBox(width: 32),
-
-                  // Next Channel / Forward 10s
-                  if (widget.streamType == StreamType.live &&
-                      widget.channels != null &&
-                      widget.channels!.isNotEmpty)
-                    TVFocusable(
-                      focusNode: _nextFocusNode,
-                      onPressed: _playNext,
                       onFocus: _resetControlsTimer,
+                      scale: 1.1, // Larger scale for main button
                       borderRadius: BorderRadius.circular(50),
                       child: IconButton(
-                        icon: const Icon(Icons.skip_next,
-                            color: Colors.white, size: 48),
-                        onPressed: _playNext,
+                        iconSize: 72,
+                        icon: Icon(
+                          _isPlaying
+                              ? Icons.pause_circle_filled
+                              : Icons.play_circle_filled,
+                          color: Colors.white,
+                        ),
+                        onPressed: _togglePlayPause,
                       ),
-                    )
-                  else if (widget.streamType != StreamType.live)
-                    TVFocusable(
-                      focusNode: _nextFocusNode,
-                      onPressed: () async {
-                        final pos = await _player.stream.position.first;
-                        _player.seek(pos + const Duration(seconds: 5));
-                        _resetControlsTimer();
-                      },
-                      onFocus: _resetControlsTimer,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(Icons.forward_10,
-                            color: Colors.white, size: 48),
+                    ),
+
+                    const SizedBox(width: 32),
+
+                    // Next Channel / Forward 10s
+                    if (widget.streamType == StreamType.live &&
+                        widget.channels != null &&
+                        widget.channels!.isNotEmpty)
+                      TVFocusable(
+                        focusNode: _nextFocusNode,
+                        onPressed: _playNext,
+                        onFocus: _resetControlsTimer,
+                        borderRadius: BorderRadius.circular(50),
+                        child: IconButton(
+                          icon: const Icon(Icons.skip_next,
+                              color: Colors.white, size: 48),
+                          onPressed: _playNext,
+                        ),
+                      )
+                    else if (widget.streamType != StreamType.live)
+                      TVFocusable(
+                        focusNode: _nextFocusNode,
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
                           _player.seek(pos + const Duration(seconds: 5));
+                          _resetControlsTimer();
                         },
+                        onFocus: _resetControlsTimer,
+                        borderRadius: BorderRadius.circular(50),
+                        child: IconButton(
+                          icon: const Icon(Icons.forward_10,
+                              color: Colors.white, size: 48),
+                          onPressed: () async {
+                            final pos = await _player.stream.position.first;
+                            _player.seek(pos + const Duration(seconds: 5));
+                          },
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
 
