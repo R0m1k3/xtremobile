@@ -138,17 +138,37 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Tuned to eliminate micro-stuttering during live TV playback
     // Increased buffers for smoother playback at cost of ~100MB RAM
 
-    // LARGE Cache for smoother playback (100MB = ~2 min of HD stream)
+    // Unified Buffering Logic (Live vs VOD)
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
-    (_player.platform as dynamic)
-        ?.setProperty('cache-secs', '120'); // 2 minutes cache
-    (_player.platform as dynamic)?.setProperty(
-        'demuxer-max-bytes', '100000000'); // 100MB buffer (doubled)
-    (_player.platform as dynamic)
-        ?.setProperty('demuxer-max-back-bytes', '20000000'); // 20MB back buffer
-    (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
-    (_player.platform as dynamic)?.setProperty('cache-pause-wait',
-        '5'); // Wait 5s before resuming after buffer underrun
+
+    if (widget.streamType == StreamType.live) {
+      // LIVE PROFILE: Faster startup, lower latency, smaller buffer
+      debugPrint('MediaKitPlayer: Applying LIVE optimization profile');
+      (_player.platform as dynamic)?.setProperty('cache-secs', '30');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-bytes', '32000000'); // 32MB
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-readahead-secs', '20');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-back-bytes', '10000000'); // 10MB back
+
+      // Start playing as soon as possible, don't wait for cache fill
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+    } else {
+      // VOD PROFILE: Max stability, large buffer
+      debugPrint('MediaKitPlayer: Applying VOD optimization profile');
+      (_player.platform as dynamic)?.setProperty('cache-secs', '120');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-bytes', '100000000'); // 100MB
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-readahead-secs', '120');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-back-bytes', '20000000'); // 20MB back
+
+      // Wait a bit to fill buffer for smooth playback
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
+      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5');
+    }
 
     // Audio/Video Sync - critical for smooth playback
     (_player.platform as dynamic)
@@ -174,9 +194,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('demuxer-lavf-o',
         'live_start_index=-1,analyzeduration=10000000,probesize=5000000');
 
-    // Prevent stalls with more aggressive read-ahead
-    (_player.platform as dynamic)?.setProperty(
-        'demuxer-readahead-secs', '120'); // Read 2 min ahead (doubled)
+    // Prevent stalls (readahead already set above)
     (_player.platform as dynamic)
         ?.setProperty('hr-seek', 'yes'); // High-res seeking
     (_player.platform as dynamic)
