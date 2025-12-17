@@ -37,25 +37,47 @@ class MobileScaffold extends ConsumerWidget {
             child: SafeArea(
               bottom: false,
               child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
-                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildNavItem(0, 'Live TV', Icons.tv),
-                    _buildNavItem(1, 'Films', Icons.movie),
-                    _buildNavItem(2, 'Séries', Icons.video_library),
-                    _buildNavItem(3, 'Paramètres', Icons.settings),
+                    // LOGO (Left side)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Image.asset(
+                        'assets/images/logo_xtremflow.png',
+                        height: 40,
+                        width: 40,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const SizedBox(width: 40), // Fallback if missing
+                      ),
+                    ),
+
+                    // NAVIGATION PILL (Expanded)
+                    Expanded(
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(30),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.15)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildNavItem(0, 'Live TV', Icons.tv),
+                            _buildNavItem(1, 'Films', Icons.movie),
+                            _buildNavItem(2, 'Séries', Icons.video_library),
+                            _buildNavItem(3, 'Paramètres', Icons.settings),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          
+
           // Main Content
           Expanded(child: child),
         ],
@@ -65,7 +87,7 @@ class MobileScaffold extends ConsumerWidget {
 
   Widget _buildNavItem(int index, String label, IconData icon) {
     final isSelected = currentIndex == index;
-    
+
     return _AppleTVNavItem(
       isSelected: isSelected,
       icon: icon,
@@ -117,9 +139,11 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
   @override
   Widget build(BuildContext context) {
     // Selected OR Focused = black text (white bg), Normal = white70 text
-    final Color textColor = (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
-    final Color iconColor = (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
-    
+    final Color textColor =
+        (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
+    final Color iconColor =
+        (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
+
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: (node, event) {
@@ -142,9 +166,11 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
           margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
           decoration: BoxDecoration(
             // White pill when selected OR focused
-            color: widget.isSelected 
-                ? Colors.white 
-                : (_isFocused ? Colors.white.withOpacity(0.9) : Colors.transparent),
+            color: widget.isSelected
+                ? Colors.white
+                : (_isFocused
+                    ? Colors.white.withOpacity(0.9)
+                    : Colors.transparent),
             borderRadius: BorderRadius.circular(25),
             // Strong glow when focused
             boxShadow: _isFocused
@@ -166,7 +192,8 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
                 widget.label,
                 style: TextStyle(
                   color: textColor,
-                  fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w400,
+                  fontWeight:
+                      widget.isSelected ? FontWeight.w700 : FontWeight.w400,
                   fontSize: 13,
                 ),
               ),

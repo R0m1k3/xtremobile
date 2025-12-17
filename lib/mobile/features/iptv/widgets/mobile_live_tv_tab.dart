@@ -567,7 +567,7 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                       Text(
                         _epgTitle!,
                         style: const TextStyle(
-                          color: AppColors.textSecondary,
+                          color: Colors.yellow,
                           fontSize: 9,
                         ),
                         textAlign: TextAlign.center,

@@ -48,6 +48,7 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.10.1
   wakelock_plus: ^1.2.8
+  universal_html: ^2.3.0
   
 
 
@@ -71,3 +72,5 @@ flutter_launcher_icons:
   
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

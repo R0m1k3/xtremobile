@@ -187,7 +187,7 @@ class _MobileSeriesDetailScreenState
                             const SizedBox(width: 16),
                           ],
                           Text(
-                            '${_seriesInfo!.episodes.keys.length} Seasons',
+                            '${_seriesInfo!.episodes.keys.length} Saisons',
                             style: const TextStyle(
                                 color: AppColors.textSecondary, fontSize: 13),
                           ),
@@ -233,7 +233,7 @@ class _MobileSeriesDetailScreenState
                         _seriesInfo!.episodes.keys.elementAt(index);
                     final isSelected = seasonNum == _selectedSeason;
                     return ChoiceChip(
-                      label: Text('Season $seasonNum'),
+                      label: Text('Saison $seasonNum'),
                       selected: isSelected,
                       onSelected: (selected) {
                         if (selected)

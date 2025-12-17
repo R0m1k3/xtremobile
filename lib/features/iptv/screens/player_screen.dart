@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
+import 'package:universal_html/html.dart' as html;
+import '../../../core/shims/ui_web.dart' as ui_web;
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;

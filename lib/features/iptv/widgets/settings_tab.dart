@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:html' as html; // For reloading
+import 'package:universal_html/html.dart' as html; // For reloading
 import '../../auth/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import 'streaming_settings_tab.dart';

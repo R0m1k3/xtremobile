@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
+// import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import '../../../widgets/tv_focusable.dart';
 
@@ -75,15 +75,17 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/images/logo_xtremflow.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.play_circle_filled,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
                   ),
-                  child: const Icon(Icons.play_circle_filled,
-                      color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Column(
@@ -98,7 +100,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.3.3',
+                      'Version 1.3.4',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -273,9 +275,10 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     setState(() => _isRefreshingCache = true);
 
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final cacheStore = HiveCacheStore(dir.path);
-      await cacheStore.clean();
+      // final dir = await getApplicationDocumentsDirectory();
+      // final cacheStore = HiveCacheStore(dir.path);
+      // await cacheStore.clean();
+      await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
