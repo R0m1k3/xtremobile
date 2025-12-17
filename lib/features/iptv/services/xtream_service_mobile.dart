@@ -7,12 +7,12 @@ import '../../../core/api/dns_resolver.dart';
 import '../models/xtream_models.dart' as xm;
 
 /// Xtream Codes API Service for Mobile (no dart:html dependency)
-/// 
+///
 /// Handles all communication with Xtream API servers
 class XtreamServiceMobile {
   late final Dio _dio;
   late final CacheOptions _cacheOptions;
-  
+
   PlaylistConfig? _currentPlaylist;
   String? _resolvedIp; // Cached resolved IP for the playlist server
   String? _originalHost; // Original hostname for Host header
@@ -27,10 +27,12 @@ class XtreamServiceMobile {
 
   XtreamServiceMobile(String cachePath) {
     _cacheStore = HiveCacheStore(cachePath);
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-    ),);
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
 
     // Setup caching for API responses - 24h cache for VOD content
     _cacheOptions = CacheOptions(
@@ -58,20 +60,21 @@ class XtreamServiceMobile {
   /// Initialize connection with a playlist - now async for DNS resolution
   Future<void> setPlaylistAsync(PlaylistConfig playlist) async {
     _currentPlaylist = playlist;
-    
+
     // Extract hostname from DNS URL
     final uri = Uri.tryParse(playlist.dns);
     if (uri != null && uri.host.isNotEmpty) {
       _originalHost = uri.host;
-      
+
       // Proactively resolve DNS
       print('XtreamServiceMobile: Pre-resolving ${uri.host}');
       _resolvedIp = await DnsResolver.resolve(uri.host);
-      
+
       if (_resolvedIp != null) {
         print('XtreamServiceMobile: Will use IP $_resolvedIp for ${uri.host}');
       } else {
-        print('XtreamServiceMobile: DNS resolution failed, will use hostname directly');
+        print(
+            'XtreamServiceMobile: DNS resolution failed, will use hostname directly');
       }
     }
   }
@@ -92,7 +95,7 @@ class XtreamServiceMobile {
   /// Get the API base URL, using resolved IP if available
   String get _effectiveApiBaseUrl {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     if (_resolvedIp != null && _originalHost != null) {
       // Replace hostname with IP in the URL
       final originalUrl = _currentPlaylist!.apiBaseUrl;
@@ -104,7 +107,7 @@ class XtreamServiceMobile {
   /// Get effective DNS base, using resolved IP if available
   String get _effectiveDnsBase {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     if (_resolvedIp != null && _originalHost != null) {
       return _currentPlaylist!.dns.replaceFirst(_originalHost!, _resolvedIp!);
     }
@@ -125,7 +128,7 @@ class XtreamServiceMobile {
   /// Generate direct stream URL for live TV (HLS format for mobile compatibility)
   String getLiveStreamUrl(String streamId) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     // Use .m3u8 format for HLS streaming (best mobile compatibility)
     return '$_effectiveDnsBase/live/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.m3u8';
   }
@@ -133,14 +136,14 @@ class XtreamServiceMobile {
   /// Generate stream URL for VOD (movies)
   String getVodStreamUrl(String streamId, String containerExtension) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     return '$_effectiveDnsBase/movie/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
   }
 
   /// Generate stream URL for series episodes
   String getSeriesStreamUrl(String streamId, String containerExtension) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
-    
+
     return '$_effectiveDnsBase/series/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.$containerExtension';
   }
 
@@ -179,6 +182,7 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return {};
       final List<dynamic> categories = response.data as List<dynamic>;
       final Map<String, String> categoryMap = {};
 
@@ -215,6 +219,7 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return {};
       final List<dynamic> streams = response.data as List<dynamic>;
       final Map<String, List<Channel>> groupedChannels = {};
 
@@ -223,10 +228,10 @@ class XtreamServiceMobile {
         // Get category name from our mapping using category_id
         final categoryId = data['category_id']?.toString() ?? '';
         final categoryName = categoryMap[categoryId] ?? 'Uncategorized';
-        
+
         // Inject category_name into data before parsing
         data['category_name'] = categoryName;
-        
+
         final channel = Channel.fromJson(data);
 
         if (!groupedChannels.containsKey(categoryName)) {
@@ -256,6 +261,7 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return {};
       final List<dynamic> categories = response.data as List<dynamic>;
       final Map<String, String> categoryMap = {};
 
@@ -287,6 +293,7 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return {};
       final List<dynamic> categories = response.data as List<dynamic>;
       final Map<String, String> categoryMap = {};
 
@@ -304,7 +311,8 @@ class XtreamServiceMobile {
   }
 
   /// Get movies with pagination support (uses in-memory cache for performance)
-  Future<List<xm.Movie>> getMoviesPaginated({int offset = 0, int limit = 100}) async {
+  Future<List<xm.Movie>> getMoviesPaginated(
+      {int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -323,20 +331,27 @@ class XtreamServiceMobile {
           options: _getOptions(),
         );
 
-        _cachedMoviesRaw = response.data as List<dynamic>;
+        if (response.data is! List) {
+          _cachedMoviesRaw = [];
+        } else {
+          _cachedMoviesRaw = response.data as List<dynamic>;
+        }
       }
 
       final allMovies = _cachedMoviesRaw!;
       final categoryMap = _cachedVodCategories!;
-      
+
       // Apply pagination
-      final endIndex = (offset + limit) > allMovies.length ? allMovies.length : offset + limit;
+      final endIndex = (offset + limit) > allMovies.length
+          ? allMovies.length
+          : offset + limit;
       if (offset >= allMovies.length) return [];
-      
+
       final paginatedMovies = allMovies.sublist(offset, endIndex);
-      
+
       return paginatedMovies.map((movieData) {
-        final data = Map<String, dynamic>.from(movieData as Map<String, dynamic>);
+        final data =
+            Map<String, dynamic>.from(movieData as Map<String, dynamic>);
         final categoryId = data['category_id']?.toString() ?? '';
         data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
         return xm.Movie.fromJson(data);
@@ -364,9 +379,10 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return [];
       final List<dynamic> allMovies = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
-      
+
       // Filter by search query
       return allMovies
           .where((m) {
@@ -387,7 +403,8 @@ class XtreamServiceMobile {
   }
 
   /// Get series with pagination support (uses in-memory cache for performance)
-  Future<List<xm.Series>> getSeriesPaginated({int offset = 0, int limit = 100}) async {
+  Future<List<xm.Series>> getSeriesPaginated(
+      {int offset = 0, int limit = 100}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -406,20 +423,27 @@ class XtreamServiceMobile {
           options: _getOptions(),
         );
 
-        _cachedSeriesRaw = response.data as List<dynamic>;
+        if (response.data is! List) {
+          _cachedSeriesRaw = [];
+        } else {
+          _cachedSeriesRaw = response.data as List<dynamic>;
+        }
       }
 
       final allSeries = _cachedSeriesRaw!;
       final categoryMap = _cachedSeriesCategories!;
-      
+
       // Apply pagination
-      final endIndex = (offset + limit) > allSeries.length ? allSeries.length : offset + limit;
+      final endIndex = (offset + limit) > allSeries.length
+          ? allSeries.length
+          : offset + limit;
       if (offset >= allSeries.length) return [];
-      
+
       final paginatedSeries = allSeries.sublist(offset, endIndex);
-      
+
       return paginatedSeries.map((seriesData) {
-        final data = Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
+        final data =
+            Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
         final categoryId = data['category_id']?.toString() ?? '';
         data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
         return xm.Series.fromJson(data);
@@ -447,9 +471,10 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! List) return [];
       final List<dynamic> allSeries = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
-      
+
       // Filter by search query
       return allSeries
           .where((s) {
@@ -485,6 +510,9 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! Map<String, dynamic>) {
+        throw Exception('Invalid response format for Series Info');
+      }
       return xm.SeriesInfo.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
       throw Exception('Failed to fetch series info: $e');
@@ -505,7 +533,9 @@ class XtreamServiceMobile {
           'stream_id': streamId,
         },
         options: Options(
-          headers: _resolvedIp != null && _originalHost != null ? {'Host': _originalHost!} : null,
+          headers: _resolvedIp != null && _originalHost != null
+              ? {'Host': _originalHost!}
+              : null,
           extra: CacheOptions(
             store: _cacheOptions.store,
             policy: CachePolicy.request,
@@ -518,7 +548,9 @@ class XtreamServiceMobile {
         return [];
       }
 
-      final List<dynamic> epgData = response.data['epg_listings'] as List<dynamic>;
+      if (response.data['epg_listings'] is! List) return [];
+      final List<dynamic> epgData =
+          response.data['epg_listings'] as List<dynamic>;
       return epgData
           .map((entry) => EpgEntry.fromJson(entry as Map<String, dynamic>))
           .toList();
@@ -530,7 +562,8 @@ class XtreamServiceMobile {
 
   /// Get short EPG as ShortEPG object (for EPGWidget)
   /// Caches results for 12 hours by default
-  Future<xm.ShortEPG> getShortEPG(String streamId, {bool forceRefresh = false}) async {
+  Future<xm.ShortEPG> getShortEPG(String streamId,
+      {bool forceRefresh = false}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -543,7 +576,9 @@ class XtreamServiceMobile {
           'stream_id': streamId,
         },
         options: Options(
-          headers: _resolvedIp != null && _originalHost != null ? {'Host': _originalHost!} : null,
+          headers: _resolvedIp != null && _originalHost != null
+              ? {'Host': _originalHost!}
+              : null,
           extra: CacheOptions(
             store: _cacheOptions.store,
             policy: forceRefresh ? CachePolicy.refresh : CachePolicy.request,
@@ -556,6 +591,9 @@ class XtreamServiceMobile {
         return const xm.ShortEPG();
       }
 
+      if (response.data is! Map<String, dynamic>) {
+        return const xm.ShortEPG();
+      }
       return xm.ShortEPG.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
       // EPG is optional, don't throw on failure
@@ -576,7 +614,7 @@ class XtreamServiceMobile {
   Future<void> forceRefreshCache() async {
     // Clear in-memory cache
     clearCache();
-    
+
     // Clear HTTP cache (Hive store)
     try {
       await _cacheStore.clean();
