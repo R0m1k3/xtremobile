@@ -161,6 +161,11 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
+      if (response.data is! Map<String, dynamic>) {
+        if (response.data is String)
+          throw Exception('Auth Error: ${response.data}');
+        throw Exception('Invalid auth response format');
+      }
       return response.data as Map<String, dynamic>;
     } catch (e) {
       throw Exception('Authentication failed: $e');
@@ -182,7 +187,11 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
-      if (response.data is! List) return {};
+      if (response.data is! List) {
+        if (response.data is String)
+          throw Exception('Category Error: ${response.data}');
+        return {};
+      }
       final List<dynamic> categories = response.data as List<dynamic>;
       final Map<String, String> categoryMap = {};
 
@@ -219,7 +228,11 @@ class XtreamServiceMobile {
         options: _getOptions(),
       );
 
-      if (response.data is! List) return {};
+      if (response.data is! List) {
+        if (response.data is String)
+          throw Exception('Live TV Error: ${response.data}');
+        return {};
+      }
       final List<dynamic> streams = response.data as List<dynamic>;
       final Map<String, List<Channel>> groupedChannels = {};
 
@@ -332,6 +345,8 @@ class XtreamServiceMobile {
         );
 
         if (response.data is! List) {
+          if (response.data is String)
+            throw Exception('VOD Error: ${response.data}');
           _cachedMoviesRaw = [];
         } else {
           _cachedMoviesRaw = response.data as List<dynamic>;
@@ -424,6 +439,8 @@ class XtreamServiceMobile {
         );
 
         if (response.data is! List) {
+          if (response.data is String)
+            throw Exception('Series Error: ${response.data}');
           _cachedSeriesRaw = [];
         } else {
           _cachedSeriesRaw = response.data as List<dynamic>;
