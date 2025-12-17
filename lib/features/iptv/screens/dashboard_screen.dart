@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/playlist_config.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/digital_clock.dart';
 import '../widgets/live_tv_tab.dart';
 import '../widgets/movies_tab.dart';
@@ -11,7 +9,7 @@ import '../widgets/series_tab.dart';
 import '../widgets/settings_tab.dart';
 
 /// Apple TV Style Dashboard
-/// 
+///
 /// Uses a floating Top Bar for navigation instead of a sidebar.
 /// Content flows underneath the top bar.
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -26,11 +24,17 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
   final List<String> _tabs = ['Live TV', 'Films', 'Séries', 'Réglages'];
-  final List<IconData> _icons = [Icons.live_tv, Icons.movie, Icons.tv, Icons.settings];
+  final List<IconData> _icons = [
+    Icons.live_tv,
+    Icons.movie,
+    Icons.tv,
+    Icons.settings
+  ];
 
   @override
   void initState() {
@@ -74,13 +78,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   child: _buildLogo(),
                 ),
               ),
-              
+
               // 2. Centered Navigation Tabs (Expanded to fill space, then Centered)
               Expanded(
                 child: Center(
                   child: Container(
                     height: 50,
-                    constraints: const BoxConstraints(maxWidth: 600), // Prevent taking too much space
+                    constraints: const BoxConstraints(
+                        maxWidth: 600), // Prevent taking too much space
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(30),
@@ -97,8 +102,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicatorPadding: const EdgeInsets.all(4),
                       labelColor: Colors.black,
-                      unselectedLabelColor: Colors.white70, // Fixed: Improved readability
-                      labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                      unselectedLabelColor:
+                          Colors.white70, // Fixed: Improved readability
+                      labelStyle: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700, fontSize: 13),
                       overlayColor: WidgetStateProperty.all(Colors.transparent),
                       tabs: List.generate(_tabs.length, (index) {
                         return Tab(
@@ -118,7 +125,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   ),
                 ),
               ),
-              
+
               // 3. Search / Profile (Fixed Width for centering balance)
               SizedBox(
                 width: 200,
@@ -130,7 +137,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       IconButton(
                         icon: const Icon(Icons.search, color: Colors.white),
                         onPressed: () {
-                           // Global search trigger
+                          // Global search trigger
                         },
                       ),
                       const SizedBox(width: 16),
@@ -139,7 +146,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                       const CircleAvatar(
                         radius: 16,
                         backgroundColor: Colors.white24,
-                        child: Icon(Icons.person, size: 18, color: Colors.white),
+                        child:
+                            Icon(Icons.person, size: 18, color: Colors.white),
                       ),
                     ],
                   ),
@@ -165,17 +173,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
               ),
             ),
           ),
-          
+
           // Content
           TabBarView(
             controller: _tabController,
-            physics: const NeverScrollableScrollPhysics(), // Disable swipe to avoid gesture conflicts
+            physics:
+                const NeverScrollableScrollPhysics(), // Disable swipe to avoid gesture conflicts
             children: [
               // Padding top to account for the transparent AppBar
-              Padding(padding: const EdgeInsets.only(top: 80), child: LiveTVTab(playlist: widget.playlist)),
-              Padding(padding: const EdgeInsets.only(top: 80), child: MoviesTab(playlist: widget.playlist)),
-              Padding(padding: const EdgeInsets.only(top: 80), child: SeriesTab(playlist: widget.playlist)),
-              const Padding(padding: EdgeInsets.only(top: 80), child: SettingsTab()),
+              Padding(
+                  padding: const EdgeInsets.only(top: 80),
+                  child: LiveTVTab(playlist: widget.playlist)),
+              Padding(
+                  padding: const EdgeInsets.only(top: 80),
+                  child: MoviesTab(playlist: widget.playlist)),
+              Padding(
+                  padding: const EdgeInsets.only(top: 80),
+                  child: SeriesTab(playlist: widget.playlist)),
+              const Padding(
+                  padding: EdgeInsets.only(top: 80), child: SettingsTab()),
             ],
           ),
         ],
@@ -190,7 +206,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF43cea2), Color(0xFF185a9d)]), // Green to Blue
+            gradient: const LinearGradient(colors: [
+              Color(0xFF43cea2),
+              Color(0xFF185a9d)
+            ]), // Green to Blue
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(Icons.play_arrow_rounded, color: Colors.white),
@@ -202,13 +221,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
           children: [
             Text(
               'Xtrem',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white),
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: Colors.white),
             ),
             Text(
               'Flow',
               style: GoogleFonts.inter(
-                fontWeight: FontWeight.w300, 
-                fontSize: 16, 
+                fontWeight: FontWeight.w300,
+                fontSize: 16,
                 color: Colors.white.withOpacity(0.8),
                 height: 0.8,
               ),

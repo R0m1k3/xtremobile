@@ -67,7 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
-          
+
           // Main content
           Center(
             child: SingleChildScrollView(
@@ -132,9 +132,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           children: [
                             Text(
                               'Welcome Back',
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 32),
@@ -143,21 +146,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 labelText: 'Username',
-                                labelStyle: const TextStyle(color: Colors.white70),
-                                prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
+                                labelStyle:
+                                    const TextStyle(color: Colors.white70),
+                                prefixIcon: const Icon(Icons.person_outline,
+                                    color: Colors.white70),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.1)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.1)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: AppColors.primary),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.primary),
                                 ),
                               ),
                               validator: (value) {
@@ -176,21 +184,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 labelText: 'Password',
-                                labelStyle: const TextStyle(color: Colors.white70),
-                                prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                                labelStyle:
+                                    const TextStyle(color: Colors.white70),
+                                prefixIcon: const Icon(Icons.lock_outline,
+                                    color: Colors.white70),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.1)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.1)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: AppColors.primary),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.primary),
                                 ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
@@ -228,7 +241,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.error_outline,
                                       color: AppColors.error,
                                       size: 20,
@@ -277,6 +290,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ],
       ),
     );
-
   }
 }

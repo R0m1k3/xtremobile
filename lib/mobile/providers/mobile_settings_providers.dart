@@ -52,8 +52,9 @@ class MobileSettings {
     if (liveTvKeywords.isEmpty) return true;
     if (category == null) return true;
     final lowerCategory = category.toLowerCase();
-    return liveTvKeywords.any((keyword) => 
-        lowerCategory.contains(keyword.toLowerCase()));
+    return liveTvKeywords.any(
+      (keyword) => lowerCategory.contains(keyword.toLowerCase()),
+    );
   }
 
   /// Check if category matches Movies filter
@@ -61,8 +62,9 @@ class MobileSettings {
     if (moviesKeywords.isEmpty) return true;
     if (category == null) return true;
     final lowerCategory = category.toLowerCase();
-    return moviesKeywords.any((keyword) => 
-        lowerCategory.contains(keyword.toLowerCase()));
+    return moviesKeywords.any(
+      (keyword) => lowerCategory.contains(keyword.toLowerCase()),
+    );
   }
 
   /// Check if category matches Series filter
@@ -70,8 +72,9 @@ class MobileSettings {
     if (seriesKeywords.isEmpty) return true;
     if (category == null) return true;
     final lowerCategory = category.toLowerCase();
-    return seriesKeywords.any((keyword) => 
-        lowerCategory.contains(keyword.toLowerCase()));
+    return seriesKeywords.any(
+      (keyword) => lowerCategory.contains(keyword.toLowerCase()),
+    );
   }
 }
 
@@ -85,16 +88,22 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
 
   Future<void> _init() async {
     _box = await Hive.openBox(_boxName);
-    
-    final liveTv = _box?.get('liveTvKeywords', defaultValue: <String>[]) as List?;
-    final movies = _box?.get('moviesKeywords', defaultValue: <String>[]) as List?;
-    final series = _box?.get('seriesKeywords', defaultValue: <String>[]) as List?;
+
+    final liveTv =
+        _box?.get('liveTvKeywords', defaultValue: <String>[]) as List?;
+    final movies =
+        _box?.get('moviesKeywords', defaultValue: <String>[]) as List?;
+    final series =
+        _box?.get('seriesKeywords', defaultValue: <String>[]) as List?;
     final showClock = _box?.get('showClock', defaultValue: false) as bool?;
-    final showDebugStats = _box?.get('showDebugStats', defaultValue: false) as bool?;
-    final decoderMode = _box?.get('decoderMode', defaultValue: 'auto') as String?;
-    final playerEngine = _box?.get('playerEngine', defaultValue: 'ultra') as String?;
+    final showDebugStats =
+        _box?.get('showDebugStats', defaultValue: false) as bool?;
+    final decoderMode =
+        _box?.get('decoderMode', defaultValue: 'auto') as String?;
+    final playerEngine =
+        _box?.get('playerEngine', defaultValue: 'ultra') as String?;
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
-    
+
     state = MobileSettings(
       liveTvKeywords: liveTv?.cast<String>() ?? [],
       moviesKeywords: movies?.cast<String>() ?? [],
@@ -148,7 +157,8 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   }
 }
 
-final mobileSettingsProvider = StateNotifierProvider<MobileSettingsNotifier, MobileSettings>((ref) {
+final mobileSettingsProvider =
+    StateNotifierProvider<MobileSettingsNotifier, MobileSettings>((ref) {
   return MobileSettingsNotifier();
 });
 
@@ -177,8 +187,9 @@ class MobileWatchHistory {
   }
 
   bool isMovieWatched(String streamId) => watchedMovies.contains(streamId);
-  bool isEpisodeWatched(String episodeKey) => watchedEpisodes.contains(episodeKey);
-  
+  bool isEpisodeWatched(String episodeKey) =>
+      watchedEpisodes.contains(episodeKey);
+
   /// Get resume position in seconds (0 if none saved)
   int getResumePosition(String contentId) => resumePositions[contentId] ?? 0;
 
@@ -197,11 +208,13 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
 
   Future<void> _init() async {
     _box = await Hive.openBox(_boxName);
-    
-    final movies = _box?.get('watchedMovies', defaultValue: <String>[]) as List?;
-    final episodes = _box?.get('watchedEpisodes', defaultValue: <String>[]) as List?;
+
+    final movies =
+        _box?.get('watchedMovies', defaultValue: <String>[]) as List?;
+    final episodes =
+        _box?.get('watchedEpisodes', defaultValue: <String>[]) as List?;
     final positionsRaw = _box?.get('resumePositions');
-    
+
     // Safe conversion for resumePositions map
     Map<String, int> positions = {};
     if (positionsRaw != null && positionsRaw is Map) {
@@ -213,7 +226,7 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
         }
       });
     }
-    
+
     state = MobileWatchHistory(
       watchedMovies: movies?.cast<String>().toSet() ?? {},
       watchedEpisodes: episodes?.cast<String>().toSet() ?? {},
@@ -247,25 +260,28 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
     // Clear resume position when marked as fully watched
     final positions = {...state.resumePositions};
     positions.remove(episodeKey);
-    state = state.copyWith(watchedEpisodes: updated, resumePositions: positions);
+    state =
+        state.copyWith(watchedEpisodes: updated, resumePositions: positions);
     _box?.put('watchedEpisodes', updated.toList());
     _box?.put('resumePositions', positions);
   }
-  
+
   /// Save resume position for movie or episode
   void saveResumePosition(String contentId, int positionSeconds) {
     // Only save if position is meaningful (> 30 seconds)
     if (positionSeconds < 30) {
-      debugPrint('[WatchHistory] Position too short ($positionSeconds), skipping save');
+      debugPrint(
+          '[WatchHistory] Position too short ($positionSeconds), skipping save');
       return;
     }
-    
-    debugPrint('[WatchHistory] Saving position for $contentId: ${positionSeconds}s');
+
+    debugPrint(
+        '[WatchHistory] Saving position for $contentId: ${positionSeconds}s');
     final positions = {...state.resumePositions, contentId: positionSeconds};
     state = state.copyWith(resumePositions: positions);
     _box?.put('resumePositions', Map<String, int>.from(positions));
   }
-  
+
   /// Clear resume position (when content finished or user wants to restart)
   void clearResumePosition(String contentId) {
     final positions = {...state.resumePositions};
@@ -275,7 +291,9 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
   }
 }
 
-final mobileWatchHistoryProvider = StateNotifierProvider<MobileWatchHistoryNotifier, MobileWatchHistory>((ref) {
+final mobileWatchHistoryProvider =
+    StateNotifierProvider<MobileWatchHistoryNotifier, MobileWatchHistory>(
+        (ref) {
   return MobileWatchHistoryNotifier();
 });
 
@@ -308,6 +326,7 @@ class MobileFavoritesNotifier extends StateNotifier<Set<String>> {
   bool isFavorite(String streamId) => state.contains(streamId);
 }
 
-final mobileFavoritesProvider = StateNotifierProvider<MobileFavoritesNotifier, Set<String>>((ref) {
+final mobileFavoritesProvider =
+    StateNotifierProvider<MobileFavoritesNotifier, Set<String>>((ref) {
   return MobileFavoritesNotifier();
 });

@@ -61,7 +61,7 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
-    
+
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
@@ -69,7 +69,7 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
         _isSearching = false;
       }
     });
-    
+
     if (query.length >= 2) {
       _searchDebounce = Timer(const Duration(milliseconds: 500), () {
         _performSearch(query);
@@ -79,13 +79,13 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) return;
-    
+
     setState(() => _isSearching = true);
-    
+
     try {
       final service = ref.read(xtreamServiceProvider(widget.playlist));
       final results = await service.searchMovies(query);
-      
+
       if (mounted && _searchQuery == query) {
         setState(() {
           _searchResults = results;
@@ -151,7 +151,7 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
 
   void _playMovie(Movie movie) {
     ref.read(watchHistoryProvider.notifier).markMovieWatched(movie.streamId);
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -170,32 +170,39 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
   Widget build(BuildContext context) {
     final settings = ref.watch(iptvSettingsProvider);
     final watchHistory = ref.watch(watchHistoryProvider);
-    
+
     List<Movie> displayMovies;
     if (_searchQuery.isNotEmpty && _searchResults != null) {
       displayMovies = _searchResults!;
     } else {
       displayMovies = settings.moviesKeywords.isEmpty
           ? _movies
-          : _movies.where((m) => settings.matchesMoviesFilter(m.categoryName)).toList();
+          : _movies
+              .where((m) => settings.matchesMoviesFilter(m.categoryName))
+              .toList();
     }
 
     // Hero Items (Take 5 random or first 5 from filtered list)
-    final heroItems = displayMovies.take(5).map((m) => HeroItem(
-      id: m.streamId,
-      title: m.name,
-      imageUrl: _getProxiedImageUrl(m.streamIcon),
-      subtitle: m.rating != null ? '${_formatRating(m.rating)} ★' : null,
-      onMoreInfo: () {
-         _playMovie(m);
-      },
-    )).toList();
+    final heroItems = displayMovies
+        .take(5)
+        .map(
+          (m) => HeroItem(
+            id: m.streamId,
+            title: m.name,
+            imageUrl: _getProxiedImageUrl(m.streamIcon),
+            subtitle: m.rating != null ? '${_formatRating(m.rating)} ★' : null,
+            onMoreInfo: () {
+              _playMovie(m);
+            },
+          ),
+        )
+        .toList();
 
     if (_movies.isEmpty && !_isLoading) {
       return const Center(child: Text('No movies available'));
     }
 
-    final double gridItemRatio = 0.65;
+    const double gridItemRatio = 0.65;
     final int crossAxisCount = ResponsiveLayout.value(
       context,
       mobile: 3,
@@ -215,9 +222,9 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                 Text(
                   'Movies',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const Spacer(),
                 Container(
@@ -231,12 +238,14 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                      const Icon(Icons.search,
+                          size: 20, color: AppColors.textSecondary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          style: const TextStyle(fontSize: 14, color: Colors.white),
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.white),
                           decoration: const InputDecoration(
                             hintText: 'Rechercher...',
                             hintStyle: TextStyle(color: Colors.white54),
@@ -250,14 +259,18 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                         ),
                       ),
                       if (_isSearching)
-                        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                        const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
                           onTap: () {
-                             _searchController.clear();
-                             _onSearchChanged('');
+                            _searchController.clear();
+                            _onSearchChanged('');
                           },
-                          child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                          child: const Icon(Icons.close,
+                              size: 16, color: AppColors.textSecondary),
                         ),
                     ],
                   ),
@@ -275,13 +288,14 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
               child: HeroCarousel(
                 items: heroItems,
                 onTap: (item) {
-                   final movie = _movies.firstWhere((element) => element.streamId == item.id);
-                   _playMovie(movie);
+                  final movie = _movies
+                      .firstWhere((element) => element.streamId == item.id);
+                  _playMovie(movie);
                 },
               ),
             ),
           ),
-        
+
         // Grid
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -297,17 +311,20 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                 if (index >= displayMovies.length) return null;
                 final movie = displayMovies[index];
                 final isWatched = watchHistory.isMovieWatched(movie.streamId);
-                
+
                 return MediaCard(
                   title: movie.name,
                   imageUrl: _getProxiedImageUrl(movie.streamIcon),
-
-                  subtitle: movie.rating != null ? '${_formatRating(movie.rating)} ★' : null,
+                  subtitle: movie.rating != null
+                      ? '${_formatRating(movie.rating)} ★'
+                      : null,
                   rating: _formatRating(movie.rating),
                   isWatched: isWatched,
                   onTap: () => _playMovie(movie),
                   onLongPress: () {
-                    ref.read(watchHistoryProvider.notifier).toggleMovieWatched(movie.streamId);
+                    ref
+                        .read(watchHistoryProvider.notifier)
+                        .toggleMovieWatched(movie.streamId);
                   },
                 );
               },
@@ -315,7 +332,7 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
             ),
           ),
         ),
-        
+
         // Loader
         if (_isLoading)
           const SliverToBoxAdapter(

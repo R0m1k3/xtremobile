@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/playlist_api_service.dart';
 import '../../../../core/models/playlist_config.dart';
-import '../../../../features/auth/providers/auth_provider.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../theme/mobile_theme.dart';
 
@@ -18,10 +18,12 @@ class MobilePlaylistSelectionScreen extends ConsumerStatefulWidget {
   const MobilePlaylistSelectionScreen({super.key, this.manageMode = false});
 
   @override
-  ConsumerState<MobilePlaylistSelectionScreen> createState() => _MobilePlaylistSelectionScreenState();
+  ConsumerState<MobilePlaylistSelectionScreen> createState() =>
+      _MobilePlaylistSelectionScreenState();
 }
 
-class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSelectionScreen> {
+class _MobilePlaylistSelectionScreenState
+    extends ConsumerState<MobilePlaylistSelectionScreen> {
   @override
   void initState() {
     super.initState();
@@ -42,9 +44,155 @@ class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSe
     }
   }
 
+  Future<void> _showPlaylistDialog({PlaylistConfig? playlist}) async {
+    final isEditing = playlist != null;
+    final nameController = TextEditingController(text: playlist?.name ?? '');
+    final dnsController = TextEditingController(text: playlist?.dns ?? '');
+    final userController =
+        TextEditingController(text: playlist?.username ?? '');
+    final passController =
+        TextEditingController(text: playlist?.password ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          isEditing ? 'Modifier la Playlist' : 'Ajouter une Playlist',
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Nom',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: dnsController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'URL (DNS)',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: userController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Utilisateur',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: passController,
+                obscureText: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Mot de passe',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (isEditing)
+            TextButton(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AppColors.surface,
+                    title: const Text('Confirmer',
+                        style: TextStyle(color: Colors.white)),
+                    content: const Text('Supprimer cette playlist ?',
+                        style: TextStyle(color: Colors.white70)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Annuler'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style:
+                            TextButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Supprimer'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  await PlaylistApiService().deletePlaylist(playlist.id);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ref.invalidate(playlistsProvider);
+                  }
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Supprimer'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || dnsController.text.isEmpty) {
+                return;
+              }
+
+              final service = PlaylistApiService();
+              if (isEditing) {
+                await service.updatePlaylist(
+                  id: playlist.id,
+                  name: nameController.text,
+                  dns: dnsController.text,
+                  username: userController.text,
+                  password: passController.text,
+                );
+              } else {
+                await service.createPlaylist(
+                  name: nameController.text,
+                  dns: dnsController.text,
+                  username: userController.text,
+                  password: passController.text,
+                );
+              }
+
+              if (context.mounted) {
+                Navigator.pop(context);
+                ref.invalidate(playlistsProvider);
+              }
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(authProvider).currentUser;
     final playlistsAsync = ref.watch(playlistsProvider);
 
     return Theme(
@@ -56,11 +204,17 @@ class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSe
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-             if (widget.manageMode)
-               IconButton(
-                 icon: const Icon(Icons.close),
-                 onPressed: () => Navigator.pop(context),
-               ),
+            if (widget.manageMode) ...[
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () => _showPlaylistDialog(),
+                tooltip: 'Ajouter une playlist',
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ],
         ),
         body: Container(
@@ -73,11 +227,13 @@ class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSe
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                  const Icon(Icons.error_outline,
+                      size: 48, color: AppColors.error),
                   const SizedBox(height: 16),
-                  Text('Erreur de chargement', style: GoogleFonts.inter(color: Colors.white)),
+                  Text('Erreur de chargement',
+                      style: GoogleFonts.inter(color: Colors.white)),
                   TextButton(
-                    onPressed: () => ref.refresh(playlistsProvider),
+                    onPressed: () => ref.invalidate(playlistsProvider),
                     child: const Text('Réessayer'),
                   ),
                 ],
@@ -85,51 +241,51 @@ class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSe
             ),
             data: (playlists) {
               if (playlists.isEmpty) {
-                 // Even in auto-mode, if empty we show this (or add button)
-                 return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.playlist_add, size: 64, color: Colors.white54),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Aucune playlist configurée',
-                          style: GoogleFonts.inter(fontSize: 18, color: Colors.white70),
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.playlist_add,
+                          size: 64, color: Colors.white54),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Aucune playlist configurée',
+                        style: GoogleFonts.inter(
+                            fontSize: 18, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: () => _showPlaylistDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter une Playlist'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
                         ),
-                        const SizedBox(height: 32),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                             // Logic to add playlist (usually dialog or separate screen)
-                             // specific logic for add playlist
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Ajouter une Playlist'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                 );
+                      ),
+                    ],
+                  ),
+                );
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 100, 16, 16), // Top padding for AppBar
+                padding: const EdgeInsets.fromLTRB(
+                    16, 100, 16, 16), // Top padding for AppBar
                 itemCount: playlists.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 16),
                 itemBuilder: (context, index) {
                   final playlist = playlists[index];
                   return _MobilePlaylistCard(
                     playlist: playlist,
+                    manageMode: widget.manageMode,
                     onTap: () {
                       if (widget.manageMode) {
-                         // In manage mode, maybe we want to edit or delete? 
-                         // For now, just switch to it.
-                         context.go('/dashboard', extra: playlist);
+                        _showPlaylistDialog(playlist: playlist);
                       } else {
-                         context.go('/dashboard', extra: playlist);
+                        context.go('/dashboard', extra: playlist);
                       }
                     },
                   );
@@ -146,10 +302,12 @@ class _MobilePlaylistSelectionScreenState extends ConsumerState<MobilePlaylistSe
 class _MobilePlaylistCard extends StatelessWidget {
   final PlaylistConfig playlist;
   final VoidCallback onTap;
+  final bool manageMode;
 
   const _MobilePlaylistCard({
     required this.playlist,
     required this.onTap,
+    this.manageMode = false,
   });
 
   @override
@@ -183,7 +341,8 @@ class _MobilePlaylistCard extends StatelessWidget {
                     color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.playlist_play, color: AppColors.primary, size: 28),
+                  child: const Icon(Icons.playlist_play,
+                      color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -213,7 +372,11 @@ class _MobilePlaylistCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                if (manageMode)
+                  const Icon(Icons.edit, color: AppColors.primary)
+                else
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.textTertiary),
               ],
             ),
           ),

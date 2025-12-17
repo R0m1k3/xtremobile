@@ -292,15 +292,11 @@ class _MobileSeriesDetailScreenState
     );
     final isWatched = watchHistory.isEpisodeWatched(episodeKey);
 
-    // Use theme colors for proper light/dark mode support
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final secondaryTextColor =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final surfaceColor =
-        isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade200;
-    final primaryColor = isDark ? Colors.white : Colors.blue;
+    // Force dark mode colors since background is hardcoded dark
+    const textColor = Colors.white;
+    final secondaryTextColor = Colors.grey.shade400;
+    const surfaceColor = Color(0xFF1C1C1E);
+    const primaryColor = Colors.white; // Or accent color if preferred
 
     return InkWell(
       onTap: () {
@@ -326,10 +322,8 @@ class _MobileSeriesDetailScreenState
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-              bottom:
-                  BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.white10)),
         ),
         child: Row(
           children: [
@@ -347,8 +341,8 @@ class _MobileSeriesDetailScreenState
               child: Icon(
                 isWatched ? Icons.check : Icons.play_arrow,
                 color: isWatched
-                    ? (isDark ? Colors.black : Colors.white)
-                    : primaryColor,
+                    ? Colors.black // Checkmark on white bg
+                    : primaryColor, // Play icon
                 size: 20,
               ),
             ),

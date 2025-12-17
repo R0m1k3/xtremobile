@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../theme/mobile_theme.dart';
-import '../../../../core/widgets/components/ui_components.dart';
 
 class MobileLoginScreen extends ConsumerStatefulWidget {
   const MobileLoginScreen({super.key});
@@ -103,8 +102,10 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                           labelText: 'Username',
                           prefixIcon: Icon(Icons.person_outline),
                         ),
-                        validator: (value) => 
-                            (value == null || value.trim().isEmpty) ? 'Required' : null,
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                                ? 'Required'
+                                : null,
                         textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 16),
@@ -121,18 +122,21 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
                             ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                         ),
-                        validator: (value) => 
-                            (value == null || value.isEmpty) ? 'Required' : null,
+                        validator: (value) => (value == null || value.isEmpty)
+                            ? 'Required'
+                            : null,
                         onFieldSubmitted: (_) => _handleLogin(),
                       ),
                       if (authState.errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Text(
                           authState.errorMessage!,
-                          style: const TextStyle(color: AppColors.error, fontSize: 12),
+                          style: const TextStyle(
+                              color: AppColors.error, fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -145,7 +149,8 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.black),
                                 )
                               : const Text('Sign In'),
                         ),

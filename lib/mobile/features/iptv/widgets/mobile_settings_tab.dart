@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import '../../../widgets/tv_focusable.dart';
-import '../../../../core/providers/theme_provider.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../screens/mobile_playlist_selection_screen.dart';
 
@@ -61,8 +61,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(mobileSettingsProvider);
-    final themeNotifier = ref.read(themeProvider.notifier);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_initialized) _syncControllers(settings);
@@ -114,16 +112,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           const SizedBox(height: 16),
 
-          // === APPARENCE ===
-          _buildSectionHeader('Apparence'),
-
-          _buildSettingItem(
-            icon: isDark ? Icons.dark_mode : Icons.light_mode,
-            title: 'Mode Sombre',
-            value: isDark ? 'Activé' : 'Désactivé',
-            onTap: () => themeNotifier.toggleTheme(),
-          ),
-
           _buildSettingItem(
             icon: Icons.access_time,
             title: 'Afficher l\'heure',
@@ -137,16 +125,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           // === LECTURE VIDEO ===
           _buildSectionHeader('Lecture Vidéo'),
-
-          _buildSettingItem(
-            icon: Icons.bug_report,
-            title: 'Stats pour Nerds',
-            subtitle: 'Affiche FPS, Buffer, Bitrate',
-            value: settings.showDebugStats ? 'Activé' : 'Désactivé',
-            onTap: () => ref
-                .read(mobileSettingsProvider.notifier)
-                .toggleShowDebugStats(!settings.showDebugStats),
-          ),
 
           _buildSettingItem(
             icon: Icons.memory,

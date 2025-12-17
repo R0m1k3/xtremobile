@@ -8,7 +8,8 @@ import '../../../services/local_playlist_service.dart';
 import 'mobile_dashboard_screen.dart';
 
 /// Provider for local playlists
-final localPlaylistsProvider = FutureProvider<List<PlaylistConfig>>((ref) async {
+final localPlaylistsProvider =
+    FutureProvider<List<PlaylistConfig>>((ref) async {
   final service = LocalPlaylistService();
   return service.getPlaylists();
 });
@@ -18,7 +19,8 @@ class MobilePlaylistScreen extends ConsumerStatefulWidget {
   const MobilePlaylistScreen({super.key});
 
   @override
-  ConsumerState<MobilePlaylistScreen> createState() => _MobilePlaylistScreenState();
+  ConsumerState<MobilePlaylistScreen> createState() =>
+      _MobilePlaylistScreenState();
 }
 
 class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
@@ -28,7 +30,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
   void initState() {
     super.initState();
     _playlistService.init();
-    
+
     // Auto-login: if playlists exist, navigate to first one automatically
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAutoLogin();
@@ -64,8 +66,10 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     final isEditing = playlist != null;
     final nameController = TextEditingController(text: playlist?.name ?? '');
     final dnsController = TextEditingController(text: playlist?.dns ?? '');
-    final usernameController = TextEditingController(text: playlist?.username ?? '');
-    final passwordController = TextEditingController(text: playlist?.password ?? '');
+    final usernameController =
+        TextEditingController(text: playlist?.username ?? '');
+    final passwordController =
+        TextEditingController(text: playlist?.password ?? '');
 
     // Focus nodes for TV navigation
     final nameFocus = FocusNode();
@@ -90,7 +94,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
           policy: OrderedTraversalPolicy(), // Ensure logical order
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView( // Ensure scrolling when keyboard/focus moves
+            child: SingleChildScrollView(
+              // Ensure scrolling when keyboard/focus moves
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +112,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Title
                   Text(
                     isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
@@ -118,7 +123,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Form fields
                   _buildTextField(
                     controller: nameController,
@@ -126,10 +131,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     hint: 'Ma Playlist IPTV',
                     icon: Icons.label_outline,
                     textAction: TextInputAction.next,
-                    onSubmitted: () => FocusScope.of(context).requestFocus(dnsFocus),
+                    onSubmitted: () =>
+                        FocusScope.of(context).requestFocus(dnsFocus),
                     focusNode: nameFocus,
                   ),
-                  
+
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: dnsController,
@@ -138,10 +144,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     icon: Icons.dns_outlined,
                     keyboardType: TextInputType.url,
                     textAction: TextInputAction.next,
-                    onSubmitted: () => FocusScope.of(context).requestFocus(usernameFocus),
+                    onSubmitted: () =>
+                        FocusScope.of(context).requestFocus(usernameFocus),
                     focusNode: dnsFocus,
                   ),
-                  
+
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: usernameController,
@@ -149,10 +156,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     hint: 'username',
                     icon: Icons.person_outline,
                     textAction: TextInputAction.next,
-                    onSubmitted: () => FocusScope.of(context).requestFocus(passwordFocus),
+                    onSubmitted: () =>
+                        FocusScope.of(context).requestFocus(passwordFocus),
                     focusNode: usernameFocus,
                   ),
-                  
+
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: passwordController,
@@ -161,12 +169,13 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     icon: Icons.lock_outline,
                     obscureText: true,
                     textAction: TextInputAction.done,
-                    onSubmitted: () => FocusScope.of(context).requestFocus(buttonFocus),
+                    onSubmitted: () =>
+                        FocusScope.of(context).requestFocus(buttonFocus),
                     focusNode: passwordFocus,
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Save button
                   SizedBox(
                     width: double.infinity,
@@ -186,54 +195,57 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                           return;
                         }
 
-                    // Auto-fix URL scheme
-                    String dns = dnsController.text.trim();
-                    if (!dns.startsWith('http://') && !dns.startsWith('https://')) {
-                      dns = 'http://$dns';
-                    }
+                        // Auto-fix URL scheme
+                        String dns = dnsController.text.trim();
+                        if (!dns.startsWith('http://') &&
+                            !dns.startsWith('https://')) {
+                          dns = 'http://$dns';
+                        }
 
-                    if (isEditing) {
-                        await _playlistService.updatePlaylist(
-                          id: playlist!.id,
-                          name: nameController.text.trim(),
-                          dns: dns,
-                          username: usernameController.text.trim(),
-                          password: passwordController.text.trim(),
-                        );
-                    } else {
-                        await _playlistService.addPlaylist(
-                          name: nameController.text.trim(),
-                          dns: dns,
-                          username: usernameController.text.trim(),
-                          password: passwordController.text.trim(),
-                        );
-                    }
+                        if (isEditing) {
+                          await _playlistService.updatePlaylist(
+                            id: playlist.id,
+                            name: nameController.text.trim(),
+                            dns: dns,
+                            username: usernameController.text.trim(),
+                            password: passwordController.text.trim(),
+                          );
+                        } else {
+                          await _playlistService.addPlaylist(
+                            name: nameController.text.trim(),
+                            dns: dns,
+                            username: usernameController.text.trim(),
+                            password: passwordController.text.trim(),
+                          );
+                        }
 
-                    if (mounted) {
-                      Navigator.pop(context);
-                      _refreshPlaylists();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isEditing ? 'Playlist modifiée' : 'Playlist ajoutée'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  },
-                  icon: Icon(isEditing ? Icons.save : Icons.add),
-                  label: Text(isEditing ? 'Enregistrer' : 'Ajouter'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                        if (mounted) {
+                          Navigator.pop(context);
+                          _refreshPlaylists();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isEditing
+                                  ? 'Playlist modifiée'
+                                  : 'Playlist ajoutée'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      icon: Icon(isEditing ? Icons.save : Icons.add),
+                      label: Text(isEditing ? 'Enregistrer' : 'Ajouter'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         ),
-      ),
-      ),
       ),
     );
   }
@@ -251,11 +263,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
   }) {
     // Create a dedicated internal focus node for the actual TextField
     // We don't expose this, allowing us to control when the keyboard opens
-    
+
     // Since we are inside a stateless method but need state for focus nodes if we want to create them on the fly...
     // Actually, to avoid State complexity, we will trust the passed 'focusNode' is for NAVIGATION.
     // And we will use a LayoutBuilder + Stateful wrapper or just a customized Focus widget.
-    
+
     return _TVTextField(
       controller: controller,
       label: label,
@@ -268,7 +280,6 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
       navigationFocus: focusNode,
     );
   }
-
 
   void _showOptionsSheet(PlaylistConfig playlist) {
     showModalBottomSheet(
@@ -297,7 +308,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.edit, color: AppColors.textPrimary),
-                title: const Text('Modifier', style: TextStyle(color: AppColors.textPrimary)),
+                title: const Text('Modifier',
+                    style: TextStyle(color: AppColors.textPrimary)),
                 onTap: () {
                   Navigator.pop(context);
                   _showPlaylistDialog(playlist: playlist);
@@ -305,7 +317,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: AppColors.error),
-                title: const Text('Supprimer', style: TextStyle(color: AppColors.error)),
+                title: const Text('Supprimer',
+                    style: TextStyle(color: AppColors.error)),
                 onTap: () {
                   Navigator.pop(context);
                   _showDeleteConfirmation(playlist);
@@ -324,10 +337,14 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Supprimer la playlist ?', 
-          style: TextStyle(color: AppColors.textPrimary)),
-        content: Text('Voulez-vous supprimer "${playlist.name}" ?',
-          style: const TextStyle(color: AppColors.textSecondary)),
+        title: const Text(
+          'Supprimer la playlist ?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'Voulez-vous supprimer "${playlist.name}" ?',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -371,13 +388,19 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                const Icon(Icons.error_outline,
+                    size: 48, color: AppColors.error),
                 const SizedBox(height: 16),
-                const Text('Erreur de chargement', 
-                  style: TextStyle(color: AppColors.textPrimary)),
+                const Text(
+                  'Erreur de chargement',
+                  style: TextStyle(color: AppColors.textPrimary),
+                ),
                 const SizedBox(height: 8),
-                Text(error.toString(), 
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Text(
+                  error.toString(),
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
+                ),
                 const SizedBox(height: 16),
                 TextButton.icon(
                   onPressed: _refreshPlaylists,
@@ -540,7 +563,8 @@ class _PlaylistCard extends StatelessWidget {
                   color: AppColors.textTertiary,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                  icon: const Icon(Icons.more_vert,
+                      color: AppColors.textSecondary),
                   onPressed: onLongPress, // Re-use the options sheet logic
                 ),
               ],
@@ -589,7 +613,7 @@ class _TVTextFieldState extends State<_TVTextField> {
     super.initState();
     _inputFocus = FocusNode();
     _navFocus = widget.navigationFocus ?? FocusNode();
-    
+
     // When input loses focus (keyboard closed), return to nav focus
     _inputFocus.addListener(() {
       if (!_inputFocus.hasFocus && _isEditing) {
@@ -622,8 +646,8 @@ class _TVTextFieldState extends State<_TVTextField> {
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
           final key = event.logicalKey;
-          if (key == LogicalKeyboardKey.select || 
-              key == LogicalKeyboardKey.enter || 
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
               key == LogicalKeyboardKey.space ||
               key == LogicalKeyboardKey.gameButtonA ||
               key == LogicalKeyboardKey.numpadEnter) {
@@ -640,7 +664,9 @@ class _TVTextFieldState extends State<_TVTextField> {
             onTap: _activateInput,
             child: Container(
               decoration: BoxDecoration(
-                border: isFocused ? Border.all(color: AppColors.primary, width: 2) : null,
+                border: isFocused
+                    ? Border.all(color: AppColors.primary, width: 2)
+                    : null,
                 borderRadius: BorderRadius.circular(4),
               ),
               // Ignore standard focus traversal to child, only allow programatic focus
@@ -650,37 +676,44 @@ class _TVTextFieldState extends State<_TVTextField> {
                   controller: widget.controller,
                   focusNode: _inputFocus,
                   // Prevent keyboard if somehow focused while not editing
-                  readOnly: !_isEditing, 
+                  readOnly: !_isEditing,
                   showCursor: _isEditing,
                   obscureText: widget.obscureText,
                   keyboardType: widget.keyboardType,
                   textInputAction: widget.textAction,
                   onSubmitted: (_) {
-                     setState(() => _isEditing = false);
-                     // Give focus back to nav node first so we can move to next
-                     _navFocus.requestFocus(); 
-                     widget.onSubmitted?.call();
+                    setState(() => _isEditing = false);
+                    // Give focus back to nav node first so we can move to next
+                    _navFocus.requestFocus();
+                    widget.onSubmitted?.call();
                   },
                   style: const TextStyle(color: AppColors.textPrimary),
                   decoration: InputDecoration(
-                  labelText: widget.label,
-                  hintText: widget.hint,
-                  prefixIcon: Icon(widget.icon, color: isFocused ? AppColors.primary : AppColors.textSecondary),
-                  labelStyle: TextStyle(color: isFocused ? AppColors.primary : AppColors.textSecondary),
-                  hintStyle: const TextStyle(color: AppColors.textTertiary),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+                    labelText: widget.label,
+                    hintText: widget.hint,
+                    prefixIcon: Icon(widget.icon,
+                        color: isFocused
+                            ? AppColors.primary
+                            : AppColors.textSecondary),
+                    labelStyle: TextStyle(
+                        color: isFocused
+                            ? AppColors.primary
+                            : AppColors.textSecondary),
+                    hintStyle: const TextStyle(color: AppColors.textTertiary),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
               ),
             ),
-            ),
           );
-        }
+        },
       ),
     );
   }

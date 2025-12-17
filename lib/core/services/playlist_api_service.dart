@@ -1,30 +1,18 @@
-import '../api/api_client.dart';
+import 'package:uuid/uuid.dart';
+import '../database/hive_service.dart';
 import '../models/playlist_config.dart';
 
-/// Service for managing playlists via API
+/// Service for managing playlists via local storage (Hive)
 class PlaylistApiService {
-  final ApiClient _api = ApiClient();
-
   /// Get all playlists for current user
   Future<List<PlaylistConfig>> getPlaylists() async {
     try {
-      final response = await _api.get('/api/playlists');
-      final data = response.data as Map<String, dynamic>;
-      final playlistsData = data['playlists'] as List<dynamic>;
-
-      return playlistsData.map((p) {
-        final playlist = p as Map<String, dynamic>;
-        return PlaylistConfig(
-          id: playlist['id'] as String,
-          name: playlist['name'] as String,
-          dns: playlist['serverUrl'] as String? ?? playlist['dns'] as String,
-          username: playlist['username'] as String,
-          password: playlist['password'] as String,
-          createdAt: DateTime.tryParse(playlist['createdAt'] as String? ?? '') ?? DateTime.now(),
-        );
-      }).toList();
+      if (!HiveService.playlistsBox.isOpen) {
+        await HiveService.init();
+      }
+      return HiveService.playlistsBox.values.toList();
     } catch (e) {
-      print('Error fetching playlists: $e');
+      print('Error fetching playlists from Hive: $e');
       return [];
     }
   }
@@ -37,30 +25,20 @@ class PlaylistApiService {
     required String password,
   }) async {
     try {
-      final response = await _api.post('/api/playlists', data: {
-        'name': name,
-        'serverUrl': dns,
-        'username': username,
-        'password': password,
-        'dns': dns,
-      },);
+      final id = const Uuid().v4();
+      final playlist = PlaylistConfig(
+        id: id,
+        name: name,
+        dns: dns,
+        username: username,
+        password: password,
+        createdAt: DateTime.now(),
+      );
 
-      final data = response.data as Map<String, dynamic>;
-      
-      if (data['success'] == true) {
-        final playlist = data['playlist'] as Map<String, dynamic>;
-        return PlaylistConfig(
-          id: playlist['id'] as String,
-          name: playlist['name'] as String,
-          dns: playlist['serverUrl'] as String? ?? playlist['dns'] as String,
-          username: playlist['username'] as String,
-          password: playlist['password'] as String,
-          createdAt: DateTime.tryParse(playlist['createdAt'] as String? ?? '') ?? DateTime.now(),
-        );
-      }
-      return null;
+      await HiveService.playlistsBox.put(id, playlist);
+      return playlist;
     } catch (e) {
-      print('Error creating playlist: $e');
+      print('Error creating playlist in Hive: $e');
       return null;
     }
   }
@@ -74,30 +52,26 @@ class PlaylistApiService {
     required String password,
   }) async {
     try {
-      final response = await _api.put('/api/playlists/$id', data: {
-        'name': name,
-        'serverUrl': dns,
-        'username': username,
-        'password': password,
-        'dns': dns,
-      },);
-
-      final data = response.data as Map<String, dynamic>;
-      
-      if (data['success'] == true) {
-        final playlist = data['playlist'] as Map<String, dynamic>;
-        return PlaylistConfig(
-          id: playlist['id'] as String,
-          name: playlist['name'] as String,
-          dns: playlist['serverUrl'] as String? ?? playlist['dns'] as String,
-          username: playlist['username'] as String,
-          password: playlist['password'] as String,
-          createdAt: DateTime.tryParse(playlist['createdAt'] as String? ?? '') ?? DateTime.now(),
-        );
+      if (!HiveService.playlistsBox.containsKey(id)) {
+        return null;
       }
-      return null;
+
+      final existing = HiveService.playlistsBox.get(id);
+      if (existing == null) return null;
+
+      final updated = PlaylistConfig(
+        id: id,
+        name: name,
+        dns: dns,
+        username: username,
+        password: password,
+        createdAt: existing.createdAt,
+      );
+
+      await HiveService.playlistsBox.put(id, updated);
+      return updated;
     } catch (e) {
-      print('Error updating playlist: $e');
+      print('Error updating playlist in Hive: $e');
       return null;
     }
   }
@@ -105,11 +79,10 @@ class PlaylistApiService {
   /// Delete a playlist
   Future<bool> deletePlaylist(String id) async {
     try {
-      final response = await _api.delete('/api/playlists/$id');
-      final data = response.data as Map<String, dynamic>;
-      return data['success'] == true;
+      await HiveService.playlistsBox.delete(id);
+      return true;
     } catch (e) {
-      print('Error deleting playlist: $e');
+      print('Error deleting playlist from Hive: $e');
       return false;
     }
   }

@@ -107,7 +107,7 @@ class StreamingSettingsTab extends ConsumerWidget {
                 style: GoogleFonts.roboto(fontSize: 12, color: Colors.white54),
               ),
               value: settings.autoReconnect,
-              activeColor: Colors.blueAccent,
+              activeThumbColor: Colors.blueAccent,
               onChanged: (v) => notifier.setAutoReconnect(v),
             ),
           ],
@@ -143,7 +143,7 @@ class StreamingSettingsTab extends ConsumerWidget {
                 style: GoogleFonts.roboto(fontSize: 12, color: Colors.white54),
               ),
               value: settings.preferDirectPlay,
-              activeColor: Colors.blueAccent,
+              activeThumbColor: Colors.blueAccent,
               onChanged: (v) => notifier.setPreferDirectPlay(v),
             ),
           ],
@@ -248,8 +248,10 @@ class StreamingSettingsTab extends ConsumerWidget {
     required String Function(T) labelBuilder,
   }) {
     return ListTile(
-      title: Text(title, style: GoogleFonts.roboto(fontSize: 14, color: Colors.white)),
-      subtitle: Text(subtitle, style: GoogleFonts.roboto(fontSize: 12, color: Colors.white54)),
+      title: Text(title,
+          style: GoogleFonts.roboto(fontSize: 14, color: Colors.white)),
+      subtitle: Text(subtitle,
+          style: GoogleFonts.roboto(fontSize: 12, color: Colors.white54)),
       trailing: DropdownButton<T>(
         value: value,
         underline: const SizedBox(),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../providers/xtream_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/favorites_provider.dart';
@@ -10,7 +9,6 @@ import '../../../core/models/playlist_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/responsive_layout.dart';
-import '../../../core/widgets/components/ui_components.dart';
 import '../../../core/widgets/themed_loading_screen.dart';
 import 'channel_card.dart';
 
@@ -26,16 +24,15 @@ class LiveTVTab extends ConsumerStatefulWidget {
 
 class _LiveTVTabState extends ConsumerState<LiveTVTab>
     with AutomaticKeepAliveClientMixin {
-  
   // State
   String? _selectedCategory;
-  
+
   // UI State
   bool _isGridView = true;
   final TextEditingController _searchController = TextEditingController();
   bool _showFavoritesOnly = false;
   String _searchQuery = '';
-  
+
   // Scroll Controllers
   final ScrollController _mainScrollController = ScrollController();
 
@@ -63,7 +60,8 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final channelsAsync = ref.watch(liveChannelsByPlaylistProvider(widget.playlist));
+    final channelsAsync =
+        ref.watch(liveChannelsByPlaylistProvider(widget.playlist));
     final favorites = ref.watch(favoritesProvider);
     final settings = ref.watch(iptvSettingsProvider);
 
@@ -73,34 +71,38 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
         loading: () => const ThemedLoading(),
         error: (e, s) => Center(child: Text('Error: $e')),
         data: (groupedChannels) {
-           // Groups
-           var categories = groupedChannels.keys.toList();
-           if (settings.liveTvKeywords.isNotEmpty) {
-             categories = categories.where((cat) => settings.matchesLiveTvFilter(cat)).toList();
-           }
-           categories.sort();
-           
-           // Filter Logic
-           List<Channel> displayedChannels = [];
-           bool showingCategoryGrid = false;
-           
-           if (_searchQuery.isNotEmpty) {
-             // Global Search
-             displayedChannels = groupedChannels.values.expand((l) => l)
-                 .where((c) => c.name.toLowerCase().contains(_searchQuery))
-                 .toList();
-           } else if (_showFavoritesOnly) {
-             // Favorites
-             displayedChannels = groupedChannels.values.expand((l) => l)
-                 .where((c) => favorites.contains(c.streamId))
-                 .toList();
-           } else if (_selectedCategory != null) {
-              // Selected Category View
-              displayedChannels = groupedChannels[_selectedCategory] ?? [];
-           } else {
-             // Category Grid View (Default)
-             showingCategoryGrid = true;
-           }
+          // Groups
+          var categories = groupedChannels.keys.toList();
+          if (settings.liveTvKeywords.isNotEmpty) {
+            categories = categories
+                .where((cat) => settings.matchesLiveTvFilter(cat))
+                .toList();
+          }
+          categories.sort();
+
+          // Filter Logic
+          List<Channel> displayedChannels = [];
+          bool showingCategoryGrid = false;
+
+          if (_searchQuery.isNotEmpty) {
+            // Global Search
+            displayedChannels = groupedChannels.values
+                .expand((l) => l)
+                .where((c) => c.name.toLowerCase().contains(_searchQuery))
+                .toList();
+          } else if (_showFavoritesOnly) {
+            // Favorites
+            displayedChannels = groupedChannels.values
+                .expand((l) => l)
+                .where((c) => favorites.contains(c.streamId))
+                .toList();
+          } else if (_selectedCategory != null) {
+            // Selected Category View
+            displayedChannels = groupedChannels[_selectedCategory] ?? [];
+          } else {
+            // Category Grid View (Default)
+            showingCategoryGrid = true;
+          }
 
           return Column(
             children: [
@@ -110,9 +112,12 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                 child: Row(
                   children: [
                     // Back Button (if in category view and not searching)
-                    if (_selectedCategory != null && _searchQuery.isEmpty && !_showFavoritesOnly) ...[
+                    if (_selectedCategory != null &&
+                        _searchQuery.isEmpty &&
+                        !_showFavoritesOnly) ...[
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                        icon: const Icon(Icons.arrow_back,
+                            color: AppColors.textPrimary),
                         onPressed: () {
                           setState(() {
                             _selectedCategory = null;
@@ -125,34 +130,40 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                     ],
 
                     Text(
-                      _searchQuery.isNotEmpty ? 'Search Results' : 
-                      _showFavoritesOnly ? 'Favorites' :
-                      _selectedCategory ?? 'Live TV',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      _searchQuery.isNotEmpty
+                          ? 'Search Results'
+                          : _showFavoritesOnly
+                              ? 'Favorites'
+                              : _selectedCategory ?? 'Live TV',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     const Spacer(),
-                    
+
                     // Search Pill
                     Container(
                       width: 300,
                       height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusFull),
                         border: Border.all(color: AppColors.border),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                          const Icon(Icons.search,
+                              size: 20, color: AppColors.textSecondary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
-                              style: const TextStyle(fontSize: 14, color: Colors.white),
+                              style: const TextStyle(
+                                  fontSize: 14, color: Colors.white),
                               decoration: const InputDecoration(
                                 hintText: 'Rechercher...',
                                 hintStyle: TextStyle(color: Colors.white54),
@@ -163,31 +174,37 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                             ),
                           ),
                           if (_searchQuery.isNotEmpty)
-                          GestureDetector(
-                            onTap: () => _searchController.clear(),
-                            child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
-                          ),
+                            GestureDetector(
+                              onTap: () => _searchController.clear(),
+                              child: const Icon(Icons.close,
+                                  size: 16, color: AppColors.textSecondary),
+                            ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // Favorites Toggle
                     IconButton(
                       icon: Icon(
-                        _showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
-                        color: _showFavoritesOnly ? AppColors.error : AppColors.textSecondary,
+                        _showFavoritesOnly
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: _showFavoritesOnly
+                            ? AppColors.error
+                            : AppColors.textSecondary,
                       ),
                       onPressed: () {
-                         setState(() {
-                           _showFavoritesOnly = !_showFavoritesOnly;
-                           if (_showFavoritesOnly) _searchController.clear();
-                           _selectedCategory = null; // Reset selection when toggling favorites
-                         });
+                        setState(() {
+                          _showFavoritesOnly = !_showFavoritesOnly;
+                          if (_showFavoritesOnly) _searchController.clear();
+                          _selectedCategory =
+                              null; // Reset selection when toggling favorites
+                        });
                       },
                       tooltip: 'Favorites Only',
                     ),
-                    
+
                     // View Toggle (Only show when not in category grid)
                     if (!showingCategoryGrid)
                       IconButton(
@@ -195,7 +212,8 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                           _isGridView ? Icons.view_list : Icons.grid_view,
                           color: AppColors.textSecondary,
                         ),
-                        onPressed: () => setState(() => _isGridView = !_isGridView),
+                        onPressed: () =>
+                            setState(() => _isGridView = !_isGridView),
                         tooltip: 'Toggle View',
                       ),
                   ],
@@ -209,9 +227,15 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                     : displayedChannels.isEmpty
                         ? Center(
                             child: Text(
-                              _searchQuery.isNotEmpty ? 'No channels found' : 
-                              _showFavoritesOnly ? 'No favorites' : 'No channels in this group',
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
+                              _searchQuery.isNotEmpty
+                                  ? 'No channels found'
+                                  : _showFavoritesOnly
+                                      ? 'No favorites'
+                                      : 'No channels in this group',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(color: AppColors.textSecondary),
                             ),
                           )
                         : _isGridView
@@ -225,7 +249,8 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
     );
   }
 
-  Widget _buildCategoryGrid(List<String> categories, Map<String, List<Channel>> groupedChannels) {
+  Widget _buildCategoryGrid(
+      List<String> categories, Map<String, List<Channel>> groupedChannels) {
     final columns = ResponsiveLayout.value(
       context,
       mobile: 2,
@@ -246,11 +271,12 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
       itemBuilder: (context, index) {
         final category = categories[index];
         final count = groupedChannels[category]?.length ?? 0;
-        
+
         return Card(
           clipBehavior: Clip.antiAlias,
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
             onTap: () {
               setState(() {
@@ -281,7 +307,8 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                       color: AppColors.primary.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.folder_open, color: AppColors.primary, size: 32),
+                    child: const Icon(Icons.folder_open,
+                        color: AppColors.primary, size: 32),
                   ),
                   const SizedBox(height: 12),
                   Text(

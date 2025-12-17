@@ -61,7 +61,7 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
-    
+
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
@@ -69,7 +69,7 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
         _isSearching = false;
       }
     });
-    
+
     if (query.length >= 2) {
       _searchDebounce = Timer(const Duration(milliseconds: 500), () {
         _performSearch(query);
@@ -79,13 +79,13 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) return;
-    
+
     setState(() => _isSearching = true);
-    
+
     try {
       final service = ref.read(xtreamServiceProvider(widget.playlist));
       final results = await service.searchSeries(query);
-      
+
       if (mounted && _searchQuery == query) {
         setState(() {
           _searchResults = results;
@@ -164,14 +164,16 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(iptvSettingsProvider);
-    
+
     List<Series> displaySeries;
     if (_searchQuery.isNotEmpty && _searchResults != null) {
       displaySeries = _searchResults!;
     } else {
       displaySeries = settings.seriesKeywords.isEmpty
           ? _series
-          : _series.where((s) => settings.matchesSeriesFilter(s.categoryName)).toList();
+          : _series
+              .where((s) => settings.matchesSeriesFilter(s.categoryName))
+              .toList();
     }
 
     if (_series.isEmpty && !_isLoading) {
@@ -179,15 +181,20 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
     }
 
     // Hero Items
-    final heroItems = displaySeries.take(5).map((s) => HeroItem(
-      id: s.seriesId.toString(), // ID logic might differ for Series
-      title: s.name,
-      imageUrl: _getProxiedImageUrl(s.cover),
-      subtitle: s.rating != null ? '${_formatRating(s.rating)} ★' : null,
-      onMoreInfo: () => _openSeries(s),
-    )).toList();
+    final heroItems = displaySeries
+        .take(5)
+        .map(
+          (s) => HeroItem(
+            id: s.seriesId.toString(), // ID logic might differ for Series
+            title: s.name,
+            imageUrl: _getProxiedImageUrl(s.cover),
+            subtitle: s.rating != null ? '${_formatRating(s.rating)} ★' : null,
+            onMoreInfo: () => _openSeries(s),
+          ),
+        )
+        .toList();
 
-    final double gridItemRatio = 0.65;
+    const double gridItemRatio = 0.65;
     final int crossAxisCount = ResponsiveLayout.value(
       context,
       mobile: 3,
@@ -207,9 +214,9 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
                 Text(
                   'TV Series',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const Spacer(),
                 Container(
@@ -223,12 +230,14 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                      const Icon(Icons.search,
+                          size: 20, color: AppColors.textSecondary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          style: const TextStyle(fontSize: 14, color: Colors.white),
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.white),
                           decoration: const InputDecoration(
                             hintText: 'Rechercher...',
                             hintStyle: TextStyle(color: Colors.white54),
@@ -242,14 +251,18 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
                         ),
                       ),
                       if (_isSearching)
-                        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                        const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
                           onTap: () {
-                             _searchController.clear();
-                             _onSearchChanged('');
+                            _searchController.clear();
+                            _onSearchChanged('');
                           },
-                          child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                          child: const Icon(Icons.close,
+                              size: 16, color: AppColors.textSecondary),
                         ),
                     ],
                   ),
@@ -267,13 +280,14 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
               child: HeroCarousel(
                 items: heroItems,
                 onTap: (item) {
-                   final series = _series.firstWhere((s) => s.name == item.title); // Fallback by title if ID mismatch
-                   _openSeries(series);
+                  final series = _series.firstWhere((s) =>
+                      s.name == item.title); // Fallback by title if ID mismatch
+                  _openSeries(series);
                 },
               ),
             ),
           ),
-        
+
         // Grid
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -291,8 +305,9 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
                 return MediaCard(
                   title: serie.name,
                   imageUrl: _getProxiedImageUrl(serie.cover),
-
-                  subtitle: serie.rating != null ? '${_formatRating(serie.rating)} ★' : null,
+                  subtitle: serie.rating != null
+                      ? '${_formatRating(serie.rating)} ★'
+                      : null,
                   rating: _formatRating(serie.rating),
                   placeholderIcon: Icons.tv,
                   onTap: () => _openSeries(serie),
@@ -302,7 +317,7 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
             ),
           ),
         ),
-        
+
         // Loader
         if (_isLoading)
           const SliverToBoxAdapter(

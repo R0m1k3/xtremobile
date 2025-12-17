@@ -72,12 +72,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
-  
+
   // Premium Features State
   List<Map<String, dynamic>> _audioTracks = [];
   String _aspectRatio = 'contain';
-
-
 
   void _setupMessageListener() {
     // Listen for postMessage from player.html iframe
@@ -95,8 +93,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               _totalDuration = duration > 0 ? duration : 1;
             });
             ref.read(playbackPositionsProvider.notifier).savePosition(
-              _contentId, currentTime, duration,
-            );
+                  _contentId,
+                  currentTime,
+                  duration,
+                );
           } else if (type == 'playback_status') {
             final status = data['status'];
             setState(() {
@@ -123,9 +123,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     debugPrint('Sending message to iframe ($_viewId): $message');
     final iframe = html.document.getElementById(_viewId) as html.IFrameElement?;
     if (iframe == null) {
-       debugPrint('ERROR: Iframe with ID $_viewId not found!');
+      debugPrint('ERROR: Iframe with ID $_viewId not found!');
     } else {
-       iframe.contentWindow?.postMessage(message, '*');
+      iframe.contentWindow?.postMessage(message, '*');
     }
   }
 
@@ -177,23 +177,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() {
       _currentPosition = value;
     });
-    
+
     // Check if we are using server-side transcoding for VOD/Series
     final settings = ref.read(iptvSettingsProvider);
     // Only reload for seeking if we are rigorously Transcoding (FFmpeg pipe)
     // If we are in Direct Proxy mode (default), we can seek natively via JS.
-    final bool usingTranscoding = settings.transcodingMode == TranscodingMode.forced;
-    
+    final bool usingTranscoding =
+        settings.transcodingMode == TranscodingMode.forced;
+
     if (usingTranscoding) {
-       debugPrint('Seeking in transcoded VOD - reloading player at ${value.round()}s');
-       ref.read(playbackPositionsProvider.notifier).savePosition(_contentId, value, _totalDuration);
-       _initializePlayer(startTimeOverride: value);
-       
+      debugPrint(
+          'Seeking in transcoded VOD - reloading player at ${value.round()}s');
+      ref
+          .read(playbackPositionsProvider.notifier)
+          .savePosition(_contentId, value, _totalDuration);
+      _initializePlayer(startTimeOverride: value);
     } else {
-       // Direct play (Proxy) or Live - standard seeking happens in the browser via Range headers
-       _sendMessage({'type': 'seek', 'value': value});
+      // Direct play (Proxy) or Live - standard seeking happens in the browser via Range headers
+      _sendMessage({'type': 'seek', 'value': value});
     }
-    
+
     _onHover();
   }
 
@@ -234,7 +237,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _playPrevious() {
     if (widget.channels == null || widget.channels!.isEmpty) return;
-    final prevIndex = (_currentIndex - 1 + widget.channels!.length) % widget.channels!.length;
+    final prevIndex =
+        (_currentIndex - 1 + widget.channels!.length) % widget.channels!.length;
     _switchChannel(prevIndex);
   }
 
@@ -252,7 +256,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _toggleFullscreen() {
     final document = html.document;
     final docElement = document.documentElement;
-    
+
     if (_isFullscreen) {
       document.exitFullscreen();
       setState(() {
@@ -275,39 +279,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       });
 
       // Validate playlist before proceeding
-      if (widget.playlist.dns.isEmpty || 
-          widget.playlist.username.isEmpty || 
+      if (widget.playlist.dns.isEmpty ||
+          widget.playlist.username.isEmpty ||
           widget.playlist.password.isEmpty) {
         throw Exception('Invalid playlist configuration: missing credentials');
       }
 
       final xtreamService = ref.read(xtreamServiceProvider(widget.playlist));
       xtreamService.setPlaylist(widget.playlist);
-      
+
       // Determine effective Stream ID (from navigation or initial)
-      final currentStreamId = widget.channels != null && widget.channels!.isNotEmpty
-          ? widget.channels![_currentIndex].streamId 
-          : widget.streamId;
+      final currentStreamId =
+          widget.channels != null && widget.channels!.isNotEmpty
+              ? widget.channels![_currentIndex].streamId
+              : widget.streamId;
 
       // Set content ID for resume features
-      _contentId = widget.streamType == StreamType.live 
-          ? '' 
+      _contentId = widget.streamType == StreamType.live
+          ? ''
           : '${widget.streamType.name}_$currentStreamId';
 
       String hlsUrl;
-      
+
       if (widget.streamType == StreamType.live) {
         // For live streams, use FFmpeg transcoding
         setState(() {
           _statusMessage = 'Starting stream transcoding...';
         });
-        
+
         // Build the FFmpeg endpoint URL with streaming settings
         final settings = ref.read(iptvSettingsProvider);
         final baseUrl = html.window.location.origin;
-        final iptvUrl = '${widget.playlist.dns}/live/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.ts';
+        final iptvUrl =
+            '${widget.playlist.dns}/live/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.ts';
         final encodedUrl = Uri.encodeComponent(iptvUrl);
-        
+
         // Map enum values to string params using if-else (avoids switch exhaustivity issues)
         String qualityParam = 'medium';
         if (settings.streamQuality == StreamQuality.low) {
@@ -315,14 +321,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         } else if (settings.streamQuality == StreamQuality.high) {
           qualityParam = 'high';
         }
-        
+
         String bufferParam = 'medium';
         if (settings.bufferSize == BufferSize.low) {
           bufferParam = 'low';
         } else if (settings.bufferSize == BufferSize.high) {
           bufferParam = 'high';
         }
-        
+
         String timeoutParam = 'medium';
         if (settings.connectionTimeout == ConnectionTimeout.short) {
           timeoutParam = 'short';
@@ -330,18 +336,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           timeoutParam = 'long';
         }
         final modeParam = settings.modeString; // direct, transcode, or auto
-        
+
         // Construct the stream URL directly using MPEG-TS format
-        final streamEndpoint = '$baseUrl/api/stream/$currentStreamId?url=$encodedUrl&quality=$qualityParam&buffer=$bufferParam&timeout=$timeoutParam&mode=$modeParam&ext=.ts';
-        
+        final streamEndpoint =
+            '$baseUrl/api/stream/$currentStreamId?url=$encodedUrl&quality=$qualityParam&buffer=$bufferParam&timeout=$timeoutParam&mode=$modeParam&ext=.ts';
+
         debugPrint('PlayerScreen: Starting Direct Stream: $streamEndpoint');
         hlsUrl = streamEndpoint;
-        
       } else {
         // For VOD and Series
-        
+
         // For VOD and Series
-        
+
         // Determine play mode: Direct (Proxy) vs Transcode (FFmpeg)
         // Default to Direct/Proxy because it preserves duration metadata and seeking capability (via Range headers)
         // Only use Transcode if explicitly FORCED (e.g. for audio compatibility issues like AC3/DTS on some browsers)
@@ -350,88 +356,98 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         bool useTranscode = settings.transcodingMode == TranscodingMode.forced;
 
         setState(() {
-          _statusMessage = useTranscode ? 'Preparing stream...' : 'Loading video...';
+          _statusMessage =
+              useTranscode ? 'Preparing stream...' : 'Loading video...';
         });
 
         if (useTranscode) {
-           // Transcoding Mode (FFmpeg pipe)
-           final encodedUrl = Uri.encodeComponent(
-              widget.streamType == StreamType.vod 
-                ? xtreamService.getVodStreamUrl(currentStreamId, widget.containerExtension)
-                : xtreamService.getSeriesStreamUrl(currentStreamId, widget.containerExtension)
-           );
-           
-           String qualityParam = 'medium';
-           if (settings.streamQuality == StreamQuality.low) qualityParam = 'low';
-           else if (settings.streamQuality == StreamQuality.high) qualityParam = 'high';
-           
-           // Calculate start time for seeking support
-           double startSeconds = startTimeOverride ?? 0;
-           if (startTimeOverride == null && _contentId.isNotEmpty) {
-               final positions = ref.read(playbackPositionsProvider);
-               final saved = positions.getPosition(_contentId);
-               if (saved > 0) startSeconds = saved;
-           }
-           
-           // We force extension to .ts for mpegts.js compatibility
-           hlsUrl = '$baseUrl/api/stream/$currentStreamId?url=$encodedUrl&quality=$qualityParam&start=${startSeconds.round()}&ext=.ts';
-           debugPrint('PlayerScreen: Streaming VOD (Transcoded): $hlsUrl');
-           
+          // Transcoding Mode (FFmpeg pipe)
+          final encodedUrl = Uri.encodeComponent(
+            widget.streamType == StreamType.vod
+                ? xtreamService.getVodStreamUrl(
+                    currentStreamId, widget.containerExtension)
+                : xtreamService.getSeriesStreamUrl(
+                    currentStreamId, widget.containerExtension),
+          );
+
+          String qualityParam = 'medium';
+          if (settings.streamQuality == StreamQuality.low) {
+            qualityParam = 'low';
+          } else if (settings.streamQuality == StreamQuality.high)
+            qualityParam = 'high';
+
+          // Calculate start time for seeking support
+          double startSeconds = startTimeOverride ?? 0;
+          if (startTimeOverride == null && _contentId.isNotEmpty) {
+            final positions = ref.read(playbackPositionsProvider);
+            final saved = positions.getPosition(_contentId);
+            if (saved > 0) startSeconds = saved;
+          }
+
+          // We force extension to .ts for mpegts.js compatibility
+          hlsUrl =
+              '$baseUrl/api/stream/$currentStreamId?url=$encodedUrl&quality=$qualityParam&start=${startSeconds.round()}&ext=.ts';
+          debugPrint('PlayerScreen: Streaming VOD (Transcoded): $hlsUrl');
         } else {
-           // Direct/Proxy Mode (Preserves Duration)
-           final rawUrl = widget.streamType == StreamType.vod 
-                ? '${widget.playlist.dns}/movie/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.${widget.containerExtension}'
-                : '${widget.playlist.dns}/series/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.${widget.containerExtension}';
-           
-           // Force use of local proxy /api/xtream/ to handle CORS and Range headers correctly
-           final proxyPath = '/api/xtream/$rawUrl';
-           hlsUrl = '$baseUrl$proxyPath';
-           
-           // Append start time for direct play? 
-           // HTML5 video handles seeking naturally via headers, but if we want to resume:
-           // We have to seek AFTER metadata is loaded via JS (_seekTo called in onMessage logic).
-           
-           debugPrint('PlayerScreen: Streaming VOD (Direct Proxy): $hlsUrl');
+          // Direct/Proxy Mode (Preserves Duration)
+          final rawUrl = widget.streamType == StreamType.vod
+              ? '${widget.playlist.dns}/movie/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.${widget.containerExtension}'
+              : '${widget.playlist.dns}/series/${widget.playlist.username}/${widget.playlist.password}/$currentStreamId.${widget.containerExtension}';
+
+          // Force use of local proxy /api/xtream/ to handle CORS and Range headers correctly
+          final proxyPath = '/api/xtream/$rawUrl';
+          hlsUrl = '$baseUrl$proxyPath';
+
+          // Append start time for direct play?
+          // HTML5 video handles seeking naturally via headers, but if we want to resume:
+          // We have to seek AFTER metadata is loaded via JS (_seekTo called in onMessage logic).
+
+          debugPrint('PlayerScreen: Streaming VOD (Direct Proxy): $hlsUrl');
         }
       }
-      
+
       setState(() {
         _statusMessage = 'Loading player...';
       });
-      
+
       // Get resume position for VOD/Series
       double startTime = startTimeOverride ?? 0;
-      if (startTime <= 0 && widget.streamType != StreamType.live && _contentId.isNotEmpty) {
+      if (startTime <= 0 &&
+          widget.streamType != StreamType.live &&
+          _contentId.isNotEmpty) {
         final positions = ref.read(playbackPositionsProvider);
         startTime = positions.getPosition(_contentId);
         if (startTime > 0) {
-          debugPrint('PlayerScreen: Resuming from ${startTime.toStringAsFixed(0)}s');
+          debugPrint(
+              'PlayerScreen: Resuming from ${startTime.toStringAsFixed(0)}s');
         }
       }
-      
+
       // If we are Transcoding VOD, the start time is handled by the server (burned into stream)
-      // So we should NOT pass startTime to player.html, otherwise it might try to seek 
+      // So we should NOT pass startTime to player.html, otherwise it might try to seek
       // on a stream that already starts at X.
       // EXCEPTION: If player.html receives an MPEG-TS stream that has timestamps starting at X,
       // setting currentTime might be redundant or needed depending on player impl.
       // Safest: If Transcoding, don't pass startTime to player.html (server handles it).
       // If Direct Play, pass startTime.
-      
+
       final settings = ref.read(iptvSettingsProvider);
       // We force transcoding/proxy usage for all VOD/Series now
-      final bool usingTranscoding = settings.transcodingMode == TranscodingMode.forced;
-      
+      final bool usingTranscoding =
+          settings.transcodingMode == TranscodingMode.forced;
+
       final encodedHlsUrl = Uri.encodeComponent(hlsUrl);
       // Pass startTime to player.html if we are NOT using server-side transcoding (Direct/Proxy mode)
       // For Transcoding, the server handles start time via the 'start' query param in hlsUrl.
       final playerUrl = (!usingTranscoding && startTime > 0)
           ? 'player.html?url=$encodedHlsUrl&startTime=${startTime.toStringAsFixed(0)}'
           : 'player.html?url=$encodedHlsUrl';
-      
+
       debugPrint('PlayerScreen: Player URL: $playerUrl');
-      
+
       // Generate a new view ID for every load to force iframe recreation
-      _viewId = 'iptv-player-${widget.streamId}-${DateTime.now().millisecondsSinceEpoch}';
+      _viewId =
+          'iptv-player-${widget.streamId}-${DateTime.now().millisecondsSinceEpoch}';
 
       // Register platform view factory
       // ignore: undefined_prefixed_name
@@ -467,11 +483,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    
+
     // Load preferred aspect ratio from settings
     final settings = ref.read(iptvSettingsProvider);
     _aspectRatio = settings.preferredAspectRatio;
-    
+
     _initializePlayer();
     _setupMessageListener();
   }
@@ -479,7 +495,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _showSettingsDialog() {
     // Read current settings
     final settingsNotifier = ref.read(iptvSettingsProvider.notifier);
-    // We use a local state variable for the switch in the dialog, 
+    // We use a local state variable for the switch in the dialog,
     // initialized from the provider.
     bool showClock = ref.read(iptvSettingsProvider).showClock;
 
@@ -540,14 +556,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white54),
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white54),
                                   onPressed: () => Navigator.pop(context),
                                   tooltip: 'Fermer',
                                 ),
                               ],
                             ),
                             const SizedBox(height: 24),
-                            const Text('FORMAT D\'IMAGE', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                            const Text('FORMAT D\'IMAGE',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1)),
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.all(4),
@@ -557,50 +579,77 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                               ),
                               child: Row(
                                 children: [
-                                   _buildRatioOption('Original', 'contain', Icons.crop_original, setDialogState),
-                                   _buildRatioOption('Remplir', 'cover', Icons.crop_free, setDialogState),
-                                   _buildRatioOption('Étirer', 'fill', Icons.aspect_ratio, setDialogState),
+                                  _buildRatioOption('Original', 'contain',
+                                      Icons.crop_original, setDialogState),
+                                  _buildRatioOption('Remplir', 'cover',
+                                      Icons.crop_free, setDialogState),
+                                  _buildRatioOption('Étirer', 'fill',
+                                      Icons.aspect_ratio, setDialogState),
                                 ],
                               ),
                             ),
-                          if (_audioTracks.isNotEmpty) ...[
-                            const SizedBox(height: 32),
-                            const Text('AUDIO', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                            const SizedBox(height: 12),
-                            Container(
-                              constraints: const BoxConstraints(maxHeight: 150),
-                              decoration: BoxDecoration(
-                                color: Colors.black26,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withOpacity(0.05)),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    children: _audioTracks.map((track) {
-                                      return Material(
-                                        color: Colors.transparent,
-                                        child: ListTile(
-                                          title: Text(track['label'] ?? 'Piste ${track['id']}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                          subtitle: Text(track['lang'] ?? '', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                                          onTap: () {
-                                            _setAudioTrack(track['id']);
-                                            setDialogState(() {});
-                                          },
-                                          dense: true,
-                                          leading: const Icon(Icons.audiotrack, size: 18, color: Colors.white54),
-                                          hoverColor: Colors.white.withOpacity(0.1),
-                                        ),
-                                      );
-                                    }).toList(),
+                            if (_audioTracks.isNotEmpty) ...[
+                              const SizedBox(height: 32),
+                              const Text('AUDIO',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1)),
+                              const SizedBox(height: 12),
+                              Container(
+                                constraints:
+                                    const BoxConstraints(maxHeight: 150),
+                                decoration: BoxDecoration(
+                                  color: Colors.black26,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.05)),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      children: _audioTracks.map((track) {
+                                        return Material(
+                                          color: Colors.transparent,
+                                          child: ListTile(
+                                            title: Text(
+                                                track['label'] ??
+                                                    'Piste ${track['id']}',
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14)),
+                                            subtitle: Text(track['lang'] ?? '',
+                                                style: const TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 12)),
+                                            onTap: () {
+                                              _setAudioTrack(track['id']);
+                                              setDialogState(() {});
+                                            },
+                                            dense: true,
+                                            leading: const Icon(
+                                                Icons.audiotrack,
+                                                size: 18,
+                                                color: Colors.white54),
+                                            hoverColor:
+                                                Colors.white.withOpacity(0.1),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 32),
-                            const Text('AFFICHAGE', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                            ],
+                            const SizedBox(height: 32),
+                            const Text('AFFICHAGE',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1)),
                             const SizedBox(height: 12),
                             SwitchListTile(
                               value: showClock,
@@ -610,12 +659,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 });
                                 settingsNotifier.setShowClock(val);
                               },
-                              title: const Text('Afficher l\'heure', style: TextStyle(color: Colors.white, fontSize: 14)),
-                              secondary: const Icon(Icons.access_time, color: Colors.white54),
-                              activeColor: AppColors.primary,
+                              title: const Text('Afficher l\'heure',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 14)),
+                              secondary: const Icon(Icons.access_time,
+                                  color: Colors.white54),
+                              activeThumbColor: AppColors.primary,
                               contentPadding: EdgeInsets.zero,
                             ),
-                        ],
+                          ],
                         ),
                       ),
                     ),
@@ -629,7 +681,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
-  Widget _buildRatioOption(String label, String value, IconData icon, StateSetter setDialogState) {
+  Widget _buildRatioOption(
+      String label, String value, IconData icon, StateSetter setDialogState) {
     final isSelected = _aspectRatio == value;
     return Expanded(
       child: GestureDetector(
@@ -637,7 +690,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           debugPrint('Changing Aspect Ratio to: $value');
           _setAspectRatio(value);
           // Save preference
-          ref.read(iptvSettingsProvider.notifier).setPreferredAspectRatio(value);
+          ref
+              .read(iptvSettingsProvider.notifier)
+              .setPreferredAspectRatio(value);
           setDialogState(() {}); // Force rebuild of the dialog content
         },
         child: AnimatedContainer(
@@ -647,11 +702,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             color: isSelected ? AppColors.surfaceVariant : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: isSelected ? Border.all(color: Colors.white12) : null,
-            boxShadow: isSelected ? [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2))] : null,
+            boxShadow: isSelected
+                ? [
+                    const BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2))
+                  ]
+                : null,
           ),
           child: Column(
             children: [
-              Icon(icon, color: isSelected ? Colors.white : Colors.white54, size: 20),
+              Icon(icon,
+                  color: isSelected ? Colors.white : Colors.white54, size: 20),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -672,331 +735,392 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(iptvSettingsProvider);
     return Scaffold(
-      appBar: _showControls ? AppBar(
-        title: Text(widget.channels != null && widget.channels!.isNotEmpty 
-            ? widget.channels![_currentIndex].name 
-            : widget.title,),
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          PointerInterceptor(
-            child: IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: _showSettingsDialog,
-              tooltip: 'Réglages',
-            ),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ) : null,
+      appBar: _showControls
+          ? AppBar(
+              title: Text(
+                widget.channels != null && widget.channels!.isNotEmpty
+                    ? widget.channels![_currentIndex].name
+                    : widget.title,
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              actions: [
+                PointerInterceptor(
+                  child: IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: _showSettingsDialog,
+                    tooltip: 'Réglages',
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+            )
+          : null,
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.black,
       body: ClipRect(
         child: MouseRegion(
-        onHover: (_) => _onHover(),
-        child: _errorMessage != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text('Failed to load stream', style: TextStyle(color: Colors.white, fontSize: 18)),
-                    const SizedBox(height: 8),
-                    Text(_errorMessage!, style: const TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _errorMessage = null;
-                          _isLoading = true;
-                        });
-                        _initializePlayer();
-                      },
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
-            : _isLoading
-                ? const ThemedLoading()
-                : !_isInitialized
-                    ? const ThemedLoading()
-                    : Stack(
-                        children: [
-                          // HTML5 video player via iframe
-                          HtmlElementView(viewType: _viewId),
+          onHover: (_) => _onHover(),
+          child: _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text('Failed to load stream',
+                          style: TextStyle(color: Colors.white, fontSize: 18)),
+                      const SizedBox(height: 8),
+                      Text(_errorMessage!,
+                          style: const TextStyle(color: Colors.white70)),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _errorMessage = null;
+                            _isLoading = true;
+                          });
+                          _initializePlayer();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : _isLoading
+                  ? const ThemedLoading()
+                  : !_isInitialized
+                      ? const ThemedLoading()
+                      : Stack(
+                          children: [
+                            // HTML5 video player via iframe
+                            HtmlElementView(viewType: _viewId),
 
-                          // GLOBAL INTERACTION LAYER (Fixes Click/Hover issues)
-                          // This transparent layer sits ABOVE the iframe but BELOW the controls.
-                          // It intercepts all pointer events, enabling Flutter to handle them.
-                          Positioned.fill(
-                            child: PointerInterceptor(
-                              child: MouseRegion(
-                                onHover: (_) => _onHover(),
-                                child: GestureDetector(
-                                  // Toggle controls on tap
-                                  onTap: () {
-                                    if (_showControls) {
-                                      _hideControls();
-                                    } else {
-                                      _onHover();
-                                    }
-                                  },
-                                  behavior: HitTestBehavior.translucent,
-                                  child: Container(color: Colors.transparent),
+                            // GLOBAL INTERACTION LAYER (Fixes Click/Hover issues)
+                            // This transparent layer sits ABOVE the iframe but BELOW the controls.
+                            // It intercepts all pointer events, enabling Flutter to handle them.
+                            Positioned.fill(
+                              child: PointerInterceptor(
+                                child: MouseRegion(
+                                  onHover: (_) => _onHover(),
+                                  child: GestureDetector(
+                                    // Toggle controls on tap
+                                    onTap: () {
+                                      if (_showControls) {
+                                        _hideControls();
+                                      } else {
+                                        _onHover();
+                                      }
+                                    },
+                                    behavior: HitTestBehavior.translucent,
+                                    child: Container(color: Colors.transparent),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          
-                          // Hover Controls Layer
-                          if (_showControls) ...[
-                            // EPG Overlay (Moved behind controls for Z-ordering)
-                            if (widget.streamType == StreamType.live)
+
+                            // Hover Controls Layer
+                            if (_showControls) ...[
+                              // EPG Overlay (Moved behind controls for Z-ordering)
+                              if (widget.streamType == StreamType.live)
+                                Positioned(
+                                  bottom:
+                                      15, // Moves EPG down to avoid blocking controls
+                                  left: 0,
+                                  right: 0,
+                                  child: PointerInterceptor(
+                                    // Wrap with IgnorePointer so EPG text doesn't steal clicks from controls
+                                    child: IgnorePointer(
+                                      child: EpgOverlay(
+                                        streamId: widget.channels != null
+                                            ? widget.channels![_currentIndex]
+                                                .streamId
+                                            : widget.streamId,
+                                        playlist: widget.playlist,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              // Volume Slider (Left Side)
                               Positioned(
-                                bottom: 15, // Moves EPG down to avoid blocking controls
-                                left: 0,
-                                right: 0,
-                                child: PointerInterceptor(
-                                  // Wrap with IgnorePointer so EPG text doesn't steal clicks from controls
-                                  child: IgnorePointer(
-                                    child: EpgOverlay(
-                                      streamId: widget.channels != null 
-                                          ? widget.channels![_currentIndex].streamId
-                                          : widget.streamId,
-                                      playlist: widget.playlist,
+                                left: 24,
+                                top: 0,
+                                bottom: 0,
+                                child: Center(
+                                  child: Container(
+                                    height: 200,
+                                    width: 40,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    child: Column(
+                                      children: [
+                                        PointerInterceptor(
+                                          child: IconButton(
+                                            icon: Icon(
+                                              _volume == 0
+                                                  ? Icons.volume_off
+                                                  : _volume < 0.5
+                                                      ? Icons.volume_down
+                                                      : Icons.volume_up,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            onPressed: _toggleMute,
+                                            tooltip: _volume == 0
+                                                ? 'Unmute'
+                                                : 'Mute',
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Expanded(
+                                          child: RotatedBox(
+                                            quarterTurns: 3,
+                                            child: SliderTheme(
+                                              data: SliderThemeData(
+                                                trackHeight: 4,
+                                                thumbShape:
+                                                    const RoundSliderThumbShape(
+                                                        enabledThumbRadius: 6),
+                                                overlayShape:
+                                                    const RoundSliderOverlayShape(
+                                                        overlayRadius: 12),
+                                                activeTrackColor: Colors.white,
+                                                inactiveTrackColor:
+                                                    Colors.white24,
+                                                thumbColor: AppColors.primary,
+                                                overlayColor: AppColors.primary
+                                                    .withOpacity(0.2),
+                                              ),
+                                              child: Slider(
+                                                value: _volume,
+                                                onChanged: _setVolume,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
 
-                            // Volume Slider (Left Side)
-                            Positioned(
-                              left: 24,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: Container(
-                                  height: 200,
-                                  width: 40,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  child: Column(
-                                    children: [
-                                      PointerInterceptor(
-                                        child: IconButton(
-                                          icon: Icon(
-                                            _volume == 0 
-                                                ? Icons.volume_off 
-                                                : _volume < 0.5 ? Icons.volume_down : Icons.volume_up,
-                                            color: Colors.white, 
-                                            size: 20,
-                                          ),
-                                          onPressed: _toggleMute,
-                                          tooltip: _volume == 0 ? 'Unmute' : 'Mute',
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Expanded(
-                                        child: RotatedBox(
-                                          quarterTurns: 3,
-                                          child: SliderTheme(
-                                            data: SliderThemeData(
-                                              trackHeight: 4,
-                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                              activeTrackColor: Colors.white,
-                                              inactiveTrackColor: Colors.white24,
-                                              thumbColor: AppColors.primary,
-                                              overlayColor: AppColors.primary.withOpacity(0.2),
-                                            ),
-                                            child: Slider(
-                                              value: _volume,
-                                              onChanged: _setVolume,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // Playback Controls (Centered Row: Previous - Play/Pause - Next - Fullscreen)
-                            Positioned(
-                              top: null,
-                              bottom: 150,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: PointerInterceptor(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // Previous Channel Button
-                                      if (widget.channels != null && widget.channels!.isNotEmpty)
-                                        InkWell(
-                                          onTap: _playPrevious,
-                                          borderRadius: BorderRadius.circular(50),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.5),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.skip_previous,
-                                              color: Colors.white,
-                                              size: 32,
-                                            ),
-                                          ),
-                                        ),
-                                      if (widget.channels != null && widget.channels!.isNotEmpty)
-                                        const SizedBox(width: 24),
-                                      
-                                      // Play/Pause Button
-                                      InkWell(
-                                        onTap: _togglePlayPause,
-                                        borderRadius: BorderRadius.circular(50),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.5),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
-                                          ),
-                                          child: Icon(
-                                            _isPlaying ? Icons.pause : Icons.play_arrow,
-                                            color: Colors.white,
-                                            size: 40,
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      // Next Channel Button
-                                      if (widget.channels != null && widget.channels!.isNotEmpty)
-                                        const SizedBox(width: 24),
-                                      if (widget.channels != null && widget.channels!.isNotEmpty)
-                                        InkWell(
-                                          onTap: _playNext,
-                                          borderRadius: BorderRadius.circular(50),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.5),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.skip_next,
-                                              color: Colors.white,
-                                              size: 32,
-                                            ),
-                                          ),
-                                        ),
-                                      
-                                      // Fullscreen Button
-                                      const SizedBox(width: 32),
-                                      InkWell(
-                                        onTap: _toggleFullscreen,
-                                        borderRadius: BorderRadius.circular(50),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.5),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                                            color: Colors.white,
-                                            size: 28,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // Progress Bar (Bottom) - Only for VOD/Series
-                            if (widget.streamType != StreamType.live)
+                              // Playback Controls (Centered Row: Previous - Play/Pause - Next - Fullscreen)
                               Positioned(
-                                bottom: 80,
-                                left: 24,
-                                right: 24,
-                                child: PointerInterceptor(
-                                  child: Column(
-                                    children: [
-                                      SliderTheme(
-                                        data: SliderThemeData(
-                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                                          activeTrackColor: AppColors.primary,
-                                          inactiveTrackColor: Colors.white24,
-                                          thumbColor: AppColors.primary,
-                                          overlayColor: AppColors.primary.withOpacity(0.2),
-                                        ),
-                                        child: Slider(
-                                          value: _currentPosition,
-                                          max: _totalDuration,
-                                          onChanged: (value) {
-                                            _seekTo(value);
-                                          },
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              _formatDuration(Duration(seconds: _currentPosition.isFinite ? _currentPosition.toInt() : 0)),
-                                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                                top: null,
+                                bottom: 150,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: PointerInterceptor(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // Previous Channel Button
+                                        if (widget.channels != null &&
+                                            widget.channels!.isNotEmpty)
+                                          InkWell(
+                                            onTap: _playPrevious,
+                                            borderRadius:
+                                                BorderRadius.circular(50),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black
+                                                    .withOpacity(0.5),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.skip_previous,
+                                                color: Colors.white,
+                                                size: 32,
+                                              ),
                                             ),
-                                            Text(
-                                              _formatDuration(Duration(seconds: _totalDuration.isFinite ? _totalDuration.toInt() : 0)),
-                                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                                          ),
+                                        if (widget.channels != null &&
+                                            widget.channels!.isNotEmpty)
+                                          const SizedBox(width: 24),
+
+                                        // Play/Pause Button
+                                        InkWell(
+                                          onTap: _togglePlayPause,
+                                          borderRadius:
+                                              BorderRadius.circular(50),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors.black.withOpacity(0.5),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                  color: Colors.white,
+                                                  width: 2),
                                             ),
-                                          ],
+                                            child: Icon(
+                                              _isPlaying
+                                                  ? Icons.pause
+                                                  : Icons.play_arrow,
+                                              color: Colors.white,
+                                              size: 40,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ],
+
+                                        // Next Channel Button
+                                        if (widget.channels != null &&
+                                            widget.channels!.isNotEmpty)
+                                          const SizedBox(width: 24),
+                                        if (widget.channels != null &&
+                                            widget.channels!.isNotEmpty)
+                                          InkWell(
+                                            onTap: _playNext,
+                                            borderRadius:
+                                                BorderRadius.circular(50),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black
+                                                    .withOpacity(0.5),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.skip_next,
+                                                color: Colors.white,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          ),
+
+                                        // Fullscreen Button
+                                        const SizedBox(width: 32),
+                                        InkWell(
+                                          onTap: _toggleFullscreen,
+                                          borderRadius:
+                                              BorderRadius.circular(50),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors.black.withOpacity(0.5),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              _isFullscreen
+                                                  ? Icons.fullscreen_exit
+                                                  : Icons.fullscreen,
+                                              color: Colors.white,
+                                              size: 28,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
 
-                              
+                              // Progress Bar (Bottom) - Only for VOD/Series
+                              if (widget.streamType != StreamType.live)
+                                Positioned(
+                                  bottom: 80,
+                                  left: 24,
+                                  right: 24,
+                                  child: PointerInterceptor(
+                                    child: Column(
+                                      children: [
+                                        SliderTheme(
+                                          data: SliderThemeData(
+                                            thumbShape:
+                                                const RoundSliderThumbShape(
+                                                    enabledThumbRadius: 8),
+                                            overlayShape:
+                                                const RoundSliderOverlayShape(
+                                                    overlayRadius: 16),
+                                            activeTrackColor: AppColors.primary,
+                                            inactiveTrackColor: Colors.white24,
+                                            thumbColor: AppColors.primary,
+                                            overlayColor: AppColors.primary
+                                                .withOpacity(0.2),
+                                          ),
+                                          child: Slider(
+                                            value: _currentPosition,
+                                            max: _totalDuration,
+                                            onChanged: (value) {
+                                              _seekTo(value);
+                                            },
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                _formatDuration(Duration(
+                                                    seconds: _currentPosition
+                                                            .isFinite
+                                                        ? _currentPosition
+                                                            .toInt()
+                                                        : 0)),
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12),
+                                              ),
+                                              Text(
+                                                _formatDuration(Duration(
+                                                    seconds: _totalDuration
+                                                            .isFinite
+                                                        ? _totalDuration.toInt()
+                                                        : 0)),
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
 
+                            // Clock Widget (Always visible if enabled, or only with controls? User asked "met l'heure dans les options")
+                            // Positioned in top right
+                            if (settings.showClock)
+                              AnimatedPositioned(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                top: 24, // Fixed top
+                                right: _showControls
+                                    ? 80
+                                    : 24, // Shift left when settings visible
+                                child: const IgnorePointer(
+                                  child: ClockWidget(
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: [
+                                        Shadow(
+                                            color: Colors.black, blurRadius: 8)
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
-                          
-                          // Clock Widget (Always visible if enabled, or only with controls? User asked "met l'heure dans les options")
-                          // Positioned in top right
-                          if (settings.showClock)
-                             AnimatedPositioned(
-                               duration: const Duration(milliseconds: 300),
-                               curve: Curves.easeInOut,
-                               top: 24, // Fixed top
-                               right: _showControls ? 80 : 24, // Shift left when settings visible
-                               child: const IgnorePointer(
-                                child: ClockWidget(
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [Shadow(color: Colors.black, blurRadius: 8)],
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                        ),
         ),
       ),
     );

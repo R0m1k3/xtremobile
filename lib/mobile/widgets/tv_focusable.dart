@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/theme/app_colors.dart';
 
 class TVFocusable extends StatefulWidget {
   final Widget child;
@@ -107,7 +106,7 @@ class _TVFocusableState extends State<TVFocusable> {
           if (!_isKeyDown) {
             _isKeyDown = true;
             _longPressTriggered = false;
-            
+
             // Start long press timer only if onLongPress is defined
             if (widget.onLongPress != null) {
               _longPressTimer?.cancel();
@@ -121,20 +120,20 @@ class _TVFocusableState extends State<TVFocusable> {
           }
           return KeyEventResult.handled;
         }
-        
+
         if (event is KeyUpEvent && isSelectKey) {
           _longPressTimer?.cancel();
-          
+
           // If long press wasn't triggered, it's a normal press
           if (_isKeyDown && !_longPressTriggered) {
             _handlePress();
           }
-          
+
           _isKeyDown = false;
           _longPressTriggered = false;
           return KeyEventResult.handled;
         }
-        
+
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
@@ -153,15 +152,18 @@ class _TVFocusableState extends State<TVFocusable> {
               child: Container(
                 decoration: _isFocused
                     ? BoxDecoration(
-                        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+                        borderRadius:
+                            widget.borderRadius ?? BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.5), // Shadow for depth
+                            color: Colors.black
+                                .withOpacity(0.5), // Shadow for depth
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
                           BoxShadow(
-                            color: widget.focusColor.withOpacity(0.3), // Glow effect
+                            color: widget.focusColor
+                                .withOpacity(0.3), // Glow effect
                             blurRadius: 12,
                             spreadRadius: 2,
                           ),
@@ -170,7 +172,8 @@ class _TVFocusableState extends State<TVFocusable> {
                     : null,
                 foregroundDecoration: _isFocused
                     ? BoxDecoration(
-                        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+                        borderRadius:
+                            widget.borderRadius ?? BorderRadius.circular(12),
                         border: Border.all(
                           color: widget.focusColor,
                           width: widget.borderWidth,

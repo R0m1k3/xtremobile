@@ -23,12 +23,10 @@ class DnsResolver {
     );
 
     // Fallback to Cloudflare via IP (1.1.1.1)
-    if (ip == null) {
-      ip = await _queryDoH(
-        'https://1.1.1.1/dns-query?name=$hostname&type=A',
-        headers: {'accept': 'application/dns-json'},
-      );
-    }
+    ip ??= await _queryDoH(
+      'https://1.1.1.1/dns-query?name=$hostname&type=A',
+      headers: {'accept': 'application/dns-json'},
+    );
 
     if (ip != null) {
       print('DnsResolver: Resolved $hostname -> $ip');
@@ -40,7 +38,8 @@ class DnsResolver {
     return ip;
   }
 
-  static Future<String?> _queryDoH(String url, {Map<String, String>? headers}) async {
+  static Future<String?> _queryDoH(String url,
+      {Map<String, String>? headers}) async {
     try {
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 10)

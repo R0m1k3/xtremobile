@@ -46,22 +46,25 @@ void main(List<String> args) async {
     ..mount('/api/auth', authHandler.router)
     // Playlists endpoints (with auth middleware)
     ..mount(
-        '/api/playlists',
-        Pipeline()
-            .addMiddleware(authMiddleware(db))
-            .addHandler(playlistsHandler.router.call))
+      '/api/playlists',
+      const Pipeline()
+          .addMiddleware(authMiddleware(db))
+          .addHandler(playlistsHandler.router.call),
+    )
     // Users endpoints (with auth middleware)
     ..mount(
-        '/api/users',
-        Pipeline()
-            .addMiddleware(authMiddleware(db))
-            .addHandler(usersHandler.router.call))
+      '/api/users',
+      const Pipeline()
+          .addMiddleware(authMiddleware(db))
+          .addHandler(usersHandler.router.call),
+    )
     // Settings endpoints (with auth middleware)
     ..mount(
-        '/api/settings',
-        Pipeline()
-            .addMiddleware(authMiddleware(db))
-            .addHandler(settingsHandler.router.call));
+      '/api/settings',
+      const Pipeline()
+          .addMiddleware(authMiddleware(db))
+          .addHandler(settingsHandler.router.call),
+    );
 
   // Initialize Cleanup Service
   final cleanupService = CleanupService();
@@ -76,7 +79,9 @@ void main(List<String> args) async {
   // Admin Routes (protected)
   apiRouter.mount(
     '/api/admin',
-    Pipeline().addMiddleware(authMiddleware(db)).addHandler((Request request) {
+    const Pipeline()
+        .addMiddleware(authMiddleware(db))
+        .addHandler((Request request) {
       final router = Router();
 
       // POST /api/admin/purge
@@ -84,7 +89,8 @@ void main(List<String> args) async {
         final user = req.context['user'] as User?;
         if (user == null || !user.isAdmin) {
           return Response.forbidden(
-              jsonEncode({'error': 'Admin access required'}));
+            jsonEncode({'error': 'Admin access required'}),
+          );
         }
 
         final result = await cleanupService.runCleanup();
@@ -107,7 +113,7 @@ void main(List<String> args) async {
   );
 
   // Wrap static handler to enforce cache policies
-  Handler staticHandler = (Request request) async {
+  FutureOr<Response> staticHandler(Request request) async {
     final response = await baseStaticHandler(request);
 
     // Disable cache for entry points to ensure updates are seen immediately
@@ -115,22 +121,27 @@ void main(List<String> args) async {
     if (path.isEmpty ||
         path == 'index.html' ||
         path.endsWith(
-            '.js') || // Disable cache for ALL JS files (main.dart.js, bootstrap, etc)
+          '.js',
+        ) || // Disable cache for ALL JS files (main.dart.js, bootstrap, etc)
         path.endsWith('.json')) {
       // version.json etc
-      return response.change(headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      });
+      return response.change(
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      );
     }
 
     // Allow aggressive caching for hashed assets (images, compiled JS)
     // Flutter web builds usually hash main.dart.js, but let's be safe with 1 day
-    return response.change(headers: {
-      'Cache-Control': 'public, max-age=86400',
-    });
-  };
+    return response.change(
+      headers: {
+        'Cache-Control': 'public, max-age=86400',
+      },
+    );
+  }
 
   // Main handler with API proxy and FFmpeg streaming
   final handler = Cascade()
@@ -142,7 +153,7 @@ void main(List<String> args) async {
       .handler;
 
   // Add middleware
-  final pipeline = Pipeline()
+  final pipeline = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(securityHeadersMiddleware()) // Basic Headers
       .addMiddleware(honeypotMiddleware()) // Trap Bots
@@ -354,7 +365,7 @@ Handler _createXtreamProxyHandler() {
 
 /// Stream video file using HttpClient with Range support for seeking
 Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
-  final maxRedirects = 5;
+  const maxRedirects = 5;
   var currentUrl = targetUrl;
   final cookies = <String, String>{}; // Cookie Jar for redirects
 
@@ -397,9 +408,9 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
       print('Upstream Response: ${response.statusCode} (Redirect $i)');
 
       // Collect Cookies from response
-      response.cookies.forEach((cookie) {
+      for (var cookie in response.cookies) {
         cookies[cookie.name] = cookie.value;
-      });
+      }
 
       // Handle Redirects (301, 302, 303, 307, 308)
       if (response.statusCode >= 300 && response.statusCode < 400) {
@@ -427,7 +438,8 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
       // Checks for 206 vs 200
       if (response.statusCode == 200 && rangeHeader != null) {
         print(
-            'WARNING: Upstream ignored Range header and returned 200. Seeking might fail.');
+          'WARNING: Upstream ignored Range header and returned 200. Seeking might fail.',
+        );
       } else if (response.statusCode == 206) {
         print('SUCCESS: Upstream returned 206 Partial Content.');
       }
@@ -458,7 +470,8 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
       if (i == maxRedirects - 1) {
         return Response.internalServerError(
           body: jsonEncode(
-              {'error': 'Video streaming error', 'message': e.toString()}),
+            {'error': 'Video streaming error', 'message': e.toString()},
+          ),
           headers: {'content-type': 'application/json'},
         );
       }
@@ -471,8 +484,12 @@ Future<Response> _streamVideoFile(Uri targetUrl, String? rangeHeader) async {
 /// Rewrite URLs in M3U8 playlist to go through the proxy
 ///
 /// Handles both relative and absolute URLs in HLS playlists
-String _rewriteM3u8Urls(String m3u8Content, String baseUrl, String originalPath,
-    String proxyOrigin) {
+String _rewriteM3u8Urls(
+  String m3u8Content,
+  String baseUrl,
+  String originalPath,
+  String proxyOrigin,
+) {
   final lines = m3u8Content.split('\n');
   final rewrittenLines = <String>[];
 
@@ -517,7 +534,11 @@ String _rewriteM3u8Urls(String m3u8Content, String baseUrl, String originalPath,
 
 /// Rewrite a single URL to go through the proxy
 String _rewriteUrl(
-    String url, String baseUrl, String basePath, String proxyOrigin) {
+  String url,
+  String baseUrl,
+  String basePath,
+  String proxyOrigin,
+) {
   String fullUrl;
 
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -731,7 +752,8 @@ Handler _createStreamHandler() {
       print(stackTrace);
       return Response.internalServerError(
         body: jsonEncode(
-            {'error': 'Stream setup error', 'message': e.toString()}),
+          {'error': 'Stream setup error', 'message': e.toString()},
+        ),
         headers: {'content-type': 'application/json'},
       );
     }
