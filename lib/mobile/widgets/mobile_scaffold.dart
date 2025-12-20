@@ -40,9 +40,9 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
           // Top Navigation Bar (Redesigned)
           Container(
             padding: const EdgeInsets.symmetric(
-                vertical: 24,
-                horizontal:
-                    24), // Increased vertical padding for floating effect
+              vertical: 24,
+              horizontal: 24,
+            ), // Increased vertical padding for floating effect
             decoration: const BoxDecoration(
               color: Colors.transparent, // Transparent background
             ),
@@ -61,7 +61,7 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                       color: Colors.black.withOpacity(0.3),
                       blurRadius: 10,
                       spreadRadius: 2,
-                    )
+                    ),
                   ],
                 ),
                 child: Row(
@@ -69,10 +69,12 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                     // --- LEFT: LOGO & BRAND ---
                     Padding(
                       padding: const EdgeInsets.only(
-                          left: 8, right: 32), // More spacing after logo
+                        left: 8,
+                        right: 32,
+                      ), // More spacing after logo
                       child: Row(
                         children: [
-                          Container(
+                          SizedBox(
                             width: 52, // Larger Logo
                             height: 52,
                             // No decoration for free-floating logo
@@ -121,7 +123,9 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                       padding: const EdgeInsets.only(left: 32, right: 16),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white
                               .withOpacity(0.08), // Subtle background
@@ -246,8 +250,8 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
             borderRadius: BorderRadius.circular(20), // Matches pill shape
             border: _isFocused && !widget.isSelected
                 ? Border.all(
-                    color: Colors.white
-                        .withOpacity(0.3)) // Subtle border for focus
+                    color: Colors.white.withOpacity(0.3),
+                  ) // Subtle border for focus
                 : null,
           ),
           child: Row(

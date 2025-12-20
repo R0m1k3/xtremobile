@@ -38,8 +38,10 @@ class DnsResolver {
     return ip;
   }
 
-  static Future<String?> _queryDoH(String url,
-      {Map<String, String>? headers}) async {
+  static Future<String?> _queryDoH(
+    String url, {
+    Map<String, String>? headers,
+  }) async {
     try {
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 10)

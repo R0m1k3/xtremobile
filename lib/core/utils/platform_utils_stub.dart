@@ -1,5 +1,6 @@
 /// Platform-specific utilities for web
 /// This file is used when compiling for web
+library;
 
 /// Check if we're running on HTTPS
 bool isHttps() {

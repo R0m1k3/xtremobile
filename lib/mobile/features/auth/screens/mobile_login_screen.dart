@@ -123,7 +123,8 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                                   : Icons.visibility_off_outlined,
                             ),
                             onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
                           ),
                         ),
                         validator: (value) => (value == null || value.isEmpty)
@@ -136,7 +137,9 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                         Text(
                           authState.errorMessage!,
                           style: const TextStyle(
-                              color: AppColors.error, fontSize: 12),
+                            color: AppColors.error,
+                            fontSize: 12,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -150,7 +153,9 @@ class _MobileLoginScreenState extends ConsumerState<MobileLoginScreen> {
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.black),
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
                                 )
                               : const Text('Sign In'),
                         ),

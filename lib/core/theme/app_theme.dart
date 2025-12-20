@@ -48,43 +48,52 @@ class AppTheme {
       // Typography: San Francisco style (using Inter as proxy)
       textTheme: TextTheme(
         displayLarge: GoogleFonts.inter(
-            fontSize: 56,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1.0,
-            color: AppColors.textPrimary),
+          fontSize: 56,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1.0,
+          color: AppColors.textPrimary,
+        ),
         displayMedium: GoogleFonts.inter(
-            fontSize: 48,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-            color: AppColors.textPrimary),
+          fontSize: 48,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+          color: AppColors.textPrimary,
+        ),
         displaySmall: GoogleFonts.inter(
-            fontSize: 32,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+          fontSize: 32,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         headlineMedium: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         titleLarge: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         titleMedium: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         bodyLarge: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary),
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
+        ),
         bodyMedium: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary),
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
+        ),
         labelLarge: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
       ),
 
       // AppBar: Transparent / Glass
@@ -106,7 +115,9 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: spacing24, vertical: spacing16),
+          horizontal: spacing24,
+          vertical: spacing16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: BorderSide.none,
@@ -130,15 +141,18 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(radiusMd)),
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
           textStyle:
               GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16),
         ).copyWith(
           overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered))
+            if (states.contains(WidgetState.hovered)) {
               return Colors.black.withOpacity(0.1);
-            if (states.contains(WidgetState.pressed))
+            }
+            if (states.contains(WidgetState.pressed)) {
               return Colors.black.withOpacity(0.2);
+            }
             return null;
           }),
         ),

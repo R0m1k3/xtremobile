@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -14,7 +13,6 @@ import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremflow/core/theme/app_colors.dart';
 import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
-import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
 
 /// Stream type enum for player
 enum StreamType { live, vod, series }
@@ -125,7 +123,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Initialize media_kit player with potential software decoding fallback
     // 'hwdec': 'auto' tries hardware first, then software.
     // 'vo': 'gpu' is standard.
-    final config = PlayerConfiguration(
+    const config = PlayerConfiguration(
       vo: 'gpu',
       // msgLevel removed as it might be deprecated or invalid
     );
@@ -191,11 +189,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
     // Live Stream optimizations - aggressive reconnection
-    (_player.platform as dynamic)?.setProperty('stream-lavf-o',
-        'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=10,reconnect_on_http_error=4xx,5xx');
+    (_player.platform as dynamic)?.setProperty(
+      'stream-lavf-o',
+      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=10,reconnect_on_http_error=4xx,5xx',
+    );
     (_player.platform as dynamic)?.setProperty('force-seekable', 'yes');
-    (_player.platform as dynamic)?.setProperty('demuxer-lavf-o',
-        'live_start_index=-1,analyzeduration=10000000,probesize=5000000');
+    (_player.platform as dynamic)?.setProperty(
+      'demuxer-lavf-o',
+      'live_start_index=-1,analyzeduration=10000000,probesize=5000000',
+    );
 
     // Prevent stalls (readahead already set above)
     (_player.platform as dynamic)
@@ -204,8 +206,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         ?.setProperty('hr-seek-framedrop', 'yes'); // Drop frames to catch up
 
     // Frame dropping policy - prefer dropping frames over stuttering
-    (_player.platform as dynamic)?.setProperty('framedrop',
-        'decoder+vo'); // Allow frame drops at decoder and video output
+    (_player.platform as dynamic)?.setProperty(
+      'framedrop',
+      'decoder+vo',
+    ); // Allow frame drops at decoder and video output
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
     // V3: Explicit LAVC Downmix & Audiotrack
@@ -300,7 +304,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // If we haven't tried SW decoding yet, retry with it enabled.
       if (!_useSoftwareDecoder) {
         debugPrint(
-            'MediaKitPlayer: Error encountered. Auto-retrying with Software Decoding...');
+          'MediaKitPlayer: Error encountered. Auto-retrying with Software Decoding...',
+        );
         setState(() => _useSoftwareDecoder = true);
 
         // Short delay to allow player cleanup
@@ -320,7 +325,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _player.stream.completed.listen((completed) {
       if (completed && mounted && widget.streamType == StreamType.live) {
         debugPrint(
-            'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...');
+          'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...',
+        );
         _attemptReconnect();
       }
     });
@@ -413,7 +419,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         widget.season != null &&
         widget.episodeNum != null) {
       return MobileWatchHistory.episodeKey(
-          widget.seriesId, widget.season!, widget.episodeNum!);
+        widget.seriesId,
+        widget.season!,
+        widget.episodeNum!,
+      );
     }
     return widget.streamId;
   }
@@ -423,7 +432,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (widget.streamType == StreamType.live) return;
 
     debugPrint(
-        'MediaKitPlayer: Saving position - pos: ${_position.inSeconds}s, dur: ${_duration.inSeconds}s, contentId: $_contentId');
+      'MediaKitPlayer: Saving position - pos: ${_position.inSeconds}s, dur: ${_duration.inSeconds}s, contentId: $_contentId',
+    );
 
     // If already marked as watched, clear any saved position
     if (_hasMarkedAsWatched) {
@@ -442,7 +452,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
             .read(mobileWatchHistoryProvider.notifier)
             .clearResumePosition(_contentId);
         debugPrint(
-            'MediaKitPlayer: Almost finished (${(progress * 100).toStringAsFixed(1)}%), clearing position');
+          'MediaKitPlayer: Almost finished (${(progress * 100).toStringAsFixed(1)}%), clearing position',
+        );
         return;
       }
     }
@@ -463,7 +474,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       if (_isPlaying && _duration.inSeconds > 0) {
         debugPrint(
-            'MediaKitPlayer: Seeking to resume position ${positionSeconds}s (attempt $attempt)');
+          'MediaKitPlayer: Seeking to resume position ${positionSeconds}s (attempt $attempt)',
+        );
         _player.seek(Duration(seconds: positionSeconds));
 
         // Show visual notification
@@ -472,14 +484,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}'),
+              'Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+            ),
             duration: const Duration(seconds: 2),
             backgroundColor: Colors.green.shade700,
           ),
         );
       } else {
         debugPrint(
-            'MediaKitPlayer: Player not ready, retrying resume seek (attempt $attempt)');
+          'MediaKitPlayer: Player not ready, retrying resume seek (attempt $attempt)',
+        );
         _seekToResume(positionSeconds, attempt + 1);
       }
     });
@@ -498,7 +512,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     _reconnectAttempts++;
     debugPrint(
-        'MediaKitPlayer: Reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts');
+      'MediaKitPlayer: Reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts',
+    );
 
     // Delay before reconnect to avoid hammering the server
     Future.delayed(Duration(seconds: 2 * _reconnectAttempts), () {
@@ -555,7 +570,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // If we're supposedly playing but position hasn't changed, reconnect
       if (!_isPlaying && !_isLoading && _errorMessage == null) {
         debugPrint(
-            'MediaKitPlayer: Watchdog detected stalled stream, reconnecting...');
+          'MediaKitPlayer: Watchdog detected stalled stream, reconnecting...',
+        );
         _attemptReconnect();
       }
     });
@@ -614,10 +630,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         streamUrl = _xtreamService!.getLiveStreamUrl(currentStreamId);
       } else if (widget.streamType == StreamType.vod) {
         streamUrl = _xtreamService!.getVodStreamUrl(
-            currentStreamId, widget.containerExtension ?? 'mp4');
+          currentStreamId,
+          widget.containerExtension ?? 'mp4',
+        );
       } else {
         streamUrl = _xtreamService!.getSeriesStreamUrl(
-            currentStreamId, widget.containerExtension ?? 'mp4');
+          currentStreamId,
+          widget.containerExtension ?? 'mp4',
+        );
       }
 
       debugPrint('MediaKitPlayer: Loading stream: $streamUrl');
@@ -653,7 +673,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         if (widget.initialPosition != null &&
             widget.initialPosition!.inSeconds > 0) {
           debugPrint(
-              'MediaKitPlayer: Using explicit initial position: ${widget.initialPosition!.inSeconds}s');
+            'MediaKitPlayer: Using explicit initial position: ${widget.initialPosition!.inSeconds}s',
+          );
           _seekToResume(widget.initialPosition!.inSeconds);
         } else {
           // Priority 2: Internal lookup (fallback)
@@ -661,7 +682,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               .read(mobileWatchHistoryProvider)
               .getResumePosition(_contentId);
           debugPrint(
-              'MediaKitPlayer: Resume check - contentId: $_contentId, resumePos: $resumePos');
+            'MediaKitPlayer: Resume check - contentId: $_contentId, resumePos: $resumePos',
+          );
           if (resumePos > 30) {
             _seekToResume(resumePos);
           }
@@ -826,6 +848,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       return true;
     }
 
+    // Cycle Aspect Ratio - secret key 'A' or digit 1
+    if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
+      _cycleAspectRatio();
+      return true;
+    }
+
     // Escape / Back - Exit player
     if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack) {
       // If controls are visible, close them first
@@ -846,8 +874,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Aucune piste audio détectée'),
-              duration: Duration(seconds: 1)),
+            content: Text('Aucune piste audio détectée'),
+            duration: Duration(seconds: 1),
+          ),
         );
       }
       return;
@@ -864,7 +893,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Audio: ${nextTrack.language ?? "inconnu"} (${nextTrack.title ?? nextTrack.id})'),
+            'Audio: ${nextTrack.language ?? "inconnu"} (${nextTrack.title ?? nextTrack.id})',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -894,6 +924,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 child: Video(
                   controller: _controller,
                   controls: NoVideoControls, // We use our own custom controls
+                  fit: _getBoxFit(
+                      ref.watch(mobileSettingsProvider).aspectRatioMode),
                 ),
               ),
 
@@ -933,8 +965,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           onFocus: _resetControlsTimer,
                           borderRadius: BorderRadius.circular(50),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back,
-                                color: Colors.white),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
@@ -948,9 +982,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                 .toggleShowDebugStats(!current);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text(
-                                      'Debug Mode: ${!current ? "ON" : "OFF"}'),
-                                  duration: const Duration(seconds: 1)),
+                                content: Text(
+                                  'Debug Mode: ${!current ? "ON" : "OFF"}',
+                                ),
+                                duration: const Duration(seconds: 1),
+                              ),
                             );
                           },
                           child: const SizedBox(width: 20, height: 40),
@@ -1002,6 +1038,46 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     );
   }
 
+  BoxFit _getBoxFit(String mode) {
+    switch (mode) {
+      case 'cover':
+        return BoxFit.cover;
+      case 'fill':
+        return BoxFit.fill;
+      case 'contain':
+      default:
+        return BoxFit.contain;
+    }
+  }
+
+  void _cycleAspectRatio() {
+    final current = ref.read(mobileSettingsProvider).aspectRatioMode;
+    String next;
+    String label;
+    if (current == 'contain') {
+      next = 'cover';
+      label = 'Zoom (Cover)';
+    } else if (current == 'cover') {
+      next = 'fill';
+      label = 'Étirer (Fill)';
+    } else {
+      next = 'contain';
+      label = 'Original (Contain)';
+    }
+
+    ref.read(mobileSettingsProvider.notifier).setAspectRatioMode(next);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Format: $label'),
+          duration: const Duration(seconds: 1),
+          backgroundColor: Colors.black87,
+        ),
+      );
+    }
+  }
+
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
@@ -1037,8 +1113,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         onFocus: _resetControlsTimer,
                         borderRadius: BorderRadius.circular(50),
                         child: IconButton(
-                          icon: const Icon(Icons.skip_previous,
-                              color: Colors.white, size: 48),
+                          icon: const Icon(
+                            Icons.skip_previous,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                           onPressed: _playPrevious,
                         ),
                       )
@@ -1053,8 +1132,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         onFocus: _resetControlsTimer,
                         borderRadius: BorderRadius.circular(50),
                         child: IconButton(
-                          icon: const Icon(Icons.replay_10,
-                              color: Colors.white, size: 48),
+                          icon: const Icon(
+                            Icons.replay_10,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                           onPressed: () async {
                             final pos = await _player.stream.position.first;
                             _player.seek(pos - const Duration(seconds: 5));
@@ -1095,8 +1177,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         onFocus: _resetControlsTimer,
                         borderRadius: BorderRadius.circular(50),
                         child: IconButton(
-                          icon: const Icon(Icons.skip_next,
-                              color: Colors.white, size: 48),
+                          icon: const Icon(
+                            Icons.skip_next,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                           onPressed: _playNext,
                         ),
                       )
@@ -1111,8 +1196,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         onFocus: _resetControlsTimer,
                         borderRadius: BorderRadius.circular(50),
                         child: IconButton(
-                          icon: const Icon(Icons.forward_10,
-                              color: Colors.white, size: 48),
+                          icon: const Icon(
+                            Icons.forward_10,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                           onPressed: () async {
                             final pos = await _player.stream.position.first;
                             _player.seek(pos + const Duration(seconds: 5));
@@ -1153,9 +1241,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                   Text(
                                     _epg!.nowPlaying!,
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold),
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1165,8 +1254,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                       child: Text(
                                         "A suivre: ${_epg!.nextPlaying}",
                                         style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 14),
+                                          color: Colors.white70,
+                                          fontSize: 14,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1177,20 +1267,42 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             // LIVE Badge inside the box, right side
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               margin: const EdgeInsets.only(left: 8),
                               decoration: BoxDecoration(
                                 color: Colors.red,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('LIVE',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12)),
+                              child: const Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
                           ],
                         ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 32),
+
+                    // Aspect Ratio Toggle
+                    TVFocusable(
+                      focusNode:
+                          FocusNode(), // Temporary node or add to state if needed
+                      onPressed: _cycleAspectRatio,
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(Icons.aspect_ratio,
+                            color: Colors.white, size: 36),
+                        onPressed: _cycleAspectRatio,
+                        tooltip: 'Format d\'image',
                       ),
                     ),
                   ],
@@ -1220,7 +1332,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           Text(
                             _formatDuration(_position),
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                           ),
                           Expanded(
                             child: Slider(
@@ -1251,7 +1365,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           Text(
                             _formatDuration(_duration),
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       )
@@ -1266,16 +1382,21 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                               // Clock
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 margin: const EdgeInsets.only(right: 12),
                                 decoration: BoxDecoration(
                                   color: Colors.black54,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: Text(_currentTime,
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  _currentTime,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             // LIVE Badge removed from here
                           ],
@@ -1399,8 +1520,9 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (!ref.watch(mobileSettingsProvider).showDebugStats)
+    if (!ref.watch(mobileSettingsProvider).showDebugStats) {
       return const SizedBox.shrink();
+    }
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -1413,16 +1535,23 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('STATS FOR NERDS 🤓',
-              style: TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12)),
+          const Text(
+            'STATS FOR NERDS 🤓',
+            style: TextStyle(
+              color: Colors.green,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text('Buffer: ${_buffer.inSeconds}s',
-              style: const TextStyle(color: Colors.white, fontSize: 12)),
-          Text('Decoder: $_decoder',
-              style: const TextStyle(color: Colors.white, fontSize: 12)),
+          Text(
+            'Buffer: ${_buffer.inSeconds}s',
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          Text(
+            'Decoder: $_decoder',
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
         ],
       ),
     );

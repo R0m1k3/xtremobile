@@ -116,8 +116,10 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                         _searchQuery.isEmpty &&
                         !_showFavoritesOnly) ...[
                       IconButton(
-                        icon: const Icon(Icons.arrow_back,
-                            color: AppColors.textPrimary),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: AppColors.textPrimary,
+                        ),
                         onPressed: () {
                           setState(() {
                             _selectedCategory = null;
@@ -156,14 +158,19 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.search,
-                              size: 20, color: AppColors.textSecondary),
+                          const Icon(
+                            Icons.search,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
                               style: const TextStyle(
-                                  fontSize: 14, color: Colors.white),
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
                               decoration: const InputDecoration(
                                 hintText: 'Rechercher...',
                                 hintStyle: TextStyle(color: Colors.white54),
@@ -176,8 +183,11 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                           if (_searchQuery.isNotEmpty)
                             GestureDetector(
                               onTap: () => _searchController.clear(),
-                              child: const Icon(Icons.close,
-                                  size: 16, color: AppColors.textSecondary),
+                              child: const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                         ],
                       ),
@@ -250,7 +260,9 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
   }
 
   Widget _buildCategoryGrid(
-      List<String> categories, Map<String, List<Channel>> groupedChannels) {
+    List<String> categories,
+    Map<String, List<Channel>> groupedChannels,
+  ) {
     final columns = ResponsiveLayout.value(
       context,
       mobile: 2,
@@ -307,8 +319,11 @@ class _LiveTVTabState extends ConsumerState<LiveTVTab>
                       color: AppColors.primary.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.folder_open,
-                        color: AppColors.primary, size: 32),
+                    child: const Icon(
+                      Icons.folder_open,
+                      color: AppColors.primary,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(

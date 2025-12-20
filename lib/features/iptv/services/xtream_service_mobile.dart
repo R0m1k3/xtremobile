@@ -74,7 +74,7 @@ class XtreamServiceMobile {
         print('XtreamServiceMobile: Will use IP $_resolvedIp for ${uri.host}');
       } else {
         print(
-            'XtreamServiceMobile: DNS resolution failed, will use hostname directly');
+            'XtreamServiceMobile: DNS resolution failed, will use hostname directly',);
       }
     }
   }
@@ -162,8 +162,9 @@ class XtreamServiceMobile {
       );
 
       if (response.data is! Map<String, dynamic>) {
-        if (response.data is String)
+        if (response.data is String) {
           throw Exception('Auth Error: ${response.data}');
+        }
         throw Exception('Invalid auth response format');
       }
       return response.data as Map<String, dynamic>;
@@ -188,8 +189,9 @@ class XtreamServiceMobile {
       );
 
       if (response.data is! List) {
-        if (response.data is String)
+        if (response.data is String) {
           throw Exception('Category Error: ${response.data}');
+        }
         return {};
       }
       final List<dynamic> categories = response.data as List<dynamic>;
@@ -229,8 +231,9 @@ class XtreamServiceMobile {
       );
 
       if (response.data is! List) {
-        if (response.data is String)
+        if (response.data is String) {
           throw Exception('Live TV Error: ${response.data}');
+        }
         return {};
       }
       final List<dynamic> streams = response.data as List<dynamic>;
@@ -325,7 +328,7 @@ class XtreamServiceMobile {
 
   /// Get movies with pagination support (uses in-memory cache for performance)
   Future<List<xm.Movie>> getMoviesPaginated(
-      {int offset = 0, int limit = 100}) async {
+      {int offset = 0, int limit = 100,}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -345,8 +348,9 @@ class XtreamServiceMobile {
         );
 
         if (response.data is! List) {
-          if (response.data is String)
+          if (response.data is String) {
             throw Exception('VOD Error: ${response.data}');
+          }
           _cachedMoviesRaw = [];
         } else {
           _cachedMoviesRaw = response.data as List<dynamic>;
@@ -419,7 +423,7 @@ class XtreamServiceMobile {
 
   /// Get series with pagination support (uses in-memory cache for performance)
   Future<List<xm.Series>> getSeriesPaginated(
-      {int offset = 0, int limit = 100}) async {
+      {int offset = 0, int limit = 100,}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -439,8 +443,9 @@ class XtreamServiceMobile {
         );
 
         if (response.data is! List) {
-          if (response.data is String)
+          if (response.data is String) {
             throw Exception('Series Error: ${response.data}');
+          }
           _cachedSeriesRaw = [];
         } else {
           _cachedSeriesRaw = response.data as List<dynamic>;
@@ -580,7 +585,7 @@ class XtreamServiceMobile {
   /// Get short EPG as ShortEPG object (for EPGWidget)
   /// Caches results for 12 hours by default
   Future<xm.ShortEPG> getShortEPG(String streamId,
-      {bool forceRefresh = false}) async {
+      {bool forceRefresh = false,}) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {

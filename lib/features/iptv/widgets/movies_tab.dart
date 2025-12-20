@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/playlist_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -238,14 +237,19 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      const Icon(Icons.search,
-                          size: 20, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.search,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
                           style: const TextStyle(
-                              fontSize: 14, color: Colors.white),
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
                           decoration: const InputDecoration(
                             hintText: 'Rechercher...',
                             hintStyle: TextStyle(color: Colors.white54),
@@ -260,17 +264,21 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                       ),
                       if (_isSearching)
                         const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
                           onTap: () {
                             _searchController.clear();
                             _onSearchChanged('');
                           },
-                          child: const Icon(Icons.close,
-                              size: 16, color: AppColors.textSecondary),
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                     ],
                   ),

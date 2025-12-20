@@ -12,7 +12,6 @@ import 'package:xtremflow/core/models/playlist_config.dart';
 import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremflow/mobile/features/iptv/screens/native_player_screen.dart'
     show StreamType;
 import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
@@ -163,10 +162,14 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         streamUrl = _xtreamService!.getLiveStreamUrl(currentStreamId);
       } else if (widget.streamType == StreamType.vod) {
         streamUrl = _xtreamService!.getVodStreamUrl(
-            currentStreamId, widget.containerExtension ?? 'mp4');
+          currentStreamId,
+          widget.containerExtension ?? 'mp4',
+        );
       } else {
         streamUrl = _xtreamService!.getSeriesStreamUrl(
-            currentStreamId, widget.containerExtension ?? 'mp4');
+          currentStreamId,
+          widget.containerExtension ?? 'mp4',
+        );
       }
 
       final controller = VideoPlayerController.networkUrl(
@@ -272,8 +275,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     if (_controller == null || !_controller!.value.isInitialized) return;
     final newPos = _controller!.value.position + offset;
     final clamped = Duration(
-        milliseconds: newPos.inMilliseconds
-            .clamp(0, _controller!.value.duration.inMilliseconds));
+      milliseconds: newPos.inMilliseconds
+          .clamp(0, _controller!.value.duration.inMilliseconds),
+    );
     await _controller!.seekTo(clamped);
     _onUserInteraction();
   }
@@ -327,6 +331,12 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         _seek(const Duration(seconds: 10));
         return true;
       }
+    }
+
+    // Cycle Aspect Ratio - secret key 'A' or digit 1
+    if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
+      _cycleAspectRatio();
+      return true;
     }
 
     if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack) {
@@ -387,6 +397,62 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
 
+  Widget _buildVideoOutput() {
+    final mode = ref.watch(mobileSettingsProvider).aspectRatioMode;
+
+    switch (mode) {
+      case 'cover':
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: _controller!.value.size.width,
+              height: _controller!.value.size.height,
+              child: VideoPlayer(_controller!),
+            ),
+          ),
+        );
+      case 'fill':
+        return SizedBox.expand(
+          child: VideoPlayer(_controller!),
+        );
+      case 'contain':
+      default:
+        return AspectRatio(
+          aspectRatio: _controller!.value.aspectRatio,
+          child: VideoPlayer(_controller!),
+        );
+    }
+  }
+
+  void _cycleAspectRatio() {
+    final current = ref.read(mobileSettingsProvider).aspectRatioMode;
+    String next;
+    String label;
+    if (current == 'contain') {
+      next = 'cover';
+      label = 'Zoom (Cover)';
+    } else if (current == 'cover') {
+      next = 'fill';
+      label = 'Étirer (Fill)';
+    } else {
+      next = 'contain';
+      label = 'Original (Contain)';
+    }
+
+    ref.read(mobileSettingsProvider.notifier).setAspectRatioMode(next);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Format: $label'),
+          duration: const Duration(seconds: 1),
+          backgroundColor: Colors.black87,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = widget.channels != null && widget.channels!.isNotEmpty
@@ -403,17 +469,17 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
             // Video Output - Standard AspectRatio
             Center(
               child: _controller != null && _controller!.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: _controller!.value.aspectRatio,
-                      child: VideoPlayer(_controller!),
-                    )
+                  ? _buildVideoOutput()
                   : const CircularProgressIndicator(color: AppColors.primary),
             ),
 
             if (_errorMessage != null)
               Center(
-                  child: Text(_errorMessage!,
-                      style: const TextStyle(color: Colors.red))),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
 
             if (_showControls) _buildControls(title),
           ],
@@ -458,10 +524,20 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                // NO RATIO TOGGLE HERE
+                // Aspect Ratio Toggle
+                TVFocusable(
+                  focusNode: FocusNode(),
+                  onPressed: _cycleAspectRatio,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(Icons.aspect_ratio, color: Colors.white70),
+                  ),
+                ),
                 const SizedBox(width: 16),
-                Text(_currentTime,
-                    style: const TextStyle(color: Colors.white70)),
+                Text(
+                  _currentTime,
+                  style: const TextStyle(color: Colors.white70),
+                ),
               ],
             ),
           ),
@@ -482,8 +558,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                   Padding(
                     padding: const EdgeInsets.only(right: 24),
                     child: IconButton(
-                      icon: const Icon(Icons.skip_previous,
-                          color: Colors.white, size: 48),
+                      icon: const Icon(
+                        Icons.skip_previous,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                       onPressed: _playPrevious,
                     ),
                   ),
@@ -491,8 +570,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                 // VOD: Replay 10s
                 if (widget.streamType != StreamType.live) ...[
                   IconButton(
-                    icon: const Icon(Icons.replay_10,
-                        color: Colors.white70, size: 36),
+                    icon: const Icon(
+                      Icons.replay_10,
+                      color: Colors.white70,
+                      size: 36,
+                    ),
                     onPressed: () => _seek(const Duration(seconds: -10)),
                   ),
                   const SizedBox(width: 24),
@@ -525,8 +607,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                 if (widget.streamType != StreamType.live) ...[
                   const SizedBox(width: 24),
                   IconButton(
-                    icon: const Icon(Icons.forward_10,
-                        color: Colors.white70, size: 36),
+                    icon: const Icon(
+                      Icons.forward_10,
+                      color: Colors.white70,
+                      size: 36,
+                    ),
                     onPressed: () => _seek(const Duration(seconds: 10)),
                   ),
                 ],
@@ -537,8 +622,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                   Padding(
                     padding: const EdgeInsets.only(left: 24),
                     child: IconButton(
-                      icon: const Icon(Icons.skip_next,
-                          color: Colors.white, size: 48),
+                      icon: const Icon(
+                        Icons.skip_next,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                       onPressed: _playNext,
                     ),
                   ),
@@ -572,9 +660,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                         Text(
                           _epg!.nowPlaying!,
                           style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold),
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -584,7 +673,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                             child: Text(
                               "A suivre: ${_epg!.nextPlaying}",
                               style: const TextStyle(
-                                  color: Colors.white70, fontSize: 14),
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -600,11 +691,14 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('LIVE',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
+                    child: const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -622,8 +716,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Row(
                 children: [
-                  Text(_formatDuration(_position),
-                      style: const TextStyle(color: Colors.white)),
+                  Text(
+                    _formatDuration(_position),
+                    style: const TextStyle(color: Colors.white),
+                  ),
                   Expanded(
                     child: Slider(
                       value: _position.inSeconds
@@ -648,8 +744,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                       },
                     ),
                   ),
-                  Text(_formatDuration(_duration),
-                      style: const TextStyle(color: Colors.white)),
+                  Text(
+                    _formatDuration(_duration),
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ],
               ),
             ),

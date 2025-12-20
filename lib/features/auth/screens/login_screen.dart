@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/components/ui_components.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -148,24 +147,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 labelText: 'Username',
                                 labelStyle:
                                     const TextStyle(color: Colors.white70),
-                                prefixIcon: const Icon(Icons.person_outline,
-                                    color: Colors.white70),
+                                prefixIcon: const Icon(
+                                  Icons.person_outline,
+                                  color: Colors.white70,
+                                ),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.1)),
+                                    color: Colors.white.withOpacity(0.1),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.1)),
+                                    color: Colors.white.withOpacity(0.1),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: const BorderSide(
-                                      color: AppColors.primary),
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
@@ -186,24 +190,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 labelText: 'Password',
                                 labelStyle:
                                     const TextStyle(color: Colors.white70),
-                                prefixIcon: const Icon(Icons.lock_outline,
-                                    color: Colors.white70),
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.white70,
+                                ),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.05),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.1)),
+                                    color: Colors.white.withOpacity(0.1),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.1)),
+                                    color: Colors.white.withOpacity(0.1),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: const BorderSide(
-                                      color: AppColors.primary),
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                                 suffixIcon: IconButton(
                                   icon: Icon(

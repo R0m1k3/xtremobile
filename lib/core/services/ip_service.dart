@@ -27,7 +27,8 @@ class IpService {
           _cachedCountry = data['country'];
           _cachedCountryCode = data['countryCode'];
           debugPrint(
-              'IpService: Detected country: $_cachedCountry ($_cachedCountryCode)');
+            'IpService: Detected country: $_cachedCountry ($_cachedCountryCode)',
+          );
         }
       }
     } catch (e) {

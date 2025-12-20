@@ -72,7 +72,8 @@ class _MobilePlaylistSelectionScreenState
                   labelText: 'Nom',
                   labelStyle: TextStyle(color: Colors.white70),
                   enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24)),
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -83,7 +84,8 @@ class _MobilePlaylistSelectionScreenState
                   labelText: 'URL (DNS)',
                   labelStyle: TextStyle(color: Colors.white70),
                   enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24)),
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -94,7 +96,8 @@ class _MobilePlaylistSelectionScreenState
                   labelText: 'Utilisateur',
                   labelStyle: TextStyle(color: Colors.white70),
                   enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24)),
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -106,7 +109,8 @@ class _MobilePlaylistSelectionScreenState
                   labelText: 'Mot de passe',
                   labelStyle: TextStyle(color: Colors.white70),
                   enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24)),
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
                 ),
               ),
             ],
@@ -120,10 +124,14 @@ class _MobilePlaylistSelectionScreenState
                   context: context,
                   builder: (ctx) => AlertDialog(
                     backgroundColor: AppColors.surface,
-                    title: const Text('Confirmer',
-                        style: TextStyle(color: Colors.white)),
-                    content: const Text('Supprimer cette playlist ?',
-                        style: TextStyle(color: Colors.white70)),
+                    title: const Text(
+                      'Confirmer',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    content: const Text(
+                      'Supprimer cette playlist ?',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
@@ -227,11 +235,16 @@ class _MobilePlaylistSelectionScreenState
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline,
-                      size: 48, color: AppColors.error),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(height: 16),
-                  Text('Erreur de chargement',
-                      style: GoogleFonts.inter(color: Colors.white)),
+                  Text(
+                    'Erreur de chargement',
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
                   TextButton(
                     onPressed: () => ref.invalidate(playlistsProvider),
                     child: const Text('Réessayer'),
@@ -245,13 +258,18 @@ class _MobilePlaylistSelectionScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.playlist_add,
-                          size: 64, color: Colors.white54),
+                      const Icon(
+                        Icons.playlist_add,
+                        size: 64,
+                        color: Colors.white54,
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Aucune playlist configurée',
                         style: GoogleFonts.inter(
-                            fontSize: 18, color: Colors.white70),
+                          fontSize: 18,
+                          color: Colors.white70,
+                        ),
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton.icon(
@@ -262,7 +280,9 @@ class _MobilePlaylistSelectionScreenState
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -272,7 +292,11 @@ class _MobilePlaylistSelectionScreenState
 
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
-                    16, 100, 16, 16), // Top padding for AppBar
+                  16,
+                  100,
+                  16,
+                  16,
+                ), // Top padding for AppBar
                 itemCount: playlists.length,
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 16),
@@ -341,8 +365,11 @@ class _MobilePlaylistCard extends StatelessWidget {
                     color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.playlist_play,
-                      color: AppColors.primary, size: 28),
+                  child: const Icon(
+                    Icons.playlist_play,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -375,8 +402,10 @@ class _MobilePlaylistCard extends StatelessWidget {
                 if (manageMode)
                   const Icon(Icons.edit, color: AppColors.primary)
                 else
-                  const Icon(Icons.chevron_right,
-                      color: AppColors.textTertiary),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textTertiary,
+                  ),
               ],
             ),
           ),

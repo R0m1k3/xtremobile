@@ -12,6 +12,7 @@ class MobileSettings {
   final bool showDebugStats;
   final String decoderMode; // 'auto', 'mediacodec' (HW), 'no' (SW)
   final String playerEngine; // 'ultra' (MPV), 'lite' (ExoPlayer)
+  final String aspectRatioMode; // 'contain', 'cover', 'fill'
   final int bufferDuration; // seconds, 0 = auto
 
   const MobileSettings({
@@ -22,6 +23,7 @@ class MobileSettings {
     this.showDebugStats = false,
     this.decoderMode = 'auto',
     this.playerEngine = 'ultra',
+    this.aspectRatioMode = 'contain',
     this.bufferDuration = 0,
   });
 
@@ -33,6 +35,7 @@ class MobileSettings {
     bool? showDebugStats,
     String? decoderMode,
     String? playerEngine,
+    String? aspectRatioMode,
     int? bufferDuration,
   }) {
     return MobileSettings(
@@ -43,6 +46,7 @@ class MobileSettings {
       showDebugStats: showDebugStats ?? this.showDebugStats,
       decoderMode: decoderMode ?? this.decoderMode,
       playerEngine: playerEngine ?? this.playerEngine,
+      aspectRatioMode: aspectRatioMode ?? this.aspectRatioMode,
       bufferDuration: bufferDuration ?? this.bufferDuration,
     );
   }
@@ -102,6 +106,8 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
         _box?.get('decoderMode', defaultValue: 'auto') as String?;
     final playerEngine =
         _box?.get('playerEngine', defaultValue: 'ultra') as String?;
+    final aspectRatioMode =
+        _box?.get('aspectRatioMode', defaultValue: 'contain') as String?;
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
 
     state = MobileSettings(
@@ -112,6 +118,7 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
       showDebugStats: showDebugStats ?? false,
       decoderMode: decoderMode ?? 'auto',
       playerEngine: playerEngine ?? 'ultra',
+      aspectRatioMode: aspectRatioMode ?? 'contain',
       bufferDuration: buffer ?? 0,
     );
   }
@@ -149,6 +156,11 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void setPlayerEngine(String engine) {
     state = state.copyWith(playerEngine: engine);
     _box?.put('playerEngine', engine);
+  }
+
+  void setAspectRatioMode(String mode) {
+    state = state.copyWith(aspectRatioMode: mode);
+    _box?.put('aspectRatioMode', mode);
   }
 
   void setBufferDuration(int seconds) {

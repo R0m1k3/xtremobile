@@ -7,27 +7,29 @@ import '../widgets/mobile_live_tv_tab.dart';
 import '../widgets/mobile_movies_tab.dart';
 import '../widgets/mobile_series_tab.dart';
 import '../widgets/mobile_settings_tab.dart';
+import '../../../providers/mobile_xtream_providers.dart';
 
 class MobileDashboardScreen extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
-  
+
   const MobileDashboardScreen({
-    super.key, 
+    super.key,
     required this.playlist,
   });
 
   @override
-  ConsumerState<MobileDashboardScreen> createState() => _MobileDashboardScreenState();
+  ConsumerState<MobileDashboardScreen> createState() =>
+      _MobileDashboardScreenState();
 }
 
 class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
-  int _currentIndex = 0;
-
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(mobileDashboardIndexProvider);
+
     // Determine which tab to show
     Widget currentTab;
-    switch (_currentIndex) {
+    switch (currentIndex) {
       case 0:
         currentTab = MobileLiveTVTab(playlist: widget.playlist);
         break;
@@ -46,14 +48,15 @@ class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
 
     return Theme(
       data: MobileTheme.darkTheme,
-      child: MobileScaffold(
-        currentIndex: _currentIndex,
-        onIndexChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        child: currentTab,
+      child: PopScope(
+        canPop: false, // Prevent accidental exit to playlist selection
+        child: MobileScaffold(
+          currentIndex: currentIndex,
+          onIndexChanged: (index) {
+            ref.read(mobileDashboardIndexProvider.notifier).state = index;
+          },
+          child: currentTab,
+        ),
       ),
     );
   }

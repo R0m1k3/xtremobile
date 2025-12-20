@@ -331,8 +331,10 @@ class XtreamService {
   }
 
   /// Get movies with pagination support
-  Future<List<xm.Movie>> getMoviesPaginated(
-      {int offset = 0, int limit = 100}) async {
+  Future<List<xm.Movie>> getMoviesPaginated({
+    int offset = 0,
+    int limit = 100,
+  }) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -411,8 +413,10 @@ class XtreamService {
   }
 
   /// Get series with pagination support (returns flat list)
-  Future<List<xm.Series>> getSeriesPaginated(
-      {int offset = 0, int limit = 100}) async {
+  Future<List<xm.Series>> getSeriesPaginated({
+    int offset = 0,
+    int limit = 100,
+  }) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {

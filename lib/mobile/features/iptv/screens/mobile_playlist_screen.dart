@@ -224,9 +224,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                           _refreshPlaylists();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(isEditing
-                                  ? 'Playlist modifiée'
-                                  : 'Playlist ajoutée'),
+                              content: Text(
+                                isEditing
+                                    ? 'Playlist modifiée'
+                                    : 'Playlist ajoutée',
+                              ),
                               backgroundColor: Colors.green,
                             ),
                           );
@@ -308,8 +310,10 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.edit, color: AppColors.textPrimary),
-                title: const Text('Modifier',
-                    style: TextStyle(color: AppColors.textPrimary)),
+                title: const Text(
+                  'Modifier',
+                  style: TextStyle(color: AppColors.textPrimary),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _showPlaylistDialog(playlist: playlist);
@@ -317,8 +321,10 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: AppColors.error),
-                title: const Text('Supprimer',
-                    style: TextStyle(color: AppColors.error)),
+                title: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: AppColors.error),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _showDeleteConfirmation(playlist);
@@ -388,8 +394,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline,
-                    size: 48, color: AppColors.error),
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: AppColors.error,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Erreur de chargement',
@@ -399,7 +408,9 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                 Text(
                   error.toString(),
                   style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextButton.icon(
@@ -563,8 +574,10 @@ class _PlaylistCard extends StatelessWidget {
                   color: AppColors.textTertiary,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.more_vert,
-                      color: AppColors.textSecondary),
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: AppColors.textSecondary,
+                  ),
                   onPressed: onLongPress, // Re-use the options sheet logic
                 ),
               ],
@@ -691,14 +704,17 @@ class _TVTextFieldState extends State<_TVTextField> {
                   decoration: InputDecoration(
                     labelText: widget.label,
                     hintText: widget.hint,
-                    prefixIcon: Icon(widget.icon,
-                        color: isFocused
-                            ? AppColors.primary
-                            : AppColors.textSecondary),
+                    prefixIcon: Icon(
+                      widget.icon,
+                      color: isFocused
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
                     labelStyle: TextStyle(
-                        color: isFocused
-                            ? AppColors.primary
-                            : AppColors.textSecondary),
+                      color: isFocused
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
                     hintStyle: const TextStyle(color: AppColors.textTertiary),
                     filled: true,
                     fillColor: AppColors.surface,
@@ -707,7 +723,9 @@ class _TVTextFieldState extends State<_TVTextField> {
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                 ),
               ),

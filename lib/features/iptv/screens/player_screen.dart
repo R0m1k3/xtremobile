@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_html/html.dart' as html;
 import '../../../core/shims/ui_web.dart' as ui_web;
-import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
 import '../providers/xtream_provider.dart';
 import '../providers/playback_positions_provider.dart';
 import '../providers/settings_provider.dart';
@@ -187,7 +185,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     if (usingTranscoding) {
       debugPrint(
-          'Seeking in transcoded VOD - reloading player at ${value.round()}s');
+        'Seeking in transcoded VOD - reloading player at ${value.round()}s',
+      );
       ref
           .read(playbackPositionsProvider.notifier)
           .savePosition(_contentId, value, _totalDuration);
@@ -365,9 +364,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           final encodedUrl = Uri.encodeComponent(
             widget.streamType == StreamType.vod
                 ? xtreamService.getVodStreamUrl(
-                    currentStreamId, widget.containerExtension)
+                    currentStreamId,
+                    widget.containerExtension,
+                  )
                 : xtreamService.getSeriesStreamUrl(
-                    currentStreamId, widget.containerExtension),
+                    currentStreamId,
+                    widget.containerExtension,
+                  ),
           );
 
           String qualityParam = 'medium';
@@ -419,7 +422,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         startTime = positions.getPosition(_contentId);
         if (startTime > 0) {
           debugPrint(
-              'PlayerScreen: Resuming from ${startTime.toStringAsFixed(0)}s');
+            'PlayerScreen: Resuming from ${startTime.toStringAsFixed(0)}s',
+          );
         }
       }
 
@@ -556,20 +560,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close,
-                                      color: Colors.white54),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white54,
+                                  ),
                                   onPressed: () => Navigator.pop(context),
                                   tooltip: 'Fermer',
                                 ),
                               ],
                             ),
                             const SizedBox(height: 24),
-                            const Text('FORMAT D\'IMAGE',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1)),
+                            const Text(
+                              'FORMAT D\'IMAGE',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.all(4),
@@ -579,23 +588,38 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  _buildRatioOption('Original', 'contain',
-                                      Icons.crop_original, setDialogState),
-                                  _buildRatioOption('Remplir', 'cover',
-                                      Icons.crop_free, setDialogState),
-                                  _buildRatioOption('Étirer', 'fill',
-                                      Icons.aspect_ratio, setDialogState),
+                                  _buildRatioOption(
+                                    'Original',
+                                    'contain',
+                                    Icons.crop_original,
+                                    setDialogState,
+                                  ),
+                                  _buildRatioOption(
+                                    'Remplir',
+                                    'cover',
+                                    Icons.crop_free,
+                                    setDialogState,
+                                  ),
+                                  _buildRatioOption(
+                                    'Étirer',
+                                    'fill',
+                                    Icons.aspect_ratio,
+                                    setDialogState,
+                                  ),
                                 ],
                               ),
                             ),
                             if (_audioTracks.isNotEmpty) ...[
                               const SizedBox(height: 32),
-                              const Text('AUDIO',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1)),
+                              const Text(
+                                'AUDIO',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               Container(
                                 constraints:
@@ -604,7 +628,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   color: Colors.black26,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                      color: Colors.white.withOpacity(0.05)),
+                                    color: Colors.white.withOpacity(0.05),
+                                  ),
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
@@ -615,24 +640,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                           color: Colors.transparent,
                                           child: ListTile(
                                             title: Text(
-                                                track['label'] ??
-                                                    'Piste ${track['id']}',
-                                                style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14)),
-                                            subtitle: Text(track['lang'] ?? '',
-                                                style: const TextStyle(
-                                                    color: Colors.white54,
-                                                    fontSize: 12)),
+                                              track['label'] ??
+                                                  'Piste ${track['id']}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              track['lang'] ?? '',
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 12,
+                                              ),
+                                            ),
                                             onTap: () {
                                               _setAudioTrack(track['id']);
                                               setDialogState(() {});
                                             },
                                             dense: true,
                                             leading: const Icon(
-                                                Icons.audiotrack,
-                                                size: 18,
-                                                color: Colors.white54),
+                                              Icons.audiotrack,
+                                              size: 18,
+                                              color: Colors.white54,
+                                            ),
                                             hoverColor:
                                                 Colors.white.withOpacity(0.1),
                                           ),
@@ -644,12 +675,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                               ),
                             ],
                             const SizedBox(height: 32),
-                            const Text('AFFICHAGE',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1)),
+                            const Text(
+                              'AFFICHAGE',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             SwitchListTile(
                               value: showClock,
@@ -659,11 +693,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 });
                                 settingsNotifier.setShowClock(val);
                               },
-                              title: const Text('Afficher l\'heure',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 14)),
-                              secondary: const Icon(Icons.access_time,
-                                  color: Colors.white54),
+                              title: const Text(
+                                'Afficher l\'heure',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              secondary: const Icon(
+                                Icons.access_time,
+                                color: Colors.white54,
+                              ),
                               activeThumbColor: AppColors.primary,
                               contentPadding: EdgeInsets.zero,
                             ),
@@ -682,7 +722,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   Widget _buildRatioOption(
-      String label, String value, IconData icon, StateSetter setDialogState) {
+    String label,
+    String value,
+    IconData icon,
+    StateSetter setDialogState,
+  ) {
     final isSelected = _aspectRatio == value;
     return Expanded(
       child: GestureDetector(
@@ -705,16 +749,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             boxShadow: isSelected
                 ? [
                     const BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 4,
-                        offset: Offset(0, 2))
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
                   ]
                 : null,
           ),
           child: Column(
             children: [
-              Icon(icon,
-                  color: isSelected ? Colors.white : Colors.white54, size: 20),
+              Icon(
+                icon,
+                color: isSelected ? Colors.white : Colors.white54,
+                size: 20,
+              ),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -767,14 +815,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline,
-                          size: 64, color: Colors.red),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
                       const SizedBox(height: 16),
-                      const Text('Failed to load stream',
-                          style: TextStyle(color: Colors.white, fontSize: 18)),
+                      const Text(
+                        'Failed to load stream',
+                        style: TextStyle(color: Colors.white, fontSize: 18),
+                      ),
                       const SizedBox(height: 8),
-                      Text(_errorMessage!,
-                          style: const TextStyle(color: Colors.white70)),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
@@ -858,7 +913,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 12),
+                                      vertical: 12,
+                                    ),
                                     child: Column(
                                       children: [
                                         PointerInterceptor(
@@ -887,10 +943,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                                 trackHeight: 4,
                                                 thumbShape:
                                                     const RoundSliderThumbShape(
-                                                        enabledThumbRadius: 6),
+                                                  enabledThumbRadius: 6,
+                                                ),
                                                 overlayShape:
                                                     const RoundSliderOverlayShape(
-                                                        overlayRadius: 12),
+                                                  overlayRadius: 12,
+                                                ),
                                                 activeTrackColor: Colors.white,
                                                 inactiveTrackColor:
                                                     Colors.white24,
@@ -961,8 +1019,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                                   Colors.black.withOpacity(0.5),
                                               shape: BoxShape.circle,
                                               border: Border.all(
-                                                  color: Colors.white,
-                                                  width: 2),
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
                                             ),
                                             child: Icon(
                                               _isPlaying
@@ -1040,10 +1099,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                           data: SliderThemeData(
                                             thumbShape:
                                                 const RoundSliderThumbShape(
-                                                    enabledThumbRadius: 8),
+                                              enabledThumbRadius: 8,
+                                            ),
                                             overlayShape:
                                                 const RoundSliderOverlayShape(
-                                                    overlayRadius: 16),
+                                              overlayRadius: 16,
+                                            ),
                                             activeTrackColor: AppColors.primary,
                                             inactiveTrackColor: Colors.white24,
                                             thumbColor: AppColors.primary,
@@ -1060,31 +1121,40 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                         ),
                                         Padding(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 12),
+                                            horizontal: 12,
+                                          ),
                                           child: Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceBetween,
                                             children: [
                                               Text(
-                                                _formatDuration(Duration(
+                                                _formatDuration(
+                                                  Duration(
                                                     seconds: _currentPosition
                                                             .isFinite
                                                         ? _currentPosition
                                                             .toInt()
-                                                        : 0)),
+                                                        : 0,
+                                                  ),
+                                                ),
                                                 style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12),
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
                                               ),
                                               Text(
-                                                _formatDuration(Duration(
+                                                _formatDuration(
+                                                  Duration(
                                                     seconds: _totalDuration
                                                             .isFinite
                                                         ? _totalDuration.toInt()
-                                                        : 0)),
+                                                        : 0,
+                                                  ),
+                                                ),
                                                 style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12),
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -1113,7 +1183,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                       fontWeight: FontWeight.bold,
                                       shadows: [
                                         Shadow(
-                                            color: Colors.black, blurRadius: 8)
+                                          color: Colors.black,
+                                          blurRadius: 8,
+                                        ),
                                       ],
                                     ),
                                   ),

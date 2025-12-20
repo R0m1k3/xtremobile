@@ -10,33 +10,41 @@ export '../../features/iptv/models/xtream_models.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Mobile-specific Xtream service provider (no dart:html dependency)
-final mobileXtreamServiceProvider = FutureProvider.family<XtreamServiceMobile, PlaylistConfig>((ref, playlist) async {
+final mobileXtreamServiceProvider =
+    FutureProvider.family<XtreamServiceMobile, PlaylistConfig>(
+        (ref, playlist) async {
   final dir = await getApplicationDocumentsDirectory();
   final service = XtreamServiceMobile(dir.path);
-  await service.setPlaylistAsync(playlist); // Async to resolve DNS before API calls
+  await service
+      .setPlaylistAsync(playlist); // Async to resolve DNS before API calls
   return service;
 });
 
 /// Mobile-specific live channels provider
-final mobileLiveChannelsProvider = FutureProvider.family<Map<String, List<Channel>>, PlaylistConfig>((ref, playlist) async {
+final mobileLiveChannelsProvider =
+    FutureProvider.family<Map<String, List<Channel>>, PlaylistConfig>(
+        (ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getLiveChannels();
 });
 
 /// Mobile-specific movies pagination provider
-final mobileMoviesProvider = FutureProvider.family<List<Movie>, PlaylistConfig>((ref, playlist) async {
+final mobileMoviesProvider =
+    FutureProvider.family<List<Movie>, PlaylistConfig>((ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getMoviesPaginated(offset: 0, limit: 100);
 });
 
 /// Mobile-specific series pagination provider
-final mobileSeriesProvider = FutureProvider.family<List<Series>, PlaylistConfig>((ref, playlist) async {
+final mobileSeriesProvider =
+    FutureProvider.family<List<Series>, PlaylistConfig>((ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getSeriesPaginated(offset: 0, limit: 100);
 });
 
 /// Mobile-specific series info provider
-final mobileSeriesInfoProvider = FutureProvider.family<SeriesInfo, String>((ref, seriesId) {
+final mobileSeriesInfoProvider =
+    FutureProvider.family<SeriesInfo, String>((ref, seriesId) {
   throw UnimplementedError('Use mobileSeriesInfoByPlaylistProvider instead');
 });
 
@@ -44,9 +52,9 @@ final mobileSeriesInfoProvider = FutureProvider.family<SeriesInfo, String>((ref,
 class SeriesInfoRequest {
   final PlaylistConfig playlist;
   final String seriesId;
-  
+
   SeriesInfoRequest({required this.playlist, required this.seriesId});
-  
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -54,25 +62,28 @@ class SeriesInfoRequest {
           runtimeType == other.runtimeType &&
           playlist == other.playlist &&
           seriesId == other.seriesId;
-  
+
   @override
   int get hashCode => playlist.hashCode ^ seriesId.hashCode;
 }
 
-final mobileSeriesInfoByPlaylistProvider = FutureProvider.family<SeriesInfo, SeriesInfoRequest>((ref, request) async {
-  final service = await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
+final mobileSeriesInfoByPlaylistProvider =
+    FutureProvider.family<SeriesInfo, SeriesInfoRequest>((ref, request) async {
+  final service =
+      await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
   return service.getSeriesInfo(request.seriesId);
 });
 
 // UI State Provider for persistent navigation
-final mobileLiveTvUiStateProvider = StateProvider<LiveTvUiState>((ref) => LiveTvUiState());
+final mobileLiveTvUiStateProvider =
+    StateProvider<LiveTvUiState>((ref) => LiveTvUiState());
 
 class LiveTvUiState {
   final String? selectedCategory;
   final bool isCategoryView;
-  
+
   LiveTvUiState({this.selectedCategory, this.isCategoryView = true});
-  
+
   LiveTvUiState copyWith({String? selectedCategory, bool? isCategoryView}) {
     return LiveTvUiState(
       selectedCategory: selectedCategory ?? this.selectedCategory,
@@ -80,3 +91,6 @@ class LiveTvUiState {
     );
   }
 }
+
+/// Persistent index for mobile dashboard navigation
+final mobileDashboardIndexProvider = StateProvider<int>((ref) => 0);

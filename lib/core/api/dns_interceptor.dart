@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 
 /// Interceptor to fallback to DNS-over-HTTPS if standard DNS fails
 /// Useful for emulators or restricted networks
@@ -15,7 +14,9 @@ class DnsFallbackInterceptor extends Interceptor {
 
   @override
   Future<void> onError(
-      DioException err, ErrorInterceptorHandler handler) async {
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     // Basic check for connection/host lookup errors
     if (_isDnsError(err)) {
       final uri = err.requestOptions.uri;

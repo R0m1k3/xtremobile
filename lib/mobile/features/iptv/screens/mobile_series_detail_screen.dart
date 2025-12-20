@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/models/playlist_config.dart';
-import '../../../../features/iptv/models/xtream_models.dart';
-import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import 'native_player_screen.dart';
@@ -89,15 +87,20 @@ class _MobileSeriesDetailScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: AppColors.error),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: AppColors.error,
+                      ),
                       const SizedBox(height: 16),
-                      Text('Error: $_error',
-                          style:
-                              const TextStyle(color: AppColors.textSecondary)),
+                      Text(
+                        'Error: $_error',
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
                       TextButton(
-                          onPressed: _loadSeriesInfo,
-                          child: const Text('Retry')),
+                        onPressed: _loadSeriesInfo,
+                        child: const Text('Retry'),
+                      ),
                     ],
                   ),
                 )
@@ -176,20 +179,27 @@ class _MobileSeriesDetailScreenState
                       Row(
                         children: [
                           if (_seriesInfo!.rating != null) ...[
-                            const Icon(Icons.star,
-                                size: 16, color: Colors.amber),
+                            const Icon(
+                              Icons.star,
+                              size: 16,
+                              color: Colors.amber,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               _formatRating(_seriesInfo!.rating!)!,
                               style: const TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 13),
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(width: 16),
                           ],
                           Text(
                             '${_seriesInfo!.episodes.keys.length} Saisons',
                             style: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 13),
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -209,7 +219,9 @@ class _MobileSeriesDetailScreenState
               child: Text(
                 _seriesInfo!.plot!,
                 style: const TextStyle(
-                    color: AppColors.textSecondary, height: 1.4),
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -236,8 +248,9 @@ class _MobileSeriesDetailScreenState
                       label: Text('Saison $seasonNum'),
                       selected: isSelected,
                       onSelected: (selected) {
-                        if (selected)
+                        if (selected) {
                           setState(() => _selectedSeason = seasonNum);
+                        }
                       },
                       backgroundColor: isDark
                           ? const Color(0xFF1C1C1E)
@@ -253,7 +266,8 @@ class _MobileSeriesDetailScreenState
                             isSelected ? FontWeight.w600 : FontWeight.w400,
                       ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       showCheckmark: false,
                       side: BorderSide.none,
                     );
@@ -378,7 +392,9 @@ class _MobileSeriesDetailScreenState
                         Text(
                           _formatDuration(episode.durationSecs!),
                           style: TextStyle(
-                              color: secondaryTextColor, fontSize: 12),
+                            color: secondaryTextColor,
+                            fontSize: 12,
+                          ),
                         ),
                     ],
                   ),

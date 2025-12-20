@@ -33,7 +33,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     Icons.live_tv,
     Icons.movie,
     Icons.tv,
-    Icons.settings
+    Icons.settings,
   ];
 
   @override
@@ -85,7 +85,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   child: Container(
                     height: 50,
                     constraints: const BoxConstraints(
-                        maxWidth: 600), // Prevent taking too much space
+                      maxWidth: 600,
+                    ), // Prevent taking too much space
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(30),
@@ -105,7 +106,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       unselectedLabelColor:
                           Colors.white70, // Fixed: Improved readability
                       labelStyle: GoogleFonts.inter(
-                          fontWeight: FontWeight.w700, fontSize: 13),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                       overlayColor: WidgetStateProperty.all(Colors.transparent),
                       tabs: List.generate(_tabs.length, (index) {
                         return Tab(
@@ -182,16 +185,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             children: [
               // Padding top to account for the transparent AppBar
               Padding(
-                  padding: const EdgeInsets.only(top: 80),
-                  child: LiveTVTab(playlist: widget.playlist)),
+                padding: const EdgeInsets.only(top: 80),
+                child: LiveTVTab(playlist: widget.playlist),
+              ),
               Padding(
-                  padding: const EdgeInsets.only(top: 80),
-                  child: MoviesTab(playlist: widget.playlist)),
+                padding: const EdgeInsets.only(top: 80),
+                child: MoviesTab(playlist: widget.playlist),
+              ),
               Padding(
-                  padding: const EdgeInsets.only(top: 80),
-                  child: SeriesTab(playlist: widget.playlist)),
+                padding: const EdgeInsets.only(top: 80),
+                child: SeriesTab(playlist: widget.playlist),
+              ),
               const Padding(
-                  padding: EdgeInsets.only(top: 80), child: SettingsTab()),
+                padding: EdgeInsets.only(top: 80),
+                child: SettingsTab(),
+              ),
             ],
           ),
         ],
@@ -206,10 +214,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [
-              Color(0xFF43cea2),
-              Color(0xFF185a9d)
-            ]), // Green to Blue
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF43cea2),
+                Color(0xFF185a9d),
+              ],
+            ), // Green to Blue
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(Icons.play_arrow_rounded, color: Colors.white),
@@ -222,9 +232,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             Text(
               'Xtrem',
               style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  color: Colors.white),
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: Colors.white,
+              ),
             ),
             Text(
               'Flow',
