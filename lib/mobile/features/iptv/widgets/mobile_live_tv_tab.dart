@@ -14,6 +14,7 @@ import '../../../theme/mobile_theme.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/services/ip_service.dart';
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -40,6 +41,10 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
       });
+    });
+    // Trigger IP fetch for smart sorting
+    IpService().fetchIpDetails().then((_) {
+      if (mounted) setState(() {});
     });
   }
 
@@ -111,8 +116,22 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                 categories = categories
                     .where((cat) => settings.matchesLiveTvFilter(cat))
                     .toList();
+                categories.sort();
+              } else {
+                // Smart Sort (GeoIP)
+                final userCountry = IpService().country;
+                categories.sort((a, b) {
+                  if (userCountry != null) {
+                    final aMatches =
+                        a.toLowerCase().contains(userCountry.toLowerCase());
+                    final bMatches =
+                        b.toLowerCase().contains(userCountry.toLowerCase());
+                    if (aMatches && !bMatches) return -1;
+                    if (!aMatches && bMatches) return 1;
+                  }
+                  return a.compareTo(b);
+                });
               }
-              categories.sort();
 
               // Prepare channels
               List<Channel> displayedChannels = [];
@@ -151,6 +170,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                         children: [
                           // Search Bar - Wrapped in TVFocusable for remote access
                           TVFocusable(
+                            scale: 1.0, // Disable scaling to prevent overflow
                             onPressed: () {
                               setState(() => _isSearchEditing = true);
                               WidgetsBinding.instance.addPostFrameCallback((_) {

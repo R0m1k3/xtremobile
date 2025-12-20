@@ -291,6 +291,15 @@ class _MobileSeriesDetailScreenState
       episode.episodeNum,
     );
     final isWatched = watchHistory.isEpisodeWatched(episodeKey);
+    final resumePos = watchHistory.getResumePosition(episodeKey);
+
+    // Calculate progress
+    double progress = 0.0;
+    if (episode.durationSecs != null &&
+        episode.durationSecs! > 0 &&
+        resumePos > 0) {
+      progress = (resumePos / episode.durationSecs!).clamp(0.0, 1.0);
+    }
 
     // Force dark mode colors since background is hardcoded dark
     const textColor = Colors.white;
@@ -300,8 +309,6 @@ class _MobileSeriesDetailScreenState
 
     return InkWell(
       onTap: () {
-        // Watch progress is tracked in player at 80% completion
-
         // Enforce Native Player for Series (VOD)
         Navigator.push(
           context,
@@ -316,61 +323,78 @@ class _MobileSeriesDetailScreenState
               seriesId: widget.series.seriesId,
               season: episode.seasonNum,
               episodeNum: episode.episodeNum,
+              // Pass explicit initial position for resume
+              initialPosition:
+                  resumePos > 0 ? Duration(seconds: resumePos) : null,
             ),
           ),
         );
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.white10)),
-        ),
-        child: Row(
-          children: [
-            // Play Button / Indicator
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isWatched ? primaryColor : surfaceColor,
-                shape: BoxShape.circle,
-                border: isWatched
-                    ? null
-                    : Border.all(color: primaryColor, width: 2),
-              ),
-              child: Icon(
-                isWatched ? Icons.check : Icons.play_arrow,
-                color: isWatched
-                    ? Colors.black // Checkmark on white bg
-                    : primaryColor, // Play icon
-                size: 20,
-              ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.white10)),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'E${episode.episodeNum} - ${episode.title}',
-                    style: TextStyle(
-                      color: isWatched ? secondaryTextColor : textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            child: Row(
+              children: [
+                // Play Button / Indicator
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isWatched ? primaryColor : surfaceColor,
+                    shape: BoxShape.circle,
+                    border: isWatched
+                        ? null
+                        : Border.all(color: primaryColor, width: 2),
                   ),
-                  if (episode.durationSecs != null && episode.durationSecs! > 0)
-                    Text(
-                      _formatDuration(episode.durationSecs!),
-                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
-                    ),
-                ],
-              ),
+                  child: Icon(
+                    isWatched ? Icons.check : Icons.play_arrow,
+                    color: isWatched
+                        ? Colors.black // Checkmark on white bg
+                        : primaryColor, // Play icon
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'E${episode.episodeNum} - ${episode.title}',
+                        style: TextStyle(
+                          color: isWatched ? secondaryTextColor : textColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (episode.durationSecs != null &&
+                          episode.durationSecs! > 0)
+                        Text(
+                          _formatDuration(episode.durationSecs!),
+                          style: TextStyle(
+                              color: secondaryTextColor, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // Progress Bar (Red like YouTube/Netflix)
+          if (progress > 0 && !isWatched)
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.transparent,
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
+              minHeight: 2,
+            ),
+        ],
       ),
     );
   }

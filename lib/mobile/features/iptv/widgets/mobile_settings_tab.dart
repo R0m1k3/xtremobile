@@ -75,11 +75,13 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                Container(
+                  width: 48,
+                  height: 48,
+                  // No decoration for free-floating logo
                   child: Image.asset(
                     'assets/images/logo_xtremflow.png',
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.play_circle_filled,
                       color: AppColors.primary,

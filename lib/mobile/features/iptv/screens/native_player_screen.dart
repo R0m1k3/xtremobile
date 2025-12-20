@@ -44,10 +44,13 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
     this.containerExtension,
     this.channels,
     this.initialIndex = 0,
+    this.initialPosition,
     this.seriesId,
     this.season,
     this.episodeNum,
   });
+
+  final Duration? initialPosition;
 
   @override
   ConsumerState<NativePlayerScreen> createState() => _NativePlayerScreenState();
@@ -646,12 +649,22 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Resume from saved position (VOD/Series only)
       if (widget.streamType != StreamType.live) {
-        final resumePos =
-            ref.read(mobileWatchHistoryProvider).getResumePosition(_contentId);
-        debugPrint(
-            'MediaKitPlayer: Resume check - contentId: $_contentId, resumePos: $resumePos');
-        if (resumePos > 30) {
-          _seekToResume(resumePos);
+        // Priority 1: Explicit initial position passed from caller verification
+        if (widget.initialPosition != null &&
+            widget.initialPosition!.inSeconds > 0) {
+          debugPrint(
+              'MediaKitPlayer: Using explicit initial position: ${widget.initialPosition!.inSeconds}s');
+          _seekToResume(widget.initialPosition!.inSeconds);
+        } else {
+          // Priority 2: Internal lookup (fallback)
+          final resumePos = ref
+              .read(mobileWatchHistoryProvider)
+              .getResumePosition(_contentId);
+          debugPrint(
+              'MediaKitPlayer: Resume check - contentId: $_contentId, resumePos: $resumePos');
+          if (resumePos > 30) {
+            _seekToResume(resumePos);
+          }
         }
       }
     } catch (e) {

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 
-class MobileScaffold extends ConsumerWidget {
+class MobileScaffold extends ConsumerStatefulWidget {
   final Widget child;
   final int currentIndex;
   final Function(int) onIndexChanged;
@@ -16,59 +18,130 @@ class MobileScaffold extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MobileScaffold> createState() => _MobileScaffoldState();
+}
+
+class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
+  late Stream<DateTime> _clockStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _clockStream =
+        Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Top Navigation Bar (Apple TV Style)
+          // Top Navigation Bar (Redesigned)
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.6),
-                  Colors.transparent,
-                ],
-              ),
+            padding: const EdgeInsets.symmetric(
+                vertical: 24,
+                horizontal:
+                    24), // Increased vertical padding for floating effect
+            decoration: const BoxDecoration(
+              color: Colors.transparent, // Transparent background
             ),
             child: SafeArea(
               bottom: false,
               child: Container(
+                height: 64, // Taller pill to accommodate larger logo
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A)
+                      .withOpacity(0.9), // Slightly more opaque pill
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    )
+                  ],
+                ),
                 child: Row(
                   children: [
-                    // LOGO (Left side)
+                    // --- LEFT: LOGO & BRAND ---
                     Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Image.asset(
-                        'assets/images/logo_xtremflow.png',
-                        height: 40,
-                        width: 40,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const SizedBox(width: 40), // Fallback if missing
+                      padding: const EdgeInsets.only(
+                          left: 8, right: 32), // More spacing after logo
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 52, // Larger Logo
+                            height: 52,
+                            // No decoration for free-floating logo
+                            child: Image.asset(
+                              'assets/images/logo_xtremflow.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.play_circle_filled,
+                                color: Colors.white,
+                                size: 40,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'XtremFlow',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20, // Slightly larger text
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    // NAVIGATION PILL (Expanded)
+                    // --- CENTER: NAVIGATION ---
                     Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildNavItem(0, 'Live TV', Icons.tv),
+                          const SizedBox(width: 32), // Increased spacing
+                          _buildNavItem(1, 'Movies', Icons.movie),
+                          const SizedBox(width: 32),
+                          _buildNavItem(2, 'Series', Icons.video_library),
+                          const SizedBox(width: 32),
+                          _buildNavItem(3, 'Settings', Icons.settings),
+                        ],
+                      ),
+                    ),
+
+                    // --- RIGHT: CLOCK ONLY ---
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32, right: 16),
                       child: Container(
-                        height: 50,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(30),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.15)),
+                          color: Colors.white
+                              .withOpacity(0.08), // Subtle background
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildNavItem(0, 'Live TV', Icons.tv),
-                            _buildNavItem(1, 'Films', Icons.movie),
-                            _buildNavItem(2, 'Séries', Icons.video_library),
-                            _buildNavItem(3, 'Paramètres', Icons.settings),
-                          ],
+                        child: StreamBuilder<DateTime>(
+                          stream: _clockStream,
+                          initialData: DateTime.now(),
+                          builder: (context, snapshot) {
+                            final time =
+                                DateFormat('HH:mm').format(snapshot.data!);
+                            return Text(
+                              time,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -79,20 +152,19 @@ class MobileScaffold extends ConsumerWidget {
           ),
 
           // Main Content
-          Expanded(child: child),
+          Expanded(child: widget.child),
         ],
       ),
     );
   }
 
   Widget _buildNavItem(int index, String label, IconData icon) {
-    final isSelected = currentIndex == index;
-
+    final isSelected = widget.currentIndex == index;
     return _AppleTVNavItem(
       isSelected: isSelected,
       icon: icon,
       label: label,
-      onPressed: () => onIndexChanged(index),
+      onPressed: () => widget.onIndexChanged(index),
     );
   }
 }
@@ -138,11 +210,13 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Selected OR Focused = black text (white bg), Normal = white70 text
-    final Color textColor =
-        (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
-    final Color iconColor =
-        (widget.isSelected || _isFocused) ? Colors.black : Colors.white70;
+    // Selected: Black text on White bg
+    // Focused: White text on Translucent bg
+    // Normal: White70 text on Transparent bg
+    final Color textColor = widget.isSelected ? Colors.black : Colors.white;
+    final Color iconColor = widget.isSelected ? Colors.black : Colors.white;
+    final FontWeight fontWeight =
+        widget.isSelected ? FontWeight.w700 : FontWeight.w500;
 
     return Focus(
       focusNode: _focusNode,
@@ -163,38 +237,30 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
           decoration: BoxDecoration(
-            // White pill when selected OR focused
             color: widget.isSelected
                 ? Colors.white
                 : (_isFocused
-                    ? Colors.white.withOpacity(0.9)
+                    ? Colors.white.withOpacity(0.2) // Explicit focus highlight
                     : Colors.transparent),
-            borderRadius: BorderRadius.circular(25),
-            // Strong glow when focused
-            boxShadow: _isFocused
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.5),
-                      blurRadius: 16,
-                      spreadRadius: 4,
-                    ),
-                  ]
+            borderRadius: BorderRadius.circular(20), // Matches pill shape
+            border: _isFocused && !widget.isSelected
+                ? Border.all(
+                    color: Colors.white
+                        .withOpacity(0.3)) // Subtle border for focus
                 : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(widget.icon, color: iconColor, size: 18),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 widget.label,
                 style: TextStyle(
                   color: textColor,
-                  fontWeight:
-                      widget.isSelected ? FontWeight.w700 : FontWeight.w400,
-                  fontSize: 13,
+                  fontWeight: fontWeight,
+                  fontSize: 14,
                 ),
               ),
             ],
