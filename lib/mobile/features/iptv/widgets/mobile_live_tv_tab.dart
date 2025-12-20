@@ -431,20 +431,38 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   void _playChannel(BuildContext context, Channel channel,
       List<Channel> channels, PlaylistConfig playlist, int index) async {
-    // Unified Player Strategy: Use LitePlayer (ExoPlayer) for Live TV (Stability)
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LitePlayerScreen(
-          streamId: channel.streamId,
-          title: channel.name,
-          playlist: playlist,
-          streamType: StreamType.live,
-          channels: channels, // Pass full channel list for zapping
-          initialIndex: index,
+    final settings = ref.read(mobileSettingsProvider);
+    final useNative = settings.playerEngine == 'ultra';
+
+    if (useNative) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NativePlayerScreen(
+            streamId: channel.streamId,
+            title: channel.name,
+            playlist: playlist,
+            streamType: StreamType.live,
+            channels: channels, // Pass full channel list for zapping
+            initialIndex: index,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LitePlayerScreen(
+            streamId: channel.streamId,
+            title: channel.name,
+            playlist: playlist,
+            streamType: StreamType.live,
+            channels: channels, // Pass full channel list for zapping
+            initialIndex: index,
+          ),
+        ),
+      );
+    }
 
     // When returning from player, set flag to prevent PopScope from going back to categories
     if (mounted) {

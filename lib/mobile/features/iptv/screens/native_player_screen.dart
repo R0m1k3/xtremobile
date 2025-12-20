@@ -132,8 +132,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
     final decoderMode = ref.read(mobileSettingsProvider).decoderMode;
+    final deinterlace = ref.read(mobileSettingsProvider).deinterlace;
     (_player.platform as dynamic)?.setProperty('hwdec', decoderMode);
-    debugPrint('MediaKitPlayer: Decoder Mode set to $decoderMode');
+    (_player.platform as dynamic)
+        ?.setProperty('deinterlace', deinterlace ? 'yes' : 'no');
+
+    // Performance & Scaling Fixes for Android
+    (_player.platform as dynamic)?.setProperty('opengl-pbo', 'yes');
+    (_player.platform as dynamic)?.setProperty('video-unscaled', 'no');
+    debugPrint(
+        'MediaKitPlayer: Decoder Mode set to $decoderMode, Deinterlace: $deinterlace');
 
     // ============ PERFORMANCE 3.0 (ANTI MICRO-COUPURE PROFILE) ============
     // Tuned to eliminate micro-stuttering during live TV playback
@@ -200,16 +208,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     );
 
     // Prevent stalls (readahead already set above)
+    (_player.platform as dynamic)?.setProperty('hr-seek', 'yes');
+    (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
     (_player.platform as dynamic)
-        ?.setProperty('hr-seek', 'yes'); // High-res seeking
+        ?.setProperty('vd-lavc-dr', 'yes'); // Direct rendering
     (_player.platform as dynamic)
-        ?.setProperty('hr-seek-framedrop', 'yes'); // Drop frames to catch up
-
-    // Frame dropping policy - prefer dropping frames over stuttering
+        ?.setProperty('vd-lavc-fast', 'yes'); // Fast decoding
+    (_player.platform as dynamic)
+        ?.setProperty('vd-lavc-threads', '4'); // Multithreading
     (_player.platform as dynamic)?.setProperty(
-      'framedrop',
-      'decoder+vo',
-    ); // Allow frame drops at decoder and video output
+        'vd-lavc-skiploopfilter', 'all'); // Skip loop filter for performance
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
     // V3: Explicit LAVC Downmix & Audiotrack
@@ -831,21 +839,31 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
 
     // Up Arrow - Previous channel (Live only)
-    if (key == LogicalKeyboardKey.arrowUp) {
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.channelUp) {
       if (widget.streamType == StreamType.live && widget.channels != null) {
-        _playPrevious();
+        if (key == LogicalKeyboardKey.channelUp || !_showControls) {
+          _playPrevious();
+          return true;
+        }
       }
-      return true;
+      return false; // Let focus handle navigation if controls shown
     }
 
     // Down Arrow - Next channel (Live) or Cycle Audio (VOD)
-    if (key == LogicalKeyboardKey.arrowDown) {
+    if (key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.channelDown) {
       if (widget.streamType == StreamType.live && widget.channels != null) {
-        _playNext();
-      } else if (widget.streamType != StreamType.live) {
+        if (key == LogicalKeyboardKey.channelDown || !_showControls) {
+          _playNext();
+          return true;
+        }
+      } else if (widget.streamType != StreamType.live &&
+          key == LogicalKeyboardKey.arrowDown) {
         _cycleAudioTrack();
+        return true;
       }
-      return true;
+      return false; // Let focus handle navigation if controls shown
     }
 
     // Cycle Aspect Ratio - secret key 'A' or digit 1
@@ -1286,23 +1304,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             ),
                           ],
                         ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 32),
-
-                    // Aspect Ratio Toggle
-                    TVFocusable(
-                      focusNode:
-                          FocusNode(), // Temporary node or add to state if needed
-                      onPressed: _cycleAspectRatio,
-                      onFocus: _resetControlsTimer,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(Icons.aspect_ratio,
-                            color: Colors.white, size: 36),
-                        onPressed: _cycleAspectRatio,
-                        tooltip: 'Format d\'image',
                       ),
                     ),
                   ],

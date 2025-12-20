@@ -146,6 +146,18 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           ),
 
           _buildSettingItem(
+            icon: Icons.line_weight,
+            title: 'Désentrelacement',
+            subtitle: settings.deinterlace
+                ? 'Activé (Recommandé pour TV en direct)'
+                : 'Désactivé',
+            value: settings.deinterlace ? 'Oui' : 'Non',
+            onTap: () => ref
+                .read(mobileSettingsProvider.notifier)
+                .toggleDeinterlace(!settings.deinterlace),
+          ),
+
+          _buildSettingItem(
             icon: Icons.speed,
             title: 'Buffer (Cache)',
             subtitle: settings.bufferDuration == 0

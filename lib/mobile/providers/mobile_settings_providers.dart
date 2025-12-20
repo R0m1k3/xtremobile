@@ -13,6 +13,7 @@ class MobileSettings {
   final String decoderMode; // 'auto', 'mediacodec' (HW), 'no' (SW)
   final String playerEngine; // 'ultra' (MPV), 'lite' (ExoPlayer)
   final String aspectRatioMode; // 'contain', 'cover', 'fill'
+  final bool deinterlace;
   final int bufferDuration; // seconds, 0 = auto
 
   const MobileSettings({
@@ -24,6 +25,7 @@ class MobileSettings {
     this.decoderMode = 'auto',
     this.playerEngine = 'ultra',
     this.aspectRatioMode = 'contain',
+    this.deinterlace = false,
     this.bufferDuration = 0,
   });
 
@@ -36,6 +38,7 @@ class MobileSettings {
     String? decoderMode,
     String? playerEngine,
     String? aspectRatioMode,
+    bool? deinterlace,
     int? bufferDuration,
   }) {
     return MobileSettings(
@@ -47,6 +50,7 @@ class MobileSettings {
       decoderMode: decoderMode ?? this.decoderMode,
       playerEngine: playerEngine ?? this.playerEngine,
       aspectRatioMode: aspectRatioMode ?? this.aspectRatioMode,
+      deinterlace: deinterlace ?? this.deinterlace,
       bufferDuration: bufferDuration ?? this.bufferDuration,
     );
   }
@@ -108,6 +112,7 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
         _box?.get('playerEngine', defaultValue: 'ultra') as String?;
     final aspectRatioMode =
         _box?.get('aspectRatioMode', defaultValue: 'contain') as String?;
+    final deinterlace = _box?.get('deinterlace', defaultValue: false) as bool?;
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
 
     state = MobileSettings(
@@ -119,6 +124,7 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
       decoderMode: decoderMode ?? 'auto',
       playerEngine: playerEngine ?? 'ultra',
       aspectRatioMode: aspectRatioMode ?? 'contain',
+      deinterlace: deinterlace ?? false,
       bufferDuration: buffer ?? 0,
     );
   }
@@ -161,6 +167,11 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void setAspectRatioMode(String mode) {
     state = state.copyWith(aspectRatioMode: mode);
     _box?.put('aspectRatioMode', mode);
+  }
+
+  void toggleDeinterlace(bool value) {
+    state = state.copyWith(deinterlace: value);
+    _box?.put('deinterlace', value);
   }
 
   void setBufferDuration(int seconds) {

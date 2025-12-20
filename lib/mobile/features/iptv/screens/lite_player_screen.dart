@@ -307,19 +307,27 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     if (key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.channelDown) {
       if (widget.streamType == StreamType.live) {
-        _playPrevious();
-        _onUserInteraction();
+        // Only switch with arrows if controls are hidden
+        if (key == LogicalKeyboardKey.channelDown || !_showControls) {
+          _playPrevious();
+          _onUserInteraction();
+          return true;
+        }
       }
-      return true;
+      return false; // Let focus system handle it if controls are visible
     }
 
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.channelUp) {
       if (widget.streamType == StreamType.live) {
-        _playNext();
-        _onUserInteraction();
+        // Only switch with arrows if controls are hidden
+        if (key == LogicalKeyboardKey.channelUp || !_showControls) {
+          _playNext();
+          _onUserInteraction();
+          return true;
+        }
       }
-      return true;
+      return false; // Let focus system handle it if controls are visible
     }
 
     if (widget.streamType != StreamType.live) {
@@ -524,15 +532,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                // Aspect Ratio Toggle
-                TVFocusable(
-                  focusNode: FocusNode(),
-                  onPressed: _cycleAspectRatio,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Icon(Icons.aspect_ratio, color: Colors.white70),
-                  ),
-                ),
                 const SizedBox(width: 16),
                 Text(
                   _currentTime,
