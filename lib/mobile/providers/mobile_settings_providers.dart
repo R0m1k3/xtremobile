@@ -353,3 +353,38 @@ final mobileFavoritesProvider =
     StateNotifierProvider<MobileFavoritesNotifier, Set<String>>((ref) {
   return MobileFavoritesNotifier();
 });
+
+/// Per-channel deinterlace settings (stored locally)
+class DeinterlaceSettingsNotifier extends StateNotifier<Set<String>> {
+  static const String _boxName = 'deinterlace_settings';
+  Box? _box;
+
+  DeinterlaceSettingsNotifier() : super({}) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _box = await Hive.openBox(_boxName);
+    final settings =
+        _box?.get('deinterlace_on', defaultValue: <String>[]) as List?;
+    state = settings?.cast<String>().toSet() ?? {};
+  }
+
+  void toggle(String streamId) {
+    final updated = {...state};
+    if (updated.contains(streamId)) {
+      updated.remove(streamId);
+    } else {
+      updated.add(streamId);
+    }
+    state = updated;
+    _box?.put('deinterlace_on', updated.toList());
+  }
+
+  bool isEnabled(String streamId) => state.contains(streamId);
+}
+
+final deinterlaceSettingsProvider =
+    StateNotifierProvider<DeinterlaceSettingsNotifier, Set<String>>((ref) {
+  return DeinterlaceSettingsNotifier();
+});

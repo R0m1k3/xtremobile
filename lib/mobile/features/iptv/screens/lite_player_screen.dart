@@ -74,6 +74,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   // Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
+  final FocusNode _deinterlaceFocusNode = FocusNode();
 
   Timer? _controlsTimer;
   Timer? _clockTimer;
@@ -309,7 +310,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       if (widget.streamType == StreamType.live) {
         // Only switch with arrows if controls are hidden
         if (key == LogicalKeyboardKey.channelDown || !_showControls) {
-          _playPrevious();
+          _playNext();
           _onUserInteraction();
           return true;
         }
@@ -322,7 +323,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       if (widget.streamType == StreamType.live) {
         // Only switch with arrows if controls are hidden
         if (key == LogicalKeyboardKey.channelUp || !_showControls) {
-          _playNext();
+          _playPrevious();
           _onUserInteraction();
           return true;
         }
@@ -344,6 +345,12 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     // Cycle Aspect Ratio - secret key 'A' or digit 1
     if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
       _cycleAspectRatio();
+      return true;
+    }
+
+    // Toggle Deinterlace - secret key 'D' or digit 2
+    if (key == LogicalKeyboardKey.keyD || key == LogicalKeyboardKey.digit2) {
+      _togglePerChannelDeinterlace();
       return true;
     }
 
@@ -388,6 +395,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     _xtreamService?.dispose();
     _playPauseFocusNode.dispose();
     _backFocusNode.dispose();
+    _deinterlaceFocusNode.dispose();
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -456,6 +464,30 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
           content: Text('Format: $label'),
           duration: const Duration(seconds: 1),
           backgroundColor: Colors.black87,
+        ),
+      );
+    }
+  }
+
+  void _togglePerChannelDeinterlace() {
+    final currentStreamId =
+        widget.channels != null && widget.channels!.isNotEmpty
+            ? widget.channels![_currentIndex].streamId
+            : widget.streamId;
+
+    final notifier = ref.read(deinterlaceSettingsProvider.notifier);
+    notifier.toggle(currentStreamId);
+
+    final newState = notifier.isEnabled(currentStreamId);
+
+    if (mounted) {
+      setState(() {}); // Refresh UI
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Désentrelacement: ${newState ? "ACTIVER" : "DÉSACTIVER"}'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: newState ? Colors.green : Colors.grey[800],
         ),
       );
     }
@@ -532,11 +564,13 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                const SizedBox(width: 16),
-                Text(
-                  _currentTime,
-                  style: const TextStyle(color: Colors.white70),
-                ),
+                if (ref.watch(mobileSettingsProvider).showClock) ...[
+                  const SizedBox(width: 16),
+                  Text(
+                    _currentTime,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ],
               ],
             ),
           ),
@@ -639,13 +673,14 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
             _epg != null &&
             _epg!.nowPlaying != null)
           Positioned(
-            bottom: 80,
+            bottom: 180, // Moved up to avoid button overlap
             left: 24,
             width: 350,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black
+                    .withOpacity(0.85), // Higher opacity for visibility
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white24),
               ),
@@ -700,6 +735,78 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+        // Deinterlace Toggle Button (Only for Live)
+        if (widget.streamType == StreamType.live)
+          Positioned(
+            bottom: 20, // Moved down and left to be visible and out of the way
+            right: 24,
+            child: TVFocusable(
+              focusNode: _deinterlaceFocusNode,
+              onPressed: _togglePerChannelDeinterlace,
+              onFocus: _resetControlsTimer,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: ref
+                            .watch(deinterlaceSettingsProvider.notifier)
+                            .isEnabled(widget.channels != null &&
+                                    widget.channels!.isNotEmpty
+                                ? widget.channels![_currentIndex].streamId
+                                : widget.streamId)
+                        ? AppColors.primary
+                        : Colors.white24,
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.waves,
+                      color: ref
+                              .watch(deinterlaceSettingsProvider.notifier)
+                              .isEnabled(widget.channels != null &&
+                                      widget.channels!.isNotEmpty
+                                  ? widget.channels![_currentIndex].streamId
+                                  : widget.streamId)
+                          ? AppColors.primary
+                          : Colors.white70,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Désentrelacer",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 24,
+                      child: Switch(
+                        value: ref
+                            .watch(deinterlaceSettingsProvider.notifier)
+                            .isEnabled(widget.channels != null &&
+                                    widget.channels!.isNotEmpty
+                                ? widget.channels![_currentIndex].streamId
+                                : widget.streamId),
+                        onChanged: (val) => _togglePerChannelDeinterlace(),
+                        activeColor: AppColors.primary,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

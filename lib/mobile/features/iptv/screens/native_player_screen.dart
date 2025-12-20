@@ -132,16 +132,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
     final decoderMode = ref.read(mobileSettingsProvider).decoderMode;
-    final deinterlace = ref.read(mobileSettingsProvider).deinterlace;
     (_player.platform as dynamic)?.setProperty('hwdec', decoderMode);
-    (_player.platform as dynamic)
-        ?.setProperty('deinterlace', deinterlace ? 'yes' : 'no');
 
     // Performance & Scaling Fixes for Android
     (_player.platform as dynamic)?.setProperty('opengl-pbo', 'yes');
     (_player.platform as dynamic)?.setProperty('video-unscaled', 'no');
-    debugPrint(
-        'MediaKitPlayer: Decoder Mode set to $decoderMode, Deinterlace: $deinterlace');
+    debugPrint('MediaKitPlayer: Decoder Mode set to $decoderMode');
 
     // ============ PERFORMANCE 3.0 (ANTI MICRO-COUPURE PROFILE) ============
     // Tuned to eliminate micro-stuttering during live TV playback
@@ -207,17 +203,19 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       'live_start_index=-1,analyzeduration=10000000,probesize=5000000',
     );
 
-    // Prevent stalls (readahead already set above)
+    // Optimized for performance and stability on progressive & interlaced streams
     (_player.platform as dynamic)?.setProperty('hr-seek', 'yes');
     (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
+    (_player.platform as dynamic)?.setProperty('vd-lavc-fast', 'yes');
     (_player.platform as dynamic)
-        ?.setProperty('vd-lavc-dr', 'yes'); // Direct rendering
+        ?.setProperty('vd-lavc-threads', '0'); // Auto-detect
     (_player.platform as dynamic)
-        ?.setProperty('vd-lavc-fast', 'yes'); // Fast decoding
-    (_player.platform as dynamic)
-        ?.setProperty('vd-lavc-threads', '4'); // Multithreading
-    (_player.platform as dynamic)?.setProperty(
-        'vd-lavc-skiploopfilter', 'all'); // Skip loop filter for performance
+        ?.setProperty('vd-lavc-skiploopfilter', 'nonref'); // Balanced stability
+    (_player.platform as dynamic)?.setProperty('framedrop', 'vo');
+
+    if (widget.streamType == StreamType.live) {
+      (_player.platform as dynamic)?.setProperty('profile', 'low-latency');
+    }
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
     // V3: Explicit LAVC Downmix & Audiotrack
@@ -670,7 +668,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _reconnectAttempts = 0; // Reset reconnect counter on success
       });
 
-      // Start watchdog for live streams
+      // Show watchdog for live streams
       if (widget.streamType == StreamType.live) {
         _startLiveWatchdog();
       }
@@ -1235,7 +1233,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 _epg != null &&
                 _epg!.nowPlaying != null)
               Positioned(
-                bottom: 80, // Above progress/bottom bar
+                bottom: 180, // Moved up to avoid overlap with central buttons
                 left: 24,
                 width: 350, // Increased width for badge
                 child: Row(
@@ -1399,7 +1397,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                   ),
                                 ),
                               ),
-                            // LIVE Badge removed from here
                           ],
                         ),
                       ),
