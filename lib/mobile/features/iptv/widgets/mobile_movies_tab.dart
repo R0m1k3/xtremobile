@@ -279,6 +279,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: TVFocusable(
+                    scale: 1.0, // Disable scaling to prevent overflow
                     onPressed: () {
                       setState(() => _isSearchEditing = true);
                       WidgetsBinding.instance.addPostFrameCallback((_) {
