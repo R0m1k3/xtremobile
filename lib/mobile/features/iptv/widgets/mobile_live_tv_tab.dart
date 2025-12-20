@@ -171,6 +171,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                           // Search Bar - Wrapped in TVFocusable for remote access
                           TVFocusable(
                             scale: 1.0, // Disable scaling to prevent overflow
+                            focusColor:
+                                Colors.white, // Solid white selection frame
                             onPressed: () {
                               setState(() => _isSearchEditing = true);
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -185,9 +187,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                               decoration: BoxDecoration(
                                 color: AppColors.surface,
                                 borderRadius: BorderRadius.circular(12),
-                                border: _isSearchEditing
-                                    ? Border.all(color: AppColors.primary)
-                                    : null,
+                                // Removed internal editing border here to prevent conflict and "inside frame" look
                               ),
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 12),
@@ -200,6 +200,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                     child: ExcludeFocus(
                                       excluding: !_isSearchEditing,
                                       child: TextField(
+                                        cursorColor:
+                                            Colors.white, // Extra safety
                                         controller: _searchController,
                                         focusNode: _searchFocusNode,
                                         readOnly: !_isSearchEditing,
@@ -208,6 +210,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                         decoration: const InputDecoration(
                                           hintText: 'Rechercher une chaîne...',
                                           border: InputBorder.none,
+                                          focusedBorder: InputBorder
+                                              .none, // Explicitly remove focus border
+                                          enabledBorder: InputBorder.none,
                                           isDense: true,
                                         ),
                                         onSubmitted: (_) => setState(

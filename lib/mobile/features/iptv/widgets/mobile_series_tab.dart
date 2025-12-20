@@ -259,6 +259,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: TVFocusable(
                     scale: 1.0, // Disable scaling to prevent overflow
+                    focusColor: Colors.white, // Solid white selection frame
                     onPressed: () {
                       setState(() => _isSearchEditing = true);
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -271,9 +272,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: _isSearchEditing
-                            ? Border.all(color: AppColors.primary)
-                            : Border.all(color: AppColors.border),
+                        // Removed internal editing border here to prevent conflict and "inside frame" look
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
@@ -285,6 +284,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                             child: ExcludeFocus(
                               excluding: !_isSearchEditing,
                               child: TextField(
+                                cursorColor: Colors.white, // Extra safety
                                 controller: _searchController,
                                 focusNode: _searchFocusNode,
                                 readOnly: !_isSearchEditing,
@@ -293,6 +293,9 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                                 decoration: const InputDecoration(
                                   hintText: 'Rechercher une série...',
                                   border: InputBorder.none,
+                                  focusedBorder: InputBorder
+                                      .none, // Explicitly remove focus border
+                                  enabledBorder: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.only(bottom: 11),
                                 ),
