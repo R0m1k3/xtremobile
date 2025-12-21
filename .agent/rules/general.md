@@ -51,6 +51,8 @@ Structure toujours ta réponse ainsi :
     - Commentaires explicatifs *dans* le code pour les parties complexes.
 4.  **Sécurité & Limitations :** Une note sur ce qui doit être configuré pour sécuriser ce code (ex: CORS, Rate Limiting).
 
+
+
 ---
 **EXEMPLE D'INTERACTION :**
 

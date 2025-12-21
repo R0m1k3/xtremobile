@@ -196,15 +196,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
-    // Live Stream optimizations - aggressive reconnection
+    // Live Stream optimizations - reconnection only
     (_player.platform as dynamic)?.setProperty(
       'stream-lavf-o',
-      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=10,reconnect_on_http_error=4xx,5xx',
+      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
     );
-    (_player.platform as dynamic)?.setProperty('force-seekable', 'yes');
+    // Removed: force-seekable and live_start_index=-1 which caused rollbacks
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'live_start_index=-1,analyzeduration=10000000,probesize=5000000',
+      'analyzeduration=5000000,probesize=2000000',
     );
 
     // Optimized for performance and stability on progressive & interlaced streams
@@ -382,6 +382,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Stop player when widget is being removed from tree
     _player.stop();
     super.deactivate();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _player.pause();
+    }
   }
 
   @override
