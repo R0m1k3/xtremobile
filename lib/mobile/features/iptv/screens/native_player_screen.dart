@@ -147,18 +147,22 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
 
     if (widget.streamType == StreamType.live) {
-      // LIVE PROFILE: Faster startup, lower latency, smaller buffer
-      debugPrint('MediaKitPlayer: Applying LIVE optimization profile');
-      (_player.platform as dynamic)?.setProperty('cache-secs', '30');
+      // LIVE PROFILE: Increased stability, no longer low-latency (prevents cuts)
+      debugPrint(
+          'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', '32000000'); // 32MB
+          ?.setProperty('cache-secs', '15'); // 15s cache
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-readahead-secs', '20');
+          ?.setProperty('demuxer-max-bytes', '64000000'); // 64MB
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', '10000000'); // 10MB back
+          ?.setProperty('demuxer-readahead-secs', '15');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-back-bytes', '10000000');
 
-      // Start playing as soon as possible, don't wait for cache fill
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+      // ALWAYS wait for buffer fill to prevent glitches
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
+      (_player.platform as dynamic)
+          ?.setProperty('cache-pause-wait', '3'); // Wait 3s max
     } else {
       // VOD PROFILE: Max stability, large buffer
       debugPrint('MediaKitPlayer: Applying VOD optimization profile');
@@ -213,9 +217,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         ?.setProperty('vd-lavc-skiploopfilter', 'nonref'); // Balanced stability
     (_player.platform as dynamic)?.setProperty('framedrop', 'vo');
 
+    // Low-latency intentionally removed for stability
+    /*
     if (widget.streamType == StreamType.live) {
       (_player.platform as dynamic)?.setProperty('profile', 'low-latency');
     }
+    */
 
     // ============ AUDIO CODEC SUPPORT FOR VOD ============
     // V3: Explicit LAVC Downmix & Audiotrack
@@ -1336,29 +1343,40 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             ),
                           ),
                           Expanded(
-                            child: Slider(
-                              value: _position.inSeconds
-                                  .toDouble()
-                                  .clamp(0, _duration.inSeconds.toDouble()),
-                              min: 0,
-                              max: _duration.inSeconds.toDouble(),
-                              // Add divisions for precise seeking (1 step = 10 seconds)
-                              divisions: _duration.inSeconds > 0
-                                  ? (_duration.inSeconds / 10).ceil()
-                                  : null,
-                              activeColor: AppColors.primary,
-                              inactiveColor: Colors.white24,
-                              onChangeStart: (_) => _isSeeking = true,
-                              onChangeEnd: (value) async {
-                                await _player
-                                    .seek(Duration(seconds: value.toInt()));
-                                _isSeeking = false;
+                            child: Shortcuts(
+                              shortcuts: <LogicalKeySet, Intent>{
+                                LogicalKeySet(LogicalKeyboardKey.arrowUp):
+                                    const DirectionalFocusIntent(
+                                        TraversalDirection.up),
+                                LogicalKeySet(LogicalKeyboardKey.arrowDown):
+                                    const DirectionalFocusIntent(
+                                        TraversalDirection.down),
                               },
-                              onChanged: (value) {
-                                setState(() {
-                                  _position = Duration(seconds: value.toInt());
-                                });
-                              },
+                              child: Slider(
+                                value: _position.inSeconds
+                                    .toDouble()
+                                    .clamp(0, _duration.inSeconds.toDouble()),
+                                min: 0,
+                                max: _duration.inSeconds.toDouble(),
+                                // Add divisions for precise seeking (1 step = 10 seconds)
+                                divisions: _duration.inSeconds > 0
+                                    ? (_duration.inSeconds / 10).ceil()
+                                    : null,
+                                activeColor: AppColors.primary,
+                                inactiveColor: Colors.white24,
+                                onChangeStart: (_) => _isSeeking = true,
+                                onChangeEnd: (value) async {
+                                  await _player
+                                      .seek(Duration(seconds: value.toInt()));
+                                  _isSeeking = false;
+                                },
+                                onChanged: (value) {
+                                  setState(() {
+                                    _position =
+                                        Duration(seconds: value.toInt());
+                                  });
+                                },
+                              ),
                             ),
                           ),
                           Text(

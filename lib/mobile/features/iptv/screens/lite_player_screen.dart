@@ -70,6 +70,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _isSeeking = false;
+  bool _isStabilizing = false; // Flag to mask initial glitches
+  Timer? _stabilizationTimer;
 
   // Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
@@ -183,9 +185,16 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         return;
       }
 
+      // Buffer Optimization: Wait for a pre-roll delay for Live TV
+      // to let the internal buffer fill before playback starts.
+      if (widget.streamType == StreamType.live) {
+        debugPrint('[LitePlayer] Pre-roll buffer delay (3.5s)...');
+        await Future.delayed(const Duration(milliseconds: 3500));
+      }
+
       await controller.play();
       setState(() {
-        _isLoading = false;
+        _isStabilizing = true;
         _isPlaying = true;
         _duration = controller.value.duration;
       });
@@ -206,14 +215,42 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   void _videoListener() {
     if (_controller == null || !mounted) return;
 
-    final isPlaying = _controller!.value.isPlaying;
+    final value = _controller!.value;
+
+    final isPlaying = value.isPlaying;
     if (isPlaying != _isPlaying) {
       setState(() => _isPlaying = isPlaying);
     }
 
+    // --- STABILIZATION MASKING LOGIC ---
+    // Show spinner if buffering OR if we are in the initial stabilization phase
+    final isBuffering = value.isBuffering;
+    final shouldShowLoading = isBuffering || _isStabilizing;
+
+    if (shouldShowLoading != _isLoading) {
+      setState(() => _isLoading = shouldShowLoading);
+    }
+
+    // If we are playing smoothly and stabilizing, start/restart the timer
+    if (isPlaying && !isBuffering && _isStabilizing) {
+      _stabilizationTimer?.cancel();
+      _stabilizationTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _isStabilizing = false;
+            _isLoading = false;
+          });
+        }
+      });
+    } else if (isBuffering && _isStabilizing) {
+      // If we hit a buffer during stabilization, reset the timer
+      _stabilizationTimer?.cancel();
+    }
+    // ------------------------------------
+
     if (!_isSeeking) {
-      final pos = _controller!.value.position;
-      final dur = _controller!.value.duration;
+      final pos = value.position;
+      final dur = value.duration;
       if (pos != _position || dur != _duration) {
         setState(() {
           _position = pos;
@@ -222,8 +259,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       }
     }
 
-    if (_controller!.value.hasError) {
-      setState(() => _errorMessage = _controller!.value.errorDescription);
+    if (value.hasError) {
+      setState(() => _errorMessage = value.errorDescription);
     }
   }
 
@@ -732,27 +769,34 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(color: Colors.white),
                   ),
                   Expanded(
-                    child: Slider(
-                      value: _position.inSeconds
-                          .toDouble()
-                          .clamp(0, _duration.inSeconds.toDouble()),
-                      min: 0,
-                      max: _duration.inSeconds.toDouble() > 0
-                          ? _duration.inSeconds.toDouble()
-                          : 1.0,
-                      activeColor: AppColors.primary,
-                      inactiveColor: Colors.white24,
-                      onChanged: (val) {
-                        setState(() {
-                          _position = Duration(seconds: val.toInt());
-                          _isSeeking = true;
-                        });
+                    child: Shortcuts(
+                      shortcuts: <LogicalKeySet, Intent>{
+                        LogicalKeySet(LogicalKeyboardKey.arrowUp):
+                            const DirectionalFocusIntent(TraversalDirection.up),
+                        LogicalKeySet(LogicalKeyboardKey.arrowDown):
+                            const DirectionalFocusIntent(
+                                TraversalDirection.down),
                       },
-                      onChangeEnd: (val) {
-                        _controller?.seekTo(Duration(seconds: val.toInt()));
-                        _isSeeking = false;
-                        _onUserInteraction();
-                      },
+                      child: Slider(
+                        value: _position.inSeconds
+                            .toDouble()
+                            .clamp(0, _duration.inSeconds.toDouble()),
+                        min: 0,
+                        max: _duration.inSeconds.toDouble(),
+                        activeColor: AppColors.primary,
+                        inactiveColor: Colors.white24,
+                        onChanged: (val) {
+                          setState(() {
+                            _position = Duration(seconds: val.toInt());
+                            _isSeeking = true;
+                          });
+                        },
+                        onChangeEnd: (val) {
+                          _controller?.seekTo(Duration(seconds: val.toInt()));
+                          _isSeeking = false;
+                          _onUserInteraction();
+                        },
+                      ),
                     ),
                   ),
                   Text(
