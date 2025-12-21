@@ -769,33 +769,50 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(color: Colors.white),
                   ),
                   Expanded(
-                    child: Shortcuts(
-                      shortcuts: <LogicalKeySet, Intent>{
-                        LogicalKeySet(LogicalKeyboardKey.arrowUp):
-                            const DirectionalFocusIntent(TraversalDirection.up),
-                        LogicalKeySet(LogicalKeyboardKey.arrowDown):
-                            const DirectionalFocusIntent(
-                                TraversalDirection.down),
+                    child: Actions(
+                      actions: <Type, Action<Intent>>{
+                        DirectionalFocusIntent:
+                            CallbackAction<DirectionalFocusIntent>(
+                          onInvoke: (intent) {
+                            if (intent.direction == TraversalDirection.up ||
+                                intent.direction == TraversalDirection.down) {
+                              FocusScope.of(context)
+                                  .focusInDirection(intent.direction);
+                              return null;
+                            }
+                            return null;
+                          },
+                        ),
                       },
-                      child: Slider(
-                        value: _position.inSeconds
-                            .toDouble()
-                            .clamp(0, _duration.inSeconds.toDouble()),
-                        min: 0,
-                        max: _duration.inSeconds.toDouble(),
-                        activeColor: AppColors.primary,
-                        inactiveColor: Colors.white24,
-                        onChanged: (val) {
-                          setState(() {
-                            _position = Duration(seconds: val.toInt());
-                            _isSeeking = true;
-                          });
+                      child: Shortcuts(
+                        shortcuts: <LogicalKeySet, Intent>{
+                          LogicalKeySet(LogicalKeyboardKey.arrowUp):
+                              const DirectionalFocusIntent(
+                                  TraversalDirection.up),
+                          LogicalKeySet(LogicalKeyboardKey.arrowDown):
+                              const DirectionalFocusIntent(
+                                  TraversalDirection.down),
                         },
-                        onChangeEnd: (val) {
-                          _controller?.seekTo(Duration(seconds: val.toInt()));
-                          _isSeeking = false;
-                          _onUserInteraction();
-                        },
+                        child: Slider(
+                          value: _position.inSeconds
+                              .toDouble()
+                              .clamp(0, _duration.inSeconds.toDouble()),
+                          min: 0,
+                          max: _duration.inSeconds.toDouble(),
+                          activeColor: AppColors.primary,
+                          inactiveColor: Colors.white24,
+                          onChanged: (val) {
+                            setState(() {
+                              _position = Duration(seconds: val.toInt());
+                              _isSeeking = true;
+                            });
+                          },
+                          onChangeEnd: (val) {
+                            _controller?.seekTo(Duration(seconds: val.toInt()));
+                            _isSeeking = false;
+                            _onUserInteraction();
+                          },
+                        ),
                       ),
                     ),
                   ),

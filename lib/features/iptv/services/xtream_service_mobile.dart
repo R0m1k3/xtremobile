@@ -74,7 +74,8 @@ class XtreamServiceMobile {
         print('XtreamServiceMobile: Will use IP $_resolvedIp for ${uri.host}');
       } else {
         print(
-            'XtreamServiceMobile: DNS resolution failed, will use hostname directly',);
+          'XtreamServiceMobile: DNS resolution failed, will use hostname directly',
+        );
       }
     }
   }
@@ -125,12 +126,12 @@ class XtreamServiceMobile {
 
   PlaylistConfig? get currentPlaylist => _currentPlaylist;
 
-  /// Generate direct stream URL for live TV (HLS format for mobile compatibility)
+  /// Generate direct stream URL for live TV (MPEG-TS format for maximum compatibility)
   String getLiveStreamUrl(String streamId) {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
-    // Use .m3u8 format for HLS streaming (best mobile compatibility)
-    return '$_effectiveDnsBase/live/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.m3u8';
+    // Use .ts format (MPEG-TS) for better compatibility with more providers
+    return '$_effectiveDnsBase/live/${_currentPlaylist!.username}/${_currentPlaylist!.password}/$streamId.ts';
   }
 
   /// Generate stream URL for VOD (movies)
@@ -327,8 +328,10 @@ class XtreamServiceMobile {
   }
 
   /// Get movies with pagination support (uses in-memory cache for performance)
-  Future<List<xm.Movie>> getMoviesPaginated(
-      {int offset = 0, int limit = 100,}) async {
+  Future<List<xm.Movie>> getMoviesPaginated({
+    int offset = 0,
+    int limit = 100,
+  }) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -422,8 +425,10 @@ class XtreamServiceMobile {
   }
 
   /// Get series with pagination support (uses in-memory cache for performance)
-  Future<List<xm.Series>> getSeriesPaginated(
-      {int offset = 0, int limit = 100,}) async {
+  Future<List<xm.Series>> getSeriesPaginated({
+    int offset = 0,
+    int limit = 100,
+  }) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {
@@ -584,8 +589,10 @@ class XtreamServiceMobile {
 
   /// Get short EPG as ShortEPG object (for EPGWidget)
   /// Caches results for 12 hours by default
-  Future<xm.ShortEPG> getShortEPG(String streamId,
-      {bool forceRefresh = false,}) async {
+  Future<xm.ShortEPG> getShortEPG(
+    String streamId, {
+    bool forceRefresh = false,
+  }) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
 
     try {

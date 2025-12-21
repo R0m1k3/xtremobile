@@ -1343,39 +1343,59 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             ),
                           ),
                           Expanded(
-                            child: Shortcuts(
-                              shortcuts: <LogicalKeySet, Intent>{
-                                LogicalKeySet(LogicalKeyboardKey.arrowUp):
-                                    const DirectionalFocusIntent(
-                                        TraversalDirection.up),
-                                LogicalKeySet(LogicalKeyboardKey.arrowDown):
-                                    const DirectionalFocusIntent(
-                                        TraversalDirection.down),
+                            child: Actions(
+                              actions: <Type, Action<Intent>>{
+                                // Override directional focus intents for Up/Down
+                                DirectionalFocusIntent:
+                                    CallbackAction<DirectionalFocusIntent>(
+                                  onInvoke: (intent) {
+                                    if (intent.direction ==
+                                            TraversalDirection.up ||
+                                        intent.direction ==
+                                            TraversalDirection.down) {
+                                      // Manually move focus in the requested direction
+                                      FocusScope.of(context)
+                                          .focusInDirection(intent.direction);
+                                      return null;
+                                    }
+                                    // For left/right, don't handle (let Slider do seeking)
+                                    return null;
+                                  },
+                                ),
                               },
-                              child: Slider(
-                                value: _position.inSeconds
-                                    .toDouble()
-                                    .clamp(0, _duration.inSeconds.toDouble()),
-                                min: 0,
-                                max: _duration.inSeconds.toDouble(),
-                                // Add divisions for precise seeking (1 step = 10 seconds)
-                                divisions: _duration.inSeconds > 0
-                                    ? (_duration.inSeconds / 10).ceil()
-                                    : null,
-                                activeColor: AppColors.primary,
-                                inactiveColor: Colors.white24,
-                                onChangeStart: (_) => _isSeeking = true,
-                                onChangeEnd: (value) async {
-                                  await _player
-                                      .seek(Duration(seconds: value.toInt()));
-                                  _isSeeking = false;
+                              child: Shortcuts(
+                                shortcuts: <LogicalKeySet, Intent>{
+                                  LogicalKeySet(LogicalKeyboardKey.arrowUp):
+                                      const DirectionalFocusIntent(
+                                          TraversalDirection.up),
+                                  LogicalKeySet(LogicalKeyboardKey.arrowDown):
+                                      const DirectionalFocusIntent(
+                                          TraversalDirection.down),
                                 },
-                                onChanged: (value) {
-                                  setState(() {
-                                    _position =
-                                        Duration(seconds: value.toInt());
-                                  });
-                                },
+                                child: Slider(
+                                  value: _position.inSeconds
+                                      .toDouble()
+                                      .clamp(0, _duration.inSeconds.toDouble()),
+                                  min: 0,
+                                  max: _duration.inSeconds.toDouble(),
+                                  divisions: _duration.inSeconds > 0
+                                      ? (_duration.inSeconds / 10).ceil()
+                                      : null,
+                                  activeColor: AppColors.primary,
+                                  inactiveColor: Colors.white24,
+                                  onChangeStart: (_) => _isSeeking = true,
+                                  onChangeEnd: (value) async {
+                                    await _player
+                                        .seek(Duration(seconds: value.toInt()));
+                                    _isSeeking = false;
+                                  },
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _position =
+                                          Duration(seconds: value.toInt());
+                                    });
+                                  },
+                                ),
                               ),
                             ),
                           ),
