@@ -249,14 +249,24 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
   void _onUserInteraction() {
     if (!mounted) return;
+    final wasShowing = _showControls;
     setState(() => _showControls = true);
     _resetControlsTimer();
+
+    // Auto-focus the play/pause button when OSD appears to ensure OK key works instantly
+    if (!wasShowing) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _showControls) {
+          _playPauseFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
     if (_showControls && _isPlaying) {
-      _controlsTimer = Timer(const Duration(seconds: 7), () {
+      _controlsTimer = Timer(const Duration(seconds: 12), () {
         if (mounted) setState(() => _showControls = false);
       });
     }
@@ -271,6 +281,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   void _switchChannel(int index) {
     if (widget.channels == null) return;
     setState(() => _currentIndex = index);
+    _onUserInteraction(); // Ensure OSD shows up and timer resets on channel change
     _loadStream();
   }
 
