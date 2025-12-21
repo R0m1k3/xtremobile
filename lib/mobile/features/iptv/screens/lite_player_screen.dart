@@ -77,8 +77,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   final FocusNode _deinterlaceFocusNode = FocusNode();
 
   Timer? _controlsTimer;
-  Timer? _clockTimer;
-  String _currentTime = '';
 
   @override
   void initState() {
@@ -90,7 +88,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     WakelockPlus.enable();
 
     _currentIndex = widget.initialIndex;
-    _startClock();
 
     // Lock orientation
     SystemChrome.setPreferredOrientations([
@@ -305,30 +302,34 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       return false;
     }
 
+    // Arrow keys - Show controls or let focus navigate, NO zapping
     if (key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.channelDown) {
-      if (widget.streamType == StreamType.live) {
-        // Only switch with arrows if controls are hidden
-        if (key == LogicalKeyboardKey.channelDown || !_showControls) {
-          _playNext();
-          _onUserInteraction();
-          return true;
-        }
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      if (!_showControls) {
+        _onUserInteraction();
+        return true;
       }
-      return false; // Let focus system handle it if controls are visible
+      return false; // Let Focus system handle navigation
     }
 
-    if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.channelUp) {
+    // Channel Down = Previous Channel (inverted as requested)
+    if (key == LogicalKeyboardKey.channelDown) {
       if (widget.streamType == StreamType.live) {
-        // Only switch with arrows if controls are hidden
-        if (key == LogicalKeyboardKey.channelUp || !_showControls) {
-          _playPrevious();
-          _onUserInteraction();
-          return true;
-        }
+        _playPrevious();
+        _onUserInteraction();
+        return true;
       }
-      return false; // Let focus system handle it if controls are visible
+    }
+
+    // Channel Up = Next Channel (inverted as requested)
+    if (key == LogicalKeyboardKey.channelUp) {
+      if (widget.streamType == StreamType.live) {
+        _playNext();
+        _onUserInteraction();
+        return true;
+      }
     }
 
     if (widget.streamType != StreamType.live) {
@@ -366,22 +367,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     return false;
   }
 
-  void _startClock() {
-    _updateTime();
-    _clockTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
-  }
-
-  void _updateTime() {
-    if (mounted) {
-      final now = DateTime.now();
-      setState(() {
-        _currentTime =
-            "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-      });
-    }
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -389,7 +374,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     WakelockPlus.disable();
 
     _controlsTimer?.cancel();
-    _clockTimer?.cancel();
     _epgTimer?.cancel();
     _controller?.dispose();
     _xtreamService?.dispose();
@@ -564,13 +548,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                if (ref.watch(mobileSettingsProvider).showClock) ...[
-                  const SizedBox(width: 16),
-                  Text(
-                    _currentTime,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ],
               ],
             ),
           ),
@@ -735,78 +712,6 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-
-        // Deinterlace Toggle Button (Only for Live)
-        if (widget.streamType == StreamType.live)
-          Positioned(
-            bottom: 20, // Moved down and left to be visible and out of the way
-            right: 24,
-            child: TVFocusable(
-              focusNode: _deinterlaceFocusNode,
-              onPressed: _togglePerChannelDeinterlace,
-              onFocus: _resetControlsTimer,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: ref
-                            .watch(deinterlaceSettingsProvider.notifier)
-                            .isEnabled(widget.channels != null &&
-                                    widget.channels!.isNotEmpty
-                                ? widget.channels![_currentIndex].streamId
-                                : widget.streamId)
-                        ? AppColors.primary
-                        : Colors.white24,
-                    width: 2,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.waves,
-                      color: ref
-                              .watch(deinterlaceSettingsProvider.notifier)
-                              .isEnabled(widget.channels != null &&
-                                      widget.channels!.isNotEmpty
-                                  ? widget.channels![_currentIndex].streamId
-                                  : widget.streamId)
-                          ? AppColors.primary
-                          : Colors.white70,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "Désentrelacer",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 24,
-                      child: Switch(
-                        value: ref
-                            .watch(deinterlaceSettingsProvider.notifier)
-                            .isEnabled(widget.channels != null &&
-                                    widget.channels!.isNotEmpty
-                                ? widget.channels![_currentIndex].streamId
-                                : widget.streamId),
-                        onChanged: (val) => _togglePerChannelDeinterlace(),
-                        activeColor: AppColors.primary,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

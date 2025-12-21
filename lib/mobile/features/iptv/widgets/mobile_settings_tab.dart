@@ -102,7 +102,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.3.4',
+                      'Version 1.3.9',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -143,18 +143,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   .read(mobileSettingsProvider.notifier)
                   .setDecoderMode(modes[nextIndex]);
             },
-          ),
-
-          _buildSettingItem(
-            icon: Icons.line_weight,
-            title: 'Désentrelacement',
-            subtitle: settings.deinterlace
-                ? 'Activé (Recommandé pour TV en direct)'
-                : 'Désactivé',
-            value: settings.deinterlace ? 'Oui' : 'Non',
-            onTap: () => ref
-                .read(mobileSettingsProvider.notifier)
-                .toggleDeinterlace(!settings.deinterlace),
           ),
 
           _buildSettingItem(
@@ -377,8 +365,10 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -458,16 +448,21 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     );
   }
 
-  void _showKeyboardDialog(String label, TextEditingController controller,
-      ValueChanged<String> onChanged) {
+  void _showKeyboardDialog(
+    String label,
+    TextEditingController controller,
+    ValueChanged<String> onChanged,
+  ) {
     final tempController = TextEditingController(text: controller.text);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Filtres $label',
-            style: const TextStyle(color: AppColors.textPrimary)),
+        title: Text(
+          'Filtres $label',
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
         content: TextField(
           controller: tempController,
           autofocus: true,

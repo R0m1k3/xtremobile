@@ -810,58 +810,58 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       return true;
     }
 
-    // Left Arrow - Seek back 10 seconds
+    // Left Arrow - Show controls or navigate, seek in VOD when hidden
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (_showControls) return false; // Let Focus handle navigation
-
-      if (widget.streamType != StreamType.live) {
-        final newPos = _position - const Duration(seconds: 5);
-        _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
-        _onUserInteraction();
-      }
-      return true;
-    }
-
-    // Right Arrow - Seek forward 10 seconds
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (_showControls) return false; // Let Focus handle navigation
-
-      if (widget.streamType != StreamType.live) {
-        final newPos = _position + const Duration(seconds: 5);
-        if (newPos < _duration) {
-          _player.seek(newPos);
+      if (!_showControls) {
+        if (widget.streamType != StreamType.live) {
+          final newPos = _position - const Duration(seconds: 5);
+          _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
         }
         _onUserInteraction();
-      }
-      return true;
-    }
-
-    // Up Arrow - Previous channel (Live only)
-    if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.channelUp) {
-      if (widget.streamType == StreamType.live && widget.channels != null) {
-        if (key == LogicalKeyboardKey.channelUp || !_showControls) {
-          _playPrevious();
-          return true;
-        }
-      }
-      return false; // Let focus handle navigation if controls shown
-    }
-
-    // Down Arrow - Next channel (Live) or Cycle Audio (VOD)
-    if (key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.channelDown) {
-      if (widget.streamType == StreamType.live && widget.channels != null) {
-        if (key == LogicalKeyboardKey.channelDown || !_showControls) {
-          _playNext();
-          return true;
-        }
-      } else if (widget.streamType != StreamType.live &&
-          key == LogicalKeyboardKey.arrowDown) {
-        _cycleAudioTrack();
         return true;
       }
-      return false; // Let focus handle navigation if controls shown
+      return false; // Let Focus handle navigation
+    }
+
+    // Right Arrow - Show controls or navigate, seek in VOD when hidden
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (!_showControls) {
+        if (widget.streamType != StreamType.live) {
+          final newPos = _position + const Duration(seconds: 5);
+          if (newPos < _duration) {
+            _player.seek(newPos);
+          }
+        }
+        _onUserInteraction();
+        return true;
+      }
+      return false; // Let Focus handle navigation
+    }
+
+    // Up/Down Arrow - Show controls or navigate UI, NO zapping
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      if (!_showControls) {
+        _onUserInteraction();
+        return true;
+      }
+      return false; // Let Focus handle navigation
+    }
+
+    // Channel Down = Previous Channel (inverted as requested)
+    if (key == LogicalKeyboardKey.channelDown) {
+      if (widget.streamType == StreamType.live && widget.channels != null) {
+        _playPrevious();
+        return true;
+      }
+    }
+
+    // Channel Up = Next Channel (inverted as requested)
+    if (key == LogicalKeyboardKey.channelUp) {
+      if (widget.streamType == StreamType.live && widget.channels != null) {
+        _playNext();
+        return true;
+      }
     }
 
     // Cycle Aspect Ratio - secret key 'A' or digit 1
