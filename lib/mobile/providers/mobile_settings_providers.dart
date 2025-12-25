@@ -15,6 +15,8 @@ class MobileSettings {
   final String aspectRatioMode; // 'contain', 'cover', 'fill'
   final bool deinterlace;
   final int bufferDuration; // seconds, 0 = auto
+  final List<String>
+      deinterlacedChannels; // IDs of channels with forced deinterlacing
 
   const MobileSettings({
     this.liveTvKeywords = const [],
@@ -27,6 +29,7 @@ class MobileSettings {
     this.aspectRatioMode = 'contain',
     this.deinterlace = false,
     this.bufferDuration = 0,
+    this.deinterlacedChannels = const [],
   });
 
   MobileSettings copyWith({
@@ -40,6 +43,7 @@ class MobileSettings {
     String? aspectRatioMode,
     bool? deinterlace,
     int? bufferDuration,
+    List<String>? deinterlacedChannels,
   }) {
     return MobileSettings(
       liveTvKeywords: liveTvKeywords ?? this.liveTvKeywords,
@@ -52,6 +56,7 @@ class MobileSettings {
       aspectRatioMode: aspectRatioMode ?? this.aspectRatioMode,
       deinterlace: deinterlace ?? this.deinterlace,
       bufferDuration: bufferDuration ?? this.bufferDuration,
+      deinterlacedChannels: deinterlacedChannels ?? this.deinterlacedChannels,
     );
   }
 
@@ -114,6 +119,8 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
         _box?.get('aspectRatioMode', defaultValue: 'contain') as String?;
     final deinterlace = _box?.get('deinterlace', defaultValue: false) as bool?;
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
+    final deinterlacedChannels =
+        _box?.get('deinterlacedChannels', defaultValue: <String>[]) as List?;
 
     state = MobileSettings(
       liveTvKeywords: liveTv?.cast<String>() ?? [],
@@ -126,6 +133,7 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
       aspectRatioMode: aspectRatioMode ?? 'contain',
       deinterlace: deinterlace ?? false,
       bufferDuration: buffer ?? 0,
+      deinterlacedChannels: deinterlacedChannels?.cast<String>() ?? [],
     );
   }
 
@@ -177,6 +185,17 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void setBufferDuration(int seconds) {
     state = state.copyWith(bufferDuration: seconds);
     _box?.put('bufferDuration', seconds);
+  }
+
+  void toggleChannelDeinterlace(String streamId) {
+    final currentList = List<String>.from(state.deinterlacedChannels);
+    if (currentList.contains(streamId)) {
+      currentList.remove(streamId);
+    } else {
+      currentList.add(streamId);
+    }
+    state = state.copyWith(deinterlacedChannels: currentList);
+    _box?.put('deinterlacedChannels', currentList);
   }
 }
 
@@ -294,12 +313,14 @@ class MobileWatchHistoryNotifier extends StateNotifier<MobileWatchHistory> {
     // Only save if position is meaningful (> 30 seconds)
     if (positionSeconds < 30) {
       debugPrint(
-          '[WatchHistory] Position too short ($positionSeconds), skipping save');
+        '[WatchHistory] Position too short ($positionSeconds), skipping save',
+      );
       return;
     }
 
     debugPrint(
-        '[WatchHistory] Saving position for $contentId: ${positionSeconds}s');
+      '[WatchHistory] Saving position for $contentId: ${positionSeconds}s',
+    );
     final positions = {...state.resumePositions, contentId: positionSeconds};
     state = state.copyWith(resumePositions: positions);
     _box?.put('resumePositions', Map<String, int>.from(positions));

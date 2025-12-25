@@ -12,6 +12,8 @@ import 'package:xtremflow/core/models/playlist_config.dart';
 import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremflow/core/theme/app_colors.dart';
+import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
 
 /// Stream type enum for player
@@ -33,6 +35,9 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
   final int? season;
   final int? episodeNum;
 
+  // Experimental
+  final bool forceDeinterlace;
+
   const NativePlayerScreen({
     super.key,
     required this.streamId,
@@ -46,6 +51,7 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
     this.seriesId,
     this.season,
     this.episodeNum,
+    this.forceDeinterlace = false,
   });
 
   final Duration? initialPosition;
@@ -74,7 +80,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  bool _isSeeking = false;
+  final bool _isSeeking = false;
   bool _useSoftwareDecoder = false;
 
   Timer? _clockTimer;
@@ -135,8 +141,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('hwdec', decoderMode);
 
     // Performance & Scaling Fixes for Android
-    (_player.platform as dynamic)?.setProperty('opengl-pbo', 'yes');
+    // 'opengl-pbo' removed to save VRAM on low-end devices preventing long-run crashes
     (_player.platform as dynamic)?.setProperty('video-unscaled', 'no');
+
+    if (widget.forceDeinterlace) {
+      debugPrint('MediaKitPlayer: Forcing Deinterlace ON');
+      (_player.platform as dynamic)?.setProperty('deinterlace', 'yes');
+    }
+
     debugPrint('MediaKitPlayer: Decoder Mode set to $decoderMode');
 
     // ============ PERFORMANCE 3.0 (ANTI MICRO-COUPURE PROFILE) ============
@@ -149,39 +161,46 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (widget.streamType == StreamType.live) {
       // LIVE PROFILE: Increased stability, no longer low-latency (prevents cuts)
       debugPrint(
-          'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)');
+        'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)',
+      );
       (_player.platform as dynamic)
           ?.setProperty('cache-secs', '15'); // 15s cache
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', '64000000'); // 64MB
+      (_player.platform as dynamic)?.setProperty(
+        'demuxer-max-bytes',
+        '32000000',
+      ); // Reduced to 32MB (approx 20-30s @ 10Mbps) for stability
       (_player.platform as dynamic)
           ?.setProperty('demuxer-readahead-secs', '15');
       (_player.platform as dynamic)
           ?.setProperty('demuxer-max-back-bytes', '10000000');
+      // Ensure temp files are cleaned up
+      (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
 
       // ALWAYS wait for buffer fill to prevent glitches
       (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
       (_player.platform as dynamic)
-          ?.setProperty('cache-pause-wait', '3'); // Wait 3s max
+          ?.setProperty('cache-pause-wait', '6'); // Wait 6s max
     } else {
       // VOD PROFILE: Max stability, large buffer
-      debugPrint('MediaKitPlayer: Applying VOD optimization profile');
-      (_player.platform as dynamic)?.setProperty('cache-secs', '120');
+      // VOD PROFILE: Max stability, moderate buffer (reduced from 100MB to fix startup heap issues)
+      debugPrint('MediaKitPlayer: Applying VOD optimization profile (FIX)');
+      (_player.platform as dynamic)?.setProperty('cache-secs', '50');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', '100000000'); // 100MB
+          ?.setProperty('demuxer-max-bytes', '50000000'); // 50MB
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-readahead-secs', '120');
+          ?.setProperty('demuxer-readahead-secs', '60');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', '20000000'); // 20MB back
+          ?.setProperty('demuxer-max-back-bytes', '10000000'); // 10MB back
 
-      // Wait a bit to fill buffer for smooth playback
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
-      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5');
+      // Disable initial cache pause to allow immediate playback attempt
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+      // (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5');
     }
 
     // Audio/Video Sync - critical for smooth playback
+    // Changed to 'audio' (default) instead of 'display-resample' to prevent resource exhaustion/drift over time
     (_player.platform as dynamic)
-        ?.setProperty('video-sync', 'display-resample'); // Better A/V sync
+        ?.setProperty('video-sync', 'audio'); // More stable for long streams
     (_player.platform as dynamic)
         ?.setProperty('interpolation', 'no'); // Keep off for safety
     (_player.platform as dynamic)
@@ -259,7 +278,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Listen to player state
     _player.stream.playing.listen((playing) {
       if (mounted) {
-        setState(() => _isPlaying = playing);
+        setState(() {
+          _isPlaying = playing;
+          if (playing) _errorMessage = null; // Clear error on successful play
+        });
         if (playing) {
           // Smooth Loading: Hide loading screen 1s AFTER playback actually starts
           // This masks initial glitches/re-buffering
@@ -868,6 +890,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (key == LogicalKeyboardKey.channelDown) {
       if (widget.streamType == StreamType.live && widget.channels != null) {
         _playPrevious();
+        _onUserInteraction();
         return true;
       }
     }
@@ -876,6 +899,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (key == LogicalKeyboardKey.channelUp) {
       if (widget.streamType == StreamType.live && widget.channels != null) {
         _playNext();
+        _onUserInteraction();
         return true;
       }
     }
@@ -957,7 +981,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   controller: _controller,
                   controls: NoVideoControls, // We use our own custom controls
                   fit: _getBoxFit(
-                      ref.watch(mobileSettingsProvider).aspectRatioMode),
+                    ref.watch(mobileSettingsProvider).aspectRatioMode,
+                  ),
                 ),
               ),
 
@@ -970,7 +995,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               ),
 
             // Custom controls overlay
-            if (_showControls && _errorMessage == null && !_isLoading)
+            if (_showControls && _errorMessage == null)
               _buildControlsOverlay(title),
 
             // Top bar (always visible when controls are shown)
@@ -1117,16 +1142,214 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
 
+  Widget _buildUnifiedOSD(String title) {
+    return Positioned(
+      bottom: 20,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // EPG Info (Left)
+              Expanded(child: _buildEPGBox(title)),
+              const SizedBox(width: 24),
+              // Controls Continuity (Right)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Prev Channel
+                  TVFocusable(
+                    focusNode: _prevFocusNode,
+                    onPressed: _playPrevious,
+                    onFocus: _resetControlsTimer,
+                    child: const Icon(
+                      Icons.skip_previous,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Play/Pause
+                  TVFocusable(
+                    focusNode: _playPauseFocusNode,
+                    onPressed: _togglePlayPause,
+                    onFocus: _resetControlsTimer,
+                    child: Icon(
+                      _isPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_filled,
+                      color: Colors.white,
+                      size: 56,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Next Channel
+                  TVFocusable(
+                    focusNode: _nextFocusNode,
+                    onPressed: _playNext,
+                    onFocus: _resetControlsTimer,
+                    child: const Icon(
+                      Icons.skip_next,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Disable Deinterlace Button
+                  if (widget.forceDeinterlace) ...[
+                    const SizedBox(width: 16),
+                    TVFocusable(
+                      onPressed: () {
+                        final streamId =
+                            widget.channels?[_currentIndex].streamId ??
+                                widget.streamId;
+                        ref
+                            .read(mobileSettingsProvider.notifier)
+                            .toggleChannelDeinterlace(streamId);
+
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LitePlayerScreen(
+                              streamId: streamId,
+                              title: widget.channels?[_currentIndex].name ??
+                                  widget.title,
+                              playlist: widget.playlist,
+                              streamType: widget.streamType,
+                              channels: widget.channels,
+                              initialIndex: _currentIndex,
+                            ),
+                          ),
+                        );
+                      },
+                      onFocus: _resetControlsTimer,
+                      child: const Icon(
+                        Icons.grid_off,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEPGBox(String title) {
+    String nowPlaying = _epg?.nowPlaying ?? "Pas d'infos EPG";
+    String nextPlaying =
+        _epg?.nextPlaying != null ? "Suivant: ${_epg!.nextPlaying}" : "";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            if (widget.channels != null &&
+                widget.channels![_currentIndex].streamIcon.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                width: 40,
+                height: 40,
+                child: CachedNetworkImage(
+                  imageUrl: widget.channels![_currentIndex].streamIcon,
+                  fit: BoxFit.contain,
+                  errorWidget: (_, __, ___) =>
+                      const Icon(Icons.tv, color: Colors.white38),
+                ),
+              ),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    nowPlaying,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Live Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'LIVE',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (nextPlaying.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              nextPlaying,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildControlsOverlay(String title) {
-    final settings = ref.watch(mobileSettingsProvider);
+    if (widget.streamType == StreamType.live) {
+      return _buildUnifiedOSD(title);
+    }
+
     return Positioned.fill(
       child: Container(
         color: Colors.black.withOpacity(0.4),
         child: Stack(
           children: [
-            // Removed Duplicate Back Button (Top Left) - handled by Top Bar now
-
-            // Bottom Controls (Aligned with EPG)
+            // Bottom Controls (VOD - Centered)
             Positioned(
               bottom: 80,
               left: 0,
@@ -1135,46 +1358,28 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Prev Channel / Replay 10s
-                    if (widget.streamType == StreamType.live &&
-                        widget.channels != null &&
-                        widget.channels!.isNotEmpty)
-                      TVFocusable(
-                        focusNode: _prevFocusNode,
-                        onPressed: _playPrevious,
-                        onFocus: _resetControlsTimer,
-                        borderRadius: BorderRadius.circular(50),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.skip_previous,
-                            color: Colors.white,
-                            size: 48,
-                          ),
-                          onPressed: _playPrevious,
+                    // Prev 10s
+                    TVFocusable(
+                      focusNode: _prevFocusNode,
+                      onPressed: () async {
+                        final pos = await _player.stream.position.first;
+                        _player.seek(pos - const Duration(seconds: 5));
+                        _resetControlsTimer();
+                      },
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.replay_10,
+                          color: Colors.white,
+                          size: 48,
                         ),
-                      )
-                    else if (widget.streamType != StreamType.live)
-                      TVFocusable(
-                        focusNode: _prevFocusNode,
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
                           _player.seek(pos - const Duration(seconds: 5));
-                          _resetControlsTimer();
                         },
-                        onFocus: _resetControlsTimer,
-                        borderRadius: BorderRadius.circular(50),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.replay_10,
-                            color: Colors.white,
-                            size: 48,
-                          ),
-                          onPressed: () async {
-                            final pos = await _player.stream.position.first;
-                            _player.seek(pos - const Duration(seconds: 5));
-                          },
-                        ),
                       ),
+                    ),
 
                     const SizedBox(width: 32),
 
@@ -1183,7 +1388,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       focusNode: _playPauseFocusNode,
                       onPressed: _togglePlayPause,
                       onFocus: _resetControlsTimer,
-                      scale: 1.1, // Larger scale for main button
+                      scale: 1.1,
                       borderRadius: BorderRadius.circular(50),
                       child: IconButton(
                         iconSize: 72,
@@ -1199,130 +1404,32 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
                     const SizedBox(width: 32),
 
-                    // Next Channel / Forward 10s
-                    if (widget.streamType == StreamType.live &&
-                        widget.channels != null &&
-                        widget.channels!.isNotEmpty)
-                      TVFocusable(
-                        focusNode: _nextFocusNode,
-                        onPressed: _playNext,
-                        onFocus: _resetControlsTimer,
-                        borderRadius: BorderRadius.circular(50),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.skip_next,
-                            color: Colors.white,
-                            size: 48,
-                          ),
-                          onPressed: _playNext,
+                    // Next 10s
+                    TVFocusable(
+                      focusNode: _nextFocusNode,
+                      onPressed: () async {
+                        final pos = await _player.stream.position.first;
+                        _player.seek(pos + const Duration(seconds: 5));
+                        _resetControlsTimer();
+                      },
+                      onFocus: _resetControlsTimer,
+                      borderRadius: BorderRadius.circular(50),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.forward_10,
+                          color: Colors.white,
+                          size: 48,
                         ),
-                      )
-                    else if (widget.streamType != StreamType.live)
-                      TVFocusable(
-                        focusNode: _nextFocusNode,
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
                           _player.seek(pos + const Duration(seconds: 5));
-                          _resetControlsTimer();
                         },
-                        onFocus: _resetControlsTimer,
-                        borderRadius: BorderRadius.circular(50),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.forward_10,
-                            color: Colors.white,
-                            size: 48,
-                          ),
-                          onPressed: () async {
-                            final pos = await _player.stream.position.first;
-                            _player.seek(pos + const Duration(seconds: 5));
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            // EPG Box (Bottom Left) + LIVE Badge
-            if (widget.streamType == StreamType.live &&
-                _epg != null &&
-                _epg!.nowPlaying != null)
-              Positioned(
-                bottom: 180, // Moved up to avoid overlap with central buttons
-                left: 24,
-                width: 350, // Increased width for badge
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _epg!.nowPlaying!,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (_epg!.nextPlaying != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        "A suivre: ${_epg!.nextPlaying}",
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            // LIVE Badge inside the box, right side
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              margin: const EdgeInsets.only(left: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
 
             // Progress Bar / Time (Bottom)
             Positioned(
@@ -1341,112 +1448,70 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (widget.streamType != StreamType.live)
-                      Row(
-                        children: [
-                          Text(
-                            _formatDuration(_position),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
+                    Row(
+                      children: [
+                        Text(
+                          _formatDuration(_position),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
                           ),
-                          Expanded(
-                            child: Actions(
-                              actions: <Type, Action<Intent>>{
-                                // Override directional focus intents for Up/Down
-                                DirectionalFocusIntent:
-                                    CallbackAction<DirectionalFocusIntent>(
-                                  onInvoke: (intent) {
-                                    if (intent.direction ==
-                                            TraversalDirection.up ||
-                                        intent.direction ==
-                                            TraversalDirection.down) {
-                                      // Manually move focus in the requested direction
-                                      FocusScope.of(context)
-                                          .focusInDirection(intent.direction);
-                                      return null;
-                                    }
-                                    // For left/right, don't handle (let Slider do seeking)
+                        ),
+                        Expanded(
+                          child: Actions(
+                            actions: <Type, Action<Intent>>{
+                              DirectionalFocusIntent:
+                                  CallbackAction<DirectionalFocusIntent>(
+                                onInvoke: (intent) {
+                                  if (intent.direction ==
+                                          TraversalDirection.up ||
+                                      intent.direction ==
+                                          TraversalDirection.down) {
+                                    FocusScope.of(context)
+                                        .focusInDirection(intent.direction);
                                     return null;
-                                  },
+                                  }
+                                  return null;
+                                },
+                              ),
+                            },
+                            child: Shortcuts(
+                              shortcuts: <LogicalKeySet, Intent>{
+                                LogicalKeySet(LogicalKeyboardKey.arrowUp):
+                                    const DirectionalFocusIntent(
+                                  TraversalDirection.up,
+                                ),
+                                LogicalKeySet(LogicalKeyboardKey.arrowDown):
+                                    const DirectionalFocusIntent(
+                                  TraversalDirection.down,
                                 ),
                               },
-                              child: Shortcuts(
-                                shortcuts: <LogicalKeySet, Intent>{
-                                  LogicalKeySet(LogicalKeyboardKey.arrowUp):
-                                      const DirectionalFocusIntent(
-                                          TraversalDirection.up),
-                                  LogicalKeySet(LogicalKeyboardKey.arrowDown):
-                                      const DirectionalFocusIntent(
-                                          TraversalDirection.down),
+                              child: Slider(
+                                value: _position.inSeconds
+                                    .toDouble()
+                                    .clamp(0, _duration.inSeconds.toDouble()),
+                                min: 0.0,
+                                max: _duration.inSeconds.toDouble(),
+                                onChanged: (value) {
+                                  _player
+                                      .seek(Duration(seconds: value.toInt()));
+                                  _resetControlsTimer();
                                 },
-                                child: Slider(
-                                  value: _position.inSeconds
-                                      .toDouble()
-                                      .clamp(0, _duration.inSeconds.toDouble()),
-                                  min: 0,
-                                  max: _duration.inSeconds.toDouble(),
-                                  divisions: _duration.inSeconds > 0
-                                      ? (_duration.inSeconds / 10).ceil()
-                                      : null,
-                                  activeColor: AppColors.primary,
-                                  inactiveColor: Colors.white24,
-                                  onChangeStart: (_) => _isSeeking = true,
-                                  onChangeEnd: (value) async {
-                                    await _player
-                                        .seek(Duration(seconds: value.toInt()));
-                                    _isSeeking = false;
-                                  },
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _position =
-                                          Duration(seconds: value.toInt());
-                                    });
-                                  },
-                                ),
+                                activeColor: AppColors.primary,
+                                inactiveColor: Colors.white24,
                               ),
                             ),
                           ),
-                          Text(
-                            _formatDuration(_duration),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (widget.streamType == StreamType.live &&
-                                settings.showClock)
-                              // Clock
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                margin: const EdgeInsets.only(right: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  _currentTime,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
                         ),
-                      ),
+                        Text(
+                          _formatDuration(_duration),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

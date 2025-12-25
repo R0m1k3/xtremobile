@@ -219,150 +219,212 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
 
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
-      child: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          color: AppColors.primary,
-          backgroundColor: AppColors.surface,
-          child: CustomScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // Hero Section (reduced height, moved above search)
-              if (_searchQuery.isEmpty && heroItems.isNotEmpty)
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+
+          if (_searchQuery.isNotEmpty || _isSearching) {
+            _onSearchChanged(''); // clear search
+            _searchController.clear();
+            setState(() => _isSearchEditing = false);
+            return;
+          }
+
+          // Root View -> Show Exit Dialog
+          final shouldExit = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: const Text(
+                "Quitter l'application",
+                style: TextStyle(color: Colors.white),
+              ),
+              content: const Text(
+                "Voulez-vous vraiment quitter l'application ?",
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  autofocus: true,
+                  child: const Text(
+                    'Annuler',
+                    style: TextStyle(color: Colors.blueAccent),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text(
+                    'Quitter',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldExit == true) {
+            SystemNavigator.pop();
+          }
+        },
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            color: AppColors.primary,
+            backgroundColor: AppColors.surface,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Hero Section (reduced height, moved above search)
+                if (_searchQuery.isEmpty && heroItems.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 8),
+                      child: SizedBox(
+                        height: 180, // Reduced from 250
+                        child: HeroCarousel(
+                          items: heroItems,
+                          onTap: (item) {
+                            try {
+                              final series = _series.firstWhere(
+                                (s) => s.seriesId.toString() == item.id,
+                              );
+                              _openSeries(series);
+                            } catch (e) {
+                              // Fallback logic not critical
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Search Bar (moved below carousel)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 8),
-                    child: SizedBox(
-                      height: 180, // Reduced from 250
-                      child: HeroCarousel(
-                        items: heroItems,
-                        onTap: (item) {
-                          try {
-                            final series = _series.firstWhere(
-                                (s) => s.seriesId.toString() == item.id);
-                            _openSeries(series);
-                          } catch (e) {
-                            // Fallback logic not critical
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Search Bar (moved below carousel)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: TVFocusable(
-                    scale: 1.0, // Disable scaling to prevent overflow
-                    focusColor: Colors.white, // Solid white selection frame
-                    onPressed: () {
-                      setState(() => _isSearchEditing = true);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _searchFocusNode.requestFocus();
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        // Removed internal editing border here to prevent conflict and "inside frame" look
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.search,
-                              size: 20, color: AppColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ExcludeFocus(
-                              excluding: !_isSearchEditing,
-                              child: TextField(
-                                cursorColor: Colors.white, // Extra safety
-                                controller: _searchController,
-                                focusNode: _searchFocusNode,
-                                readOnly: !_isSearchEditing,
-                                style: const TextStyle(
-                                    fontSize: 14, color: AppColors.textPrimary),
-                                decoration: const InputDecoration(
-                                  hintText: 'Rechercher une série...',
-                                  border: InputBorder.none,
-                                  focusedBorder: InputBorder
-                                      .none, // Explicitly remove focus border
-                                  enabledBorder: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.only(bottom: 11),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: TVFocusable(
+                      scale: 1.0, // Disable scaling to prevent overflow
+                      focusColor: Colors.white, // Solid white selection frame
+                      onPressed: () {
+                        setState(() => _isSearchEditing = true);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _searchFocusNode.requestFocus();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          // Removed internal editing border here to prevent conflict and "inside frame" look
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ExcludeFocus(
+                                excluding: !_isSearchEditing,
+                                child: TextField(
+                                  cursorColor: Colors.white, // Extra safety
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  readOnly: !_isSearchEditing,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Rechercher une série...',
+                                    border: InputBorder.none,
+                                    focusedBorder: InputBorder
+                                        .none, // Explicitly remove focus border
+                                    enabledBorder: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.only(bottom: 11),
+                                  ),
+                                  onChanged: _onSearchChanged,
+                                  onSubmitted: (_) =>
+                                      setState(() => _isSearchEditing = false),
                                 ),
-                                onChanged: _onSearchChanged,
-                                onSubmitted: (_) =>
-                                    setState(() => _isSearchEditing = false),
                               ),
                             ),
-                          ),
-                          if (_isSearching)
-                            const SizedBox(
+                            if (_isSearching)
+                              const SizedBox(
                                 width: 12,
                                 height: 12,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2)),
-                          if (_searchQuery.isNotEmpty)
-                            GestureDetector(
-                              onTap: () {
-                                _searchController.clear();
-                                _onSearchChanged('');
-                              },
-                              child: const Icon(Icons.close,
-                                  size: 16, color: AppColors.textSecondary),
-                            ),
-                        ],
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            if (_searchQuery.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  _searchController.clear();
+                                  _onSearchChanged('');
+                                },
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              // Grid
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8, // Reduced size further (was 4)
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 0.7,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index >= displaySeries.length) return null;
-                      final series = displaySeries[index];
+                // Grid
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 8, // Reduced size further (was 4)
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.7,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index >= displaySeries.length) return null;
+                        final series = displaySeries[index];
 
-                      return MobilePosterCard(
-                        title: series.name,
-                        imageUrl: _getImageUrl(series.cover),
-                        rating: _formatRating(series.rating),
-                        placeholderIcon: Icons.tv,
-                        onTap: () => _openSeries(series),
-                      );
-                    },
-                    childCount: displaySeries.length,
-                  ),
-                ),
-              ),
-
-              if (_isLoading)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
+                        return MobilePosterCard(
+                          title: series.name,
+                          imageUrl: _getImageUrl(series.cover),
+                          rating: _formatRating(series.rating),
+                          placeholderIcon: Icons.tv,
+                          onTap: () => _openSeries(series),
+                        );
+                      },
+                      childCount: displaySeries.length,
+                    ),
                   ),
                 ),
-            ],
+
+                if (_isLoading)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

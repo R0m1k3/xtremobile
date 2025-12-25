@@ -6,13 +6,10 @@ import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 import 'package:xtremflow/mobile/widgets/mobile_poster_card.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/components/hero_carousel.dart';
-import '../../../../core/widgets/components/ui_components.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../../features/iptv/services/xtream_service_mobile.dart';
 import '../screens/native_player_screen.dart';
-import '../screens/lite_player_screen.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -27,25 +24,30 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final List<Movie> _movies = [];
+
+  // Data
+  List<MapEntry<String, String>> _categories = [];
+  List<Movie> _categoryMovies = [];
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
+
+  // Search
   List<Movie>? _searchResults;
   String _searchQuery = '';
   bool _isSearchEditing = false;
-  bool _isLoading = false;
   bool _isSearching = false;
-  bool _hasMore = true;
-  int _currentOffset = 0;
-  static const int _pageSize = 50;
   Timer? _searchDebounce;
+
+  // State
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
-    // Defer initial load to after first frame to ensure providers are ready
+    // Defer initial load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _movies.isEmpty) {
-        _loadMoreMovies();
+      if (mounted && _categories.isEmpty) {
+        _loadCategories();
       }
     });
   }
@@ -57,16 +59,6 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
-  }
-
-  void _onScroll() {
-    // Only trigger load when near bottom and not already loading
-    if (!_isLoading &&
-        _hasMore &&
-        _scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent * 0.8) {
-      _loadMoreMovies();
-    }
   }
 
   void _onSearchChanged(String query) {
@@ -106,40 +98,66 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     }
   }
 
-  Future<void> _loadMoreMovies() async {
-    // Prevent race conditions
-    if (_isLoading || !_hasMore || !mounted) return;
-
+  Future<void> _loadCategories() async {
+    if (_isLoading || !mounted) return;
     setState(() => _isLoading = true);
 
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-
-      // Add timeout to prevent infinite loading state
-      final newMovies = await service
-          .getMoviesPaginated(
-            offset: _currentOffset,
-            limit: _pageSize,
-          )
-          .timeout(const Duration(seconds: 15));
+      final categoriesMap = await service.getVodCategories();
 
       if (mounted) {
         setState(() {
-          _movies.addAll(newMovies);
-          _currentOffset += _pageSize;
-          _hasMore = newMovies.length == _pageSize;
+          _categories = categoriesMap.entries.toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading movies: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _selectCategory(String id, String name) async {
+    setState(() {
+      _selectedCategoryId = id;
+      _selectedCategoryName = name;
+      _categoryMovies = [];
+      _isLoading = true;
+    });
+
+    try {
+      final service =
+          await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      final movies = await service.getMoviesByCategory(id);
+
       if (mounted) {
         setState(() {
+          _categoryMovies = movies;
           _isLoading = false;
-          // Do NOT set _hasMore to false on error
         });
       }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onBack() {
+    if (_searchQuery.isNotEmpty) {
+      _onSearchChanged('');
+      _searchController.clear();
+      setState(() => _isSearchEditing = false);
+      return;
+    }
+
+    if (_selectedCategoryId != null) {
+      setState(() {
+        _selectedCategoryId = null;
+        _selectedCategoryName = null;
+        _categoryMovies = [];
+      });
+      return;
     }
   }
 
@@ -152,15 +170,16 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     } catch (_) {}
 
     setState(() {
-      _movies.clear();
-      _currentOffset = 0;
-      _hasMore = true;
+      _categories.clear();
+      _selectedCategoryId = null;
+      _selectedCategoryName = null;
+      _categoryMovies.clear();
       _searchResults = null;
       _searchQuery = '';
       _searchController.clear();
       _isLoading = false;
     });
-    await _loadMoreMovies();
+    await _loadCategories();
   }
 
   String? _formatRating(String? rating) {
@@ -179,16 +198,13 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
   }
 
   void _playMovie(BuildContext context, Movie movie) {
-    if (widget.playlist == null) return;
-
-    // Enforce Native Player for Movies (VOD)
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => NativePlayerScreen(
           streamId: movie.streamId,
           title: movie.name,
-          playlist: widget.playlist!,
+          playlist: widget.playlist,
           streamType: StreamType.vod,
           containerExtension: movie.containerExtension,
         ),
@@ -205,192 +221,297 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     final settings = ref.watch(mobileSettingsProvider);
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
 
-    // Retry load if movies list is empty (fixes issue where EPG loads but tab needs refresh)
-    if (_movies.isEmpty && !_isLoading && _hasMore) {
+    // Initial load retry
+    if (_categories.isEmpty && !_isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _movies.isEmpty) {
-          _loadMoreMovies();
+        if (mounted && _categories.isEmpty) {
+          _loadCategories();
         }
       });
     }
 
-    List<Movie> displayMovies;
-    if (_searchQuery.isNotEmpty && _searchResults != null) {
-      displayMovies = _searchResults!;
-    } else {
-      displayMovies = settings.moviesKeywords.isEmpty
-          ? _movies
-          : _movies
-              .where((m) => settings.matchesMoviesFilter(m.categoryName))
-              .toList();
-    }
+    // Determine what to display
+    final bool showingCategories =
+        _searchQuery.isEmpty && _selectedCategoryId == null;
+    final bool showingMovies =
+        _searchQuery.isEmpty && _selectedCategoryId != null;
+    final bool showingSearch = _searchQuery.isNotEmpty;
 
-    // Hero Items (use filtered movies)
-    final heroItems = displayMovies
-        .take(3)
-        .map((m) => HeroItem(
-              id: m.streamId,
-              title: m.name,
-              imageUrl: _getImageUrl(m.streamIcon),
-              subtitle:
-                  m.rating != null ? '${_formatRating(m.rating)} ★' : null,
-              onMoreInfo: () => _playMovie(context, m),
-            ))
+    // Filter categories based on settings
+    final filteredCategories = _categories
+        .where((entry) => settings.matchesMoviesFilter(entry.value))
         .toList();
+
+    int itemCount = 0;
+    if (showingCategories) {
+      itemCount = filteredCategories.length;
+    } else if (showingMovies) {
+      itemCount = _categoryMovies.length;
+    } else if (showingSearch) {
+      itemCount = _searchResults?.length ?? 0;
+    }
 
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
-      child: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          color: AppColors.primary,
-          backgroundColor: AppColors.surface,
-          child: CustomScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // Hero Section (reduced height, moved above search)
-              if (_searchQuery.isEmpty && heroItems.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 8),
-                    child: SizedBox(
-                      height: 180, // Reduced from 250
-                      child: HeroCarousel(
-                        items: heroItems,
-                        onTap: (item) {
-                          try {
-                            final movie = _movies.firstWhere(
-                                (element) => element.streamId == item.id);
-                            _playMovie(context, movie);
-                          } catch (e) {
-                            // Fallback ignored
-                          }
-                        },
-                      ),
-                    ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+
+          // Handle Search Exit
+          if (_searchQuery.isNotEmpty || _isSearching) {
+            _onSearchChanged(''); // clear search
+            _searchController.clear();
+            setState(() => _isSearchEditing = false);
+            return;
+          }
+
+          // Handle Category Back
+          if (_selectedCategoryId != null) {
+            _onBack();
+            return;
+          }
+
+          // Root View -> Show Exit Dialog
+          final shouldExit = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: const Text(
+                "Quitter l'application",
+                style: TextStyle(color: Colors.white),
+              ),
+              content: const Text(
+                "Voulez-vous vraiment quitter l'application ?",
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  autofocus: true,
+                  child: const Text(
+                    'Annuler',
+                    style: TextStyle(color: Colors.blueAccent),
                   ),
                 ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text(
+                    'Quitter',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                ),
+              ],
+            ),
+          );
 
-              // Search Bar (moved below carousel)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: TVFocusable(
-                    scale: 1.0, // Disable scaling to prevent overflow
-                    focusColor: Colors.white, // Solid white selection frame
-                    onPressed: () {
-                      setState(() => _isSearchEditing = true);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _searchFocusNode.requestFocus();
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        // Removed internal editing border here to prevent conflict and "inside frame" look
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+          if (shouldExit == true) {
+            SystemNavigator.pop();
+          }
+        },
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            color: AppColors.primary,
+            backgroundColor: AppColors.surface,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Category Title (If inside a category)
+                if (showingMovies)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
                       child: Row(
                         children: [
-                          const Icon(Icons.search,
-                              size: 20, color: AppColors.textSecondary),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            onPressed: _onBack,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: ExcludeFocus(
-                              excluding: !_isSearchEditing,
-                              child: TextField(
-                                cursorColor: Colors.white, // Extra safety
-                                controller: _searchController,
-                                focusNode: _searchFocusNode,
-                                readOnly: !_isSearchEditing,
-                                style: const TextStyle(
-                                    fontSize: 14, color: AppColors.textPrimary),
-                                decoration: const InputDecoration(
-                                  hintText: 'Rechercher un film...',
-                                  border: InputBorder.none,
-                                  focusedBorder: InputBorder
-                                      .none, // Explicitly remove focus border
-                                  enabledBorder: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.only(bottom: 11),
-                                ),
-                                onChanged: _onSearchChanged,
-                                onSubmitted: (_) =>
-                                    setState(() => _isSearchEditing = false),
+                            child: Text(
+                              _selectedCategoryName ?? 'Films',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          if (_isSearching)
-                            const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2)),
-                          if (_searchQuery.isNotEmpty)
-                            GestureDetector(
-                              onTap: () {
-                                _searchController.clear();
-                                _onSearchChanged('');
-                              },
-                              child: const Icon(Icons.close,
-                                  size: 16, color: AppColors.textSecondary),
-                            ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // Grid
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 0.7,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index >= displayMovies.length) return null;
-                      final movie = displayMovies[index];
-                      final isWatched =
-                          watchHistory.isMovieWatched(movie.streamId);
-
-                      return MobilePosterCard(
-                        title: movie.name,
-                        imageUrl: _getImageUrl(movie.streamIcon),
-                        rating: _formatRating(movie.rating),
-                        isWatched: isWatched,
-                        onTap: () => _playMovie(context, movie),
-                        onLongPress: () {
-                          ref
-                              .read(mobileWatchHistoryProvider.notifier)
-                              .toggleMovieWatched(movie.streamId);
-                        },
-                      );
-                    },
-                    childCount: displayMovies.length,
-                  ),
-                ),
-              ),
-
-              if (_isLoading)
-                const SliverToBoxAdapter(
+                // Search Bar
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: TVFocusable(
+                      scale: 1.0,
+                      focusColor: Colors.white,
+                      onPressed: () {
+                        setState(() => _isSearchEditing = true);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _searchFocusNode.requestFocus();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ExcludeFocus(
+                                excluding: !_isSearchEditing,
+                                child: TextField(
+                                  cursorColor: Colors.white,
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  readOnly: !_isSearchEditing,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Rechercher un film...',
+                                    border: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.only(bottom: 11),
+                                  ),
+                                  onChanged: _onSearchChanged,
+                                  onSubmitted: (_) =>
+                                      setState(() => _isSearchEditing = false),
+                                ),
+                              ),
+                            ),
+                            if (_isSearching)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            if (_searchQuery.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  _searchController.clear();
+                                  _onSearchChanged('');
+                                },
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-            ],
+
+                // Grid
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: showingCategories
+                          ? 4
+                          : 8, // Bigger cards for categories
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: showingCategories
+                          ? 2.5
+                          : 0.7, // Wide cards for categories
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (showingCategories) {
+                          if (index >= filteredCategories.length) return null;
+                          final cat = filteredCategories[index];
+                          return MobilePosterCard(
+                            title: cat.value, // Name
+                            imageUrl: null, // No image for category
+                            placeholderIcon: Icons.folder, // Folder icon
+                            onTap: () => _selectCategory(cat.key, cat.value),
+                            isWatched: false,
+                          );
+                        } else if (showingMovies) {
+                          if (index >= _categoryMovies.length) return null;
+                          final movie = _categoryMovies[index];
+                          final isWatched =
+                              watchHistory.isMovieWatched(movie.streamId);
+                          return MobilePosterCard(
+                            title: movie.name,
+                            imageUrl: _getImageUrl(movie.streamIcon),
+                            rating: _formatRating(movie.rating),
+                            isWatched: isWatched,
+                            onTap: () => _playMovie(context, movie),
+                            onLongPress: () {
+                              ref
+                                  .read(mobileWatchHistoryProvider.notifier)
+                                  .toggleMovieWatched(movie.streamId);
+                            },
+                          );
+                        } else if (showingSearch) {
+                          if (_searchResults == null ||
+                              index >= _searchResults!.length) {
+                            return null;
+                          }
+                          final movie = _searchResults![index];
+                          final isWatched =
+                              watchHistory.isMovieWatched(movie.streamId);
+                          return MobilePosterCard(
+                            title: movie.name,
+                            imageUrl: _getImageUrl(movie.streamIcon),
+                            rating: _formatRating(movie.rating),
+                            isWatched: isWatched,
+                            onTap: () => _playMovie(context, movie),
+                            onLongPress: () {
+                              ref
+                                  .read(mobileWatchHistoryProvider.notifier)
+                                  .toggleMovieWatched(movie.streamId);
+                            },
+                          );
+                        }
+                        return null;
+                      },
+                      childCount: itemCount,
+                    ),
+                  ),
+                ),
+
+                if (_isLoading)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

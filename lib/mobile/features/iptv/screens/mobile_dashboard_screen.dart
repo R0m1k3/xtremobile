@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/models/playlist_config.dart';
 import '../../../widgets/mobile_scaffold.dart';
 import '../../../theme/mobile_theme.dart';
@@ -48,15 +49,12 @@ class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
 
     return Theme(
       data: MobileTheme.darkTheme,
-      child: PopScope(
-        canPop: false, // Prevent accidental exit to playlist selection
-        child: MobileScaffold(
-          currentIndex: currentIndex,
-          onIndexChanged: (index) {
-            ref.read(mobileDashboardIndexProvider.notifier).state = index;
-          },
-          child: currentTab,
-        ),
+      child: MobileScaffold(
+        currentIndex: currentIndex,
+        onIndexChanged: (index) {
+          ref.read(mobileDashboardIndexProvider.notifier).state = index;
+        },
+        child: currentTab,
       ),
     );
   }

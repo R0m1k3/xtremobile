@@ -74,10 +74,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
         backgroundColor: Colors.transparent,
         body: PopScope(
           // Only allow full pop if we're at category view with no filters AND not just returned from player
-          canPop: uiState.isCategoryView &&
-              _searchQuery.isEmpty &&
-              !_showFavoritesOnly,
-          onPopInvokedWithResult: (didPop, _) {
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
             if (didPop) return;
 
             // If just returned from player, reset the flag and do nothing (stay on channel list)
@@ -95,6 +93,43 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
               setState(() => _showFavoritesOnly = false);
             } else if (!uiState.isCategoryView) {
               uiNotifier.state = uiState.copyWith(isCategoryView: true);
+            } else {
+              // Root View (Categories) -> Show Exit Dialog
+              final shouldExit = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: const Text(
+                    "Quitter l'application",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  content: const Text(
+                    "Voulez-vous vraiment quitter l'application ?",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      autofocus: true,
+                      child: const Text(
+                        'Annuler',
+                        style: TextStyle(color: Colors.blueAccent),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text(
+                        'Quitter',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (shouldExit == true) {
+                SystemNavigator.pop();
+              }
             }
           },
           child: channelsAsync.when(
@@ -165,7 +200,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                     // Header (Search + Title/Back)
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Column(
                         children: [
                           // Search Bar - Wrapped in TVFocusable for remote access
@@ -193,8 +230,10 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                   const EdgeInsets.symmetric(horizontal: 12),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.search,
-                                      color: AppColors.textSecondary),
+                                  const Icon(
+                                    Icons.search,
+                                    color: AppColors.textSecondary,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: ExcludeFocus(
@@ -206,7 +245,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                         focusNode: _searchFocusNode,
                                         readOnly: !_isSearchEditing,
                                         style: const TextStyle(
-                                            color: AppColors.textPrimary),
+                                          color: AppColors.textPrimary,
+                                        ),
                                         decoration: const InputDecoration(
                                           hintText: 'Rechercher une chaîne...',
                                           border: InputBorder.none,
@@ -216,15 +256,18 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                           isDense: true,
                                         ),
                                         onSubmitted: (_) => setState(
-                                            () => _isSearchEditing = false),
+                                          () => _isSearchEditing = false,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   if (_searchQuery.isNotEmpty)
                                     GestureDetector(
                                       onTap: () => _searchController.clear(),
-                                      child: const Icon(Icons.close,
-                                          color: AppColors.textSecondary),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -240,17 +283,21 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                   _showFavoritesOnly ||
                                   _searchQuery.isNotEmpty) ...[
                                 IconButton(
-                                  icon: const Icon(Icons.arrow_back,
-                                      color: AppColors.textPrimary),
+                                  icon: const Icon(
+                                    Icons.arrow_back,
+                                    color: AppColors.textPrimary,
+                                  ),
                                   onPressed: () {
                                     if (_searchQuery.isNotEmpty) {
                                       _searchController.clear();
                                     } else if (_showFavoritesOnly) {
                                       setState(
-                                          () => _showFavoritesOnly = false);
+                                        () => _showFavoritesOnly = false,
+                                      );
                                     } else {
                                       uiNotifier.state = uiState.copyWith(
-                                          isCategoryView: true);
+                                        isCategoryView: true,
+                                      );
                                     }
                                   },
                                   padding: EdgeInsets.zero,
@@ -288,13 +335,15 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                 onPressed: () => setState(() {
                                   _showFavoritesOnly = !_showFavoritesOnly;
                                   // Reset category view if entering favorites
-                                  if (_showFavoritesOnly)
+                                  if (_showFavoritesOnly) {
                                     uiNotifier.state =
                                         uiState.copyWith(isCategoryView: false);
+                                  }
                                   // If exiting favorites, default depends on logic (here back to category grid if was previously)
-                                  if (!_showFavoritesOnly)
+                                  if (!_showFavoritesOnly) {
                                     uiNotifier.state =
                                         uiState.copyWith(isCategoryView: true);
+                                  }
                                 }),
                               ),
                             ],
@@ -351,12 +400,12 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
           borderRadius: BorderRadius.circular(16),
           child: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFF4A4A4C), // Lighter grey top
-                  const Color(0xFF2C2C2E), // Medium grey bottom
+                  Color(0xFF4A4A4C), // Lighter grey top
+                  Color(0xFF2C2C2E), // Medium grey bottom
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
@@ -429,12 +478,20 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     );
   }
 
-  void _playChannel(BuildContext context, Channel channel,
-      List<Channel> channels, PlaylistConfig playlist, int index) async {
+  void _playChannel(
+    BuildContext context,
+    Channel channel,
+    List<Channel> channels,
+    PlaylistConfig playlist,
+    int index,
+  ) async {
     final settings = ref.read(mobileSettingsProvider);
-    final useNative = settings.playerEngine == 'ultra';
 
-    if (useNative) {
+    // Check if channel has forced deinterlacing enabled
+    final forceDeinterlace =
+        settings.deinterlacedChannels.contains(channel.streamId);
+
+    if (forceDeinterlace) {
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -445,6 +502,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             streamType: StreamType.live,
             channels: channels, // Pass full channel list for zapping
             initialIndex: index,
+            forceDeinterlace: true,
           ),
         ),
       );
@@ -529,12 +587,12 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
       },
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFF4A4A4C), // Lighter grey top
-              const Color(0xFF2C2C2E), // Medium grey bottom
+              Color(0xFF4A4A4C), // Lighter grey top
+              Color(0xFF2C2C2E), // Medium grey bottom
             ],
           ),
           borderRadius: BorderRadius.circular(12),
@@ -559,13 +617,22 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                           ? CachedNetworkImage(
                               imageUrl: iconUrl,
                               fit: BoxFit.contain,
-                              errorWidget: (_, __, ___) => const Icon(Icons.tv,
-                                  color: Colors.white38, size: 40),
-                              placeholder: (_, __) => const Icon(Icons.tv,
-                                  color: Colors.white24, size: 40),
+                              errorWidget: (_, __, ___) => const Icon(
+                                Icons.tv,
+                                color: Colors.white38,
+                                size: 40,
+                              ),
+                              placeholder: (_, __) => const Icon(
+                                Icons.tv,
+                                color: Colors.white24,
+                                size: 40,
+                              ),
                             )
-                          : const Icon(Icons.tv,
-                              color: Colors.white38, size: 40),
+                          : const Icon(
+                              Icons.tv,
+                              color: Colors.white38,
+                              size: 40,
+                            ),
                     ),
                     // Favorite badge
                     if (isFavorite)
@@ -578,8 +645,11 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.favorite,
-                              color: Colors.white, size: 12),
+                          child: const Icon(
+                            Icons.favorite,
+                            color: Colors.white,
+                            size: 12,
+                          ),
                         ),
                       ),
                   ],

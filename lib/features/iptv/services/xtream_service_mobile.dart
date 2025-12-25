@@ -264,7 +264,7 @@ class XtreamServiceMobile {
   }
 
   /// Load VOD categories mapping
-  Future<Map<String, String>> _getVodCategories() async {
+  Future<Map<String, String>> getVodCategories() async {
     if (_currentPlaylist == null) return {};
 
     try {
@@ -338,7 +338,7 @@ class XtreamServiceMobile {
       // Load from cache or fetch from API
       if (_cachedMoviesRaw == null) {
         // First load: fetch from API and cache
-        _cachedVodCategories ??= await _getVodCategories();
+        _cachedVodCategories ??= await getVodCategories();
 
         final response = await _dio.get(
           _effectiveApiBaseUrl,
@@ -383,13 +383,47 @@ class XtreamServiceMobile {
     }
   }
 
+  /// Get movies by category (Fast, optimized for large libraries)
+  Future<List<xm.Movie>> getMoviesByCategory(String categoryId) async {
+    if (_currentPlaylist == null) throw Exception('No playlist configured');
+
+    try {
+      final categoryMap = await getVodCategories();
+      final categoryName = categoryMap[categoryId] ?? 'Unknown';
+
+      final response = await _dio.get(
+        _effectiveApiBaseUrl,
+        queryParameters: {
+          'username': _currentPlaylist!.username,
+          'password': _currentPlaylist!.password,
+          'action': 'get_vod_streams',
+          'category_id': categoryId,
+        },
+        options: _getOptions(),
+      );
+
+      if (response.data is! List) return [];
+      final List<dynamic> movies = response.data as List<dynamic>;
+
+      return movies.map((movieData) {
+        final data =
+            Map<String, dynamic>.from(movieData as Map<String, dynamic>);
+        data['category_name'] = categoryName;
+        return xm.Movie.fromJson(data);
+      }).toList();
+    } catch (e) {
+      // Return empty list instead of throwing to prevent UI crash
+      return [];
+    }
+  }
+
   /// Search movies in the entire catalogue
   Future<List<xm.Movie>> searchMovies(String query) async {
     if (_currentPlaylist == null) throw Exception('No playlist configured');
     if (query.isEmpty) return [];
 
     try {
-      final categoryMap = await _getVodCategories();
+      final categoryMap = await getVodCategories();
 
       final response = await _dio.get(
         _effectiveApiBaseUrl,

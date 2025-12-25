@@ -75,7 +75,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                Container(
+                SizedBox(
                   width: 48,
                   height: 48,
                   // No decoration for free-floating logo
