@@ -69,6 +69,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _prevFocusNode = FocusNode();
   final FocusNode _nextFocusNode = FocusNode();
+  final FocusNode _sliderFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
   final FocusNode _audioFocusNode = FocusNode();
 
@@ -250,10 +251,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('mute', 'no');
 
     // Explicitly enable LAVC downmixing to stereo (Crucial for 5.1/7.1 on Stereo devices)
-    (_player.platform as dynamic)?.setProperty('ad-lavc-downmix', 'yes');
-    (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
-    (_player.platform as dynamic)
-        ?.setProperty('audio-normalize-downmix', 'yes');
+    // (_player.platform as dynamic)?.setProperty('ad-lavc-downmix', 'yes');
+    // (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
+    // (_player.platform as dynamic)?.setProperty('audio-normalize-downmix', 'yes');
 
     // Force software decoding for audio tracks (Maximum compatibility)
     (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
@@ -418,7 +418,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   @override
   void dispose() {
     // Remove lifecycle observer
-    WidgetsBinding.instance.removeObserver(this);
+    // WidgetsBinding.instance.removeObserver(this);
 
     // Unregister keyboard handler
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
@@ -437,6 +437,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _player.stop();
     _player.dispose();
     _xtreamService?.dispose();
+    _playPauseFocusNode.dispose();
+    _prevFocusNode.dispose();
+    _nextFocusNode.dispose();
+    _sliderFocusNode.dispose();
+    _backFocusNode.dispose();
+    _audioFocusNode.dispose();
 
     // Restore normal orientation
     SystemChrome.setPreferredOrientations([
@@ -819,108 +825,129 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
-    final key = event.logicalKey;
+    try {
+      final key = event.logicalKey;
 
-    // Space / Enter / Select
-    if (key == LogicalKeyboardKey.space ||
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.select ||
-        key == LogicalKeyboardKey.numpadEnter ||
-        key == LogicalKeyboardKey.gameButtonA) {
-      // If controls are hidden, toggle them + play/pause
-      if (!_showControls) {
-        _togglePlayPause();
-        _toggleControls();
-        return true;
-      }
-      // If controls are visible, let Focus system handle button press
-      return false;
-    }
-
-    // Debug Toggle: Long Press Key 'D' or 0 (if mapped) - Simplified to just a secret key combo?
-    // Let's use a long-press logic on Select in _handleKeyEvent?
-    // Actually, handling long press in key down is hard.
-    // We'll add a 'Debug' button in the settings or just map Key '0' if remote has it.
-    // Debug Toggle: Long Press Key 'D' or 0 (if mapped)
-    if (key == LogicalKeyboardKey.digit0) {
-      final current = ref.read(mobileSettingsProvider).showDebugStats;
-      ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!current);
-      return true;
-    }
-
-    // Left Arrow - Show controls or navigate, seek in VOD when hidden
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (!_showControls) {
-        if (widget.streamType != StreamType.live) {
-          final newPos = _position - const Duration(seconds: 5);
-          _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
-        }
+      // Explicit Play
+      if (key == LogicalKeyboardKey.mediaPlay) {
+        if (!_isPlaying) _player.play();
         _onUserInteraction();
         return true;
       }
-      return false; // Let Focus handle navigation
-    }
 
-    // Right Arrow - Show controls or navigate, seek in VOD when hidden
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (!_showControls) {
-        if (widget.streamType != StreamType.live) {
-          final newPos = _position + const Duration(seconds: 5);
-          if (newPos < _duration) {
-            _player.seek(newPos);
+      // Explicit Pause
+      if (key == LogicalKeyboardKey.mediaPause) {
+        if (_isPlaying) _player.pause();
+        _onUserInteraction();
+        return true;
+      }
+
+      // Space / Enter / Select / Toggle
+      if (key == LogicalKeyboardKey.space ||
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.numpadEnter ||
+          key == LogicalKeyboardKey.gameButtonA ||
+          key == LogicalKeyboardKey.mediaPlayPause) {
+        // If controls are hidden, toggle them + play/pause
+        if (!_showControls) {
+          _togglePlayPause();
+          _toggleControls();
+          return true;
+        }
+        // If controls are visible, let Focus system handle button press
+        return false;
+      }
+
+      // Debug Toggle: Long Press Key 'D' or 0 (if mapped) - Simplified to just a secret key combo?
+      // Let's use a long-press logic on Select in _handleKeyEvent?
+      // Actually, handling long press in key down is hard.
+      // We'll add a 'Debug' button in the settings or just map Key '0' if remote has it.
+      // Debug Toggle: Long Press Key 'D' or 0 (if mapped)
+      if (key == LogicalKeyboardKey.digit0) {
+        final current = ref.read(mobileSettingsProvider).showDebugStats;
+        ref
+            .read(mobileSettingsProvider.notifier)
+            .toggleShowDebugStats(!current);
+        return true;
+      }
+
+      // Left Arrow - Show controls or navigate, seek in VOD when hidden
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        if (!_showControls) {
+          if (widget.streamType != StreamType.live) {
+            final newPos = _position - const Duration(seconds: 10);
+            _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
           }
+          _onUserInteraction();
+          return true;
         }
-        _onUserInteraction();
+        return false; // Let Focus handle navigation
+      }
+
+      // Right Arrow - Show controls or navigate, seek in VOD when hidden
+      if (key == LogicalKeyboardKey.arrowRight) {
+        if (!_showControls) {
+          if (widget.streamType != StreamType.live) {
+            final newPos = _position + const Duration(seconds: 10);
+            if (newPos < _duration) {
+              _player.seek(newPos);
+            }
+          }
+          _onUserInteraction();
+          return true;
+        }
+        return false; // Let Focus handle navigation
+      }
+
+      // Up/Down Arrow - Show controls or navigate UI, NO zapping
+      if (key == LogicalKeyboardKey.arrowUp ||
+          key == LogicalKeyboardKey.arrowDown) {
+        if (!_showControls) {
+          _onUserInteraction();
+          return true;
+        }
+        return false; // Let Focus handle navigation
+      }
+
+      // Channel Down = Previous Channel (inverted as requested)
+      if (key == LogicalKeyboardKey.channelDown) {
+        if (widget.streamType == StreamType.live && widget.channels != null) {
+          _playPrevious();
+          _onUserInteraction();
+          return true;
+        }
+      }
+
+      // Channel Up = Next Channel (inverted as requested)
+      if (key == LogicalKeyboardKey.channelUp) {
+        if (widget.streamType == StreamType.live && widget.channels != null) {
+          _playNext();
+          _onUserInteraction();
+          return true;
+        }
+      }
+
+      // Cycle Aspect Ratio - secret key 'A' or digit 1
+      if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
+        _cycleAspectRatio();
         return true;
       }
-      return false; // Let Focus handle navigation
-    }
 
-    // Up/Down Arrow - Show controls or navigate UI, NO zapping
-    if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.arrowDown) {
-      if (!_showControls) {
-        _onUserInteraction();
+      // Escape / Back - Exit player
+      if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack) {
+        // If controls are visible, close them first
+        if (_showControls) {
+          setState(() => _showControls = false);
+        } else {
+          Navigator.of(context).pop();
+        }
         return true;
       }
-      return false; // Let Focus handle navigation
+    } catch (e) {
+      debugPrint('Error in _handleKeyEvent: $e');
     }
-
-    // Channel Down = Previous Channel (inverted as requested)
-    if (key == LogicalKeyboardKey.channelDown) {
-      if (widget.streamType == StreamType.live && widget.channels != null) {
-        _playPrevious();
-        _onUserInteraction();
-        return true;
-      }
-    }
-
-    // Channel Up = Next Channel (inverted as requested)
-    if (key == LogicalKeyboardKey.channelUp) {
-      if (widget.streamType == StreamType.live && widget.channels != null) {
-        _playNext();
-        _onUserInteraction();
-        return true;
-      }
-    }
-
-    // Cycle Aspect Ratio - secret key 'A' or digit 1
-    if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
-      _cycleAspectRatio();
-      return true;
-    }
-
-    // Escape / Back - Exit player
-    if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack) {
-      // If controls are visible, close them first
-      if (_showControls) {
-        setState(() => _showControls = false);
-      } else {
-        Navigator.of(context).pop();
-      }
-      return true;
-    }
-
     return false;
   }
 
@@ -1274,7 +1301,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       const Icon(Icons.tv, color: Colors.white38),
                 ),
               ),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1301,23 +1327,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
-            ),
-            // Live Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              margin: const EdgeInsets.only(left: 8),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'LIVE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
               ),
             ),
           ],
@@ -1363,7 +1372,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       focusNode: _prevFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
-                        _player.seek(pos - const Duration(seconds: 5));
+                        _player.seek(pos - const Duration(seconds: 10));
                         _resetControlsTimer();
                       },
                       onFocus: _resetControlsTimer,
@@ -1376,7 +1385,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         ),
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
-                          _player.seek(pos - const Duration(seconds: 5));
+                          _player.seek(pos - const Duration(seconds: 10));
                         },
                       ),
                     ),
@@ -1409,7 +1418,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       focusNode: _nextFocusNode,
                       onPressed: () async {
                         final pos = await _player.stream.position.first;
-                        _player.seek(pos + const Duration(seconds: 5));
+                        _player.seek(pos + const Duration(seconds: 10));
                         _resetControlsTimer();
                       },
                       onFocus: _resetControlsTimer,
@@ -1422,7 +1431,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         ),
                         onPressed: () async {
                           final pos = await _player.stream.position.first;
-                          _player.seek(pos + const Duration(seconds: 5));
+                          _player.seek(pos + const Duration(seconds: 10));
                         },
                       ),
                     ),
@@ -1458,48 +1467,54 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           ),
                         ),
                         Expanded(
-                          child: Actions(
-                            actions: <Type, Action<Intent>>{
-                              DirectionalFocusIntent:
-                                  CallbackAction<DirectionalFocusIntent>(
-                                onInvoke: (intent) {
-                                  if (intent.direction ==
-                                          TraversalDirection.up ||
-                                      intent.direction ==
-                                          TraversalDirection.down) {
-                                    FocusScope.of(context)
-                                        .focusInDirection(intent.direction);
-                                    return null;
-                                  }
-                                  return null;
-                                },
-                              ),
+                          child: Focus(
+                            focusNode: _sliderFocusNode,
+                            descendantsAreFocusable: false,
+                            onKeyEvent: (node, event) {
+                              if (event is! KeyDownEvent) {
+                                return KeyEventResult.ignored;
+                              }
+
+                              if (event.logicalKey ==
+                                  LogicalKeyboardKey.arrowUp) {
+                                _playPauseFocusNode.requestFocus();
+                                return KeyEventResult.handled;
+                              }
+
+                              if (event.logicalKey ==
+                                  LogicalKeyboardKey.arrowLeft) {
+                                final newPos =
+                                    _position - const Duration(seconds: 10);
+                                _player.seek(newPos < Duration.zero
+                                    ? Duration.zero
+                                    : newPos);
+                                _resetControlsTimer();
+                                return KeyEventResult.handled;
+                              }
+
+                              if (event.logicalKey ==
+                                  LogicalKeyboardKey.arrowRight) {
+                                final newPos =
+                                    _position + const Duration(seconds: 10);
+                                if (newPos < _duration) _player.seek(newPos);
+                                _resetControlsTimer();
+                                return KeyEventResult.handled;
+                              }
+
+                              return KeyEventResult.ignored;
                             },
-                            child: Shortcuts(
-                              shortcuts: <LogicalKeySet, Intent>{
-                                LogicalKeySet(LogicalKeyboardKey.arrowUp):
-                                    const DirectionalFocusIntent(
-                                  TraversalDirection.up,
-                                ),
-                                LogicalKeySet(LogicalKeyboardKey.arrowDown):
-                                    const DirectionalFocusIntent(
-                                  TraversalDirection.down,
-                                ),
+                            child: Slider(
+                              value: _position.inSeconds
+                                  .toDouble()
+                                  .clamp(0, _duration.inSeconds.toDouble()),
+                              min: 0.0,
+                              max: _duration.inSeconds.toDouble(),
+                              onChanged: (value) {
+                                _player.seek(Duration(seconds: value.toInt()));
+                                _resetControlsTimer();
                               },
-                              child: Slider(
-                                value: _position.inSeconds
-                                    .toDouble()
-                                    .clamp(0, _duration.inSeconds.toDouble()),
-                                min: 0.0,
-                                max: _duration.inSeconds.toDouble(),
-                                onChanged: (value) {
-                                  _player
-                                      .seek(Duration(seconds: value.toInt()));
-                                  _resetControlsTimer();
-                                },
-                                activeColor: AppColors.primary,
-                                inactiveColor: Colors.white24,
-                              ),
+                              activeColor: AppColors.primary,
+                              inactiveColor: Colors.white24,
                             ),
                           ),
                         ),

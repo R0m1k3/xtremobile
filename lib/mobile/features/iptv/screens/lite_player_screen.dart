@@ -71,6 +71,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   bool _isStabilizing = false;
   Timer? _stabilizationTimer;
   Timer? _controlsTimer;
+  int _loadId = 0;
 
   // Focus
   final FocusNode _playPauseFocusNode = FocusNode();
@@ -164,7 +165,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       _isLoading = true;
       _errorMessage = null;
       _isStabilizing = true;
+      _loadId++;
     });
+
+    final currentLoadId = _loadId;
 
     try {
       final currentStreamId =
@@ -215,7 +219,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       _resetControlsTimer();
       controller.addListener(_videoListener);
     } catch (e) {
-      if (mounted)
+      if (mounted && currentLoadId == _loadId)
         setState(() {
           _isLoading = false;
           _errorMessage = "Playback Error: $e";
@@ -235,6 +239,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     // Force hide loader immediately when playing
     if (value.isPlaying) {
       if (_isLoading) setState(() => _isLoading = false);
+      if (_errorMessage != null) setState(() => _errorMessage = null);
       if (_isStabilizing) _isStabilizing = false;
       _stabilizationTimer?.cancel();
     } else {
