@@ -241,20 +241,25 @@ class XtreamServiceMobile {
       final Map<String, List<Channel>> groupedChannels = {};
 
       for (final streamData in streams) {
-        final data = streamData as Map<String, dynamic>;
-        // Get category name from our mapping using category_id
-        final categoryId = data['category_id']?.toString() ?? '';
-        final categoryName = categoryMap[categoryId] ?? 'Uncategorized';
+        try {
+          final data = streamData as Map<String, dynamic>;
+          // Get category name from our mapping using category_id
+          final categoryId = data['category_id']?.toString() ?? '';
+          final categoryName = categoryMap[categoryId] ?? 'Uncategorized';
 
-        // Inject category_name into data before parsing
-        data['category_name'] = categoryName;
+          // Inject category_name into data before parsing
+          data['category_name'] = categoryName;
 
-        final channel = Channel.fromJson(data);
+          final channel = Channel.fromJson(data);
 
-        if (!groupedChannels.containsKey(categoryName)) {
-          groupedChannels[categoryName] = [];
+          if (!groupedChannels.containsKey(categoryName)) {
+            groupedChannels[categoryName] = [];
+          }
+          groupedChannels[categoryName]!.add(channel);
+        } catch (e) {
+          // Skip malformed channel
+          continue;
         }
-        groupedChannels[categoryName]!.add(channel);
       }
 
       return groupedChannels;
@@ -371,13 +376,19 @@ class XtreamServiceMobile {
 
       final paginatedMovies = allMovies.sublist(offset, endIndex);
 
-      return paginatedMovies.map((movieData) {
-        final data =
-            Map<String, dynamic>.from(movieData as Map<String, dynamic>);
-        final categoryId = data['category_id']?.toString() ?? '';
-        data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
-        return xm.Movie.fromJson(data);
-      }).toList();
+      final List<xm.Movie> movies = [];
+      for (final movieData in paginatedMovies) {
+        try {
+          final data =
+              Map<String, dynamic>.from(movieData as Map<String, dynamic>);
+          final categoryId = data['category_id']?.toString() ?? '';
+          data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
+          movies.add(xm.Movie.fromJson(data));
+        } catch (e) {
+          continue;
+        }
+      }
+      return movies;
     } catch (e) {
       throw Exception('Failed to fetch movies: $e');
     }
@@ -403,14 +414,20 @@ class XtreamServiceMobile {
       );
 
       if (response.data is! List) return [];
-      final List<dynamic> movies = response.data as List<dynamic>;
+      final List<dynamic> moviesRaw = response.data as List<dynamic>;
 
-      return movies.map((movieData) {
-        final data =
-            Map<String, dynamic>.from(movieData as Map<String, dynamic>);
-        data['category_name'] = categoryName;
-        return xm.Movie.fromJson(data);
-      }).toList();
+      final List<xm.Movie> movies = [];
+      for (final movieData in moviesRaw) {
+        try {
+          final data =
+              Map<String, dynamic>.from(movieData as Map<String, dynamic>);
+          data['category_name'] = categoryName;
+          movies.add(xm.Movie.fromJson(data));
+        } catch (e) {
+          continue;
+        }
+      }
+      return movies;
     } catch (e) {
       // Return empty list instead of throwing to prevent UI crash
       return [];
@@ -440,19 +457,21 @@ class XtreamServiceMobile {
       final queryLower = query.toLowerCase();
 
       // Filter by search query
-      return allMovies
-          .where((m) {
-            final name = (m['name']?.toString() ?? '').toLowerCase();
-            return name.contains(queryLower);
-          })
-          .take(100) // Limit results
-          .map((movieData) {
-            final data = movieData as Map<String, dynamic>;
-            final categoryId = data['category_id']?.toString() ?? '';
-            data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
-            return xm.Movie.fromJson(data);
-          })
-          .toList();
+      final List<xm.Movie> results = [];
+      for (final movieData in allMovies.where((m) {
+        final name = (m['name']?.toString() ?? '').toLowerCase();
+        return name.contains(queryLower);
+      }).take(100)) {
+        try {
+          final data = movieData as Map<String, dynamic>;
+          final categoryId = data['category_id']?.toString() ?? '';
+          data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
+          results.add(xm.Movie.fromJson(data));
+        } catch (e) {
+          continue;
+        }
+      }
+      return results;
     } catch (e) {
       return [];
     }
@@ -502,13 +521,19 @@ class XtreamServiceMobile {
 
       final paginatedSeries = allSeries.sublist(offset, endIndex);
 
-      return paginatedSeries.map((seriesData) {
-        final data =
-            Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
-        final categoryId = data['category_id']?.toString() ?? '';
-        data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
-        return xm.Series.fromJson(data);
-      }).toList();
+      final List<xm.Series> seriesList = [];
+      for (final seriesData in paginatedSeries) {
+        try {
+          final data =
+              Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
+          final categoryId = data['category_id']?.toString() ?? '';
+          data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
+          seriesList.add(xm.Series.fromJson(data));
+        } catch (e) {
+          continue;
+        }
+      }
+      return seriesList;
     } catch (e) {
       throw Exception('Failed to fetch series: $e');
     }
@@ -537,19 +562,21 @@ class XtreamServiceMobile {
       final queryLower = query.toLowerCase();
 
       // Filter by search query
-      return allSeries
-          .where((s) {
-            final name = (s['name']?.toString() ?? '').toLowerCase();
-            return name.contains(queryLower);
-          })
-          .take(100) // Limit results
-          .map((seriesData) {
-            final data = seriesData as Map<String, dynamic>;
-            final categoryId = data['category_id']?.toString() ?? '';
-            data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
-            return xm.Series.fromJson(data);
-          })
-          .toList();
+      final List<xm.Series> results = [];
+      for (final seriesData in allSeries.where((s) {
+        final name = (s['name']?.toString() ?? '').toLowerCase();
+        return name.contains(queryLower);
+      }).take(100)) {
+        try {
+          final data = seriesData as Map<String, dynamic>;
+          final categoryId = data['category_id']?.toString() ?? '';
+          data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
+          results.add(xm.Series.fromJson(data));
+        } catch (e) {
+          continue;
+        }
+      }
+      return results;
     } catch (e) {
       return [];
     }

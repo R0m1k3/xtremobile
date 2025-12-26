@@ -8,7 +8,7 @@ import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import '../../../providers/mobile_xtream_providers.dart';
-import '../../../../features/iptv/services/xtream_service_mobile.dart';
+
 import '../screens/native_player_screen.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {

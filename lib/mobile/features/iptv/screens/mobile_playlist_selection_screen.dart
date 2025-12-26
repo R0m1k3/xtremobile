@@ -37,9 +37,8 @@ class _MobilePlaylistSelectionScreenState
 
   Future<void> _checkAutoLogin() async {
     final playlists = await ref.read(playlistsProvider.future);
-    if (playlists.isNotEmpty && mounted) {
-      // Auto-login to the first playlist (or last used)
-      // Ideally last used, but for now first is fine as per request "une playlist existe".
+    // Only auto-login if there is exactly ONE playlist
+    if (playlists.length == 1 && mounted) {
       context.go('/dashboard', extra: playlists.first);
     }
   }

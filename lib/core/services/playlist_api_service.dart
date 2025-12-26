@@ -7,9 +7,7 @@ class PlaylistApiService {
   /// Get all playlists for current user
   Future<List<PlaylistConfig>> getPlaylists() async {
     try {
-      if (!HiveService.playlistsBox.isOpen) {
-        await HiveService.init();
-      }
+      await HiveService.init();
       return HiveService.playlistsBox.values.toList();
     } catch (e) {
       print('Error fetching playlists from Hive: $e');
@@ -25,6 +23,7 @@ class PlaylistApiService {
     required String password,
   }) async {
     try {
+      await HiveService.init();
       final id = const Uuid().v4();
       final playlist = PlaylistConfig(
         id: id,
@@ -52,6 +51,7 @@ class PlaylistApiService {
     required String password,
   }) async {
     try {
+      await HiveService.init();
       if (!HiveService.playlistsBox.containsKey(id)) {
         return null;
       }
@@ -79,6 +79,7 @@ class PlaylistApiService {
   /// Delete a playlist
   Future<bool> deletePlaylist(String id) async {
     try {
+      await HiveService.init();
       await HiveService.playlistsBox.delete(id);
       return true;
     } catch (e) {

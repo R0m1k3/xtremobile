@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../theme/mobile_theme.dart';
-import '../../../services/local_playlist_service.dart';
+import '../../../../core/services/playlist_api_service.dart';
 import 'mobile_dashboard_screen.dart';
 
 /// Provider for local playlists
 final localPlaylistsProvider =
     FutureProvider<List<PlaylistConfig>>((ref) async {
-  final service = LocalPlaylistService();
+  final service = PlaylistApiService();
   return service.getPlaylists();
 });
 
@@ -24,12 +24,12 @@ class MobilePlaylistScreen extends ConsumerStatefulWidget {
 }
 
 class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
-  final LocalPlaylistService _playlistService = LocalPlaylistService();
+  final PlaylistApiService _playlistService = PlaylistApiService();
 
   @override
   void initState() {
     super.initState();
-    _playlistService.init();
+    // _playlistService.init(); // PlaylistAPI service inits internally via HiveService
 
     // Auto-login: if playlists exist, navigate to first one automatically
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -40,7 +40,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
   Future<void> _checkAutoLogin() async {
     try {
       final playlists = await _playlistService.getPlaylists();
-      if (playlists.isNotEmpty && mounted) {
+      if (playlists.length == 1 && mounted) {
         // Navigate to first playlist automatically
         _navigateToDashboard(playlists.first);
       }
@@ -211,7 +211,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                             password: passwordController.text.trim(),
                           );
                         } else {
-                          await _playlistService.addPlaylist(
+                          await _playlistService.createPlaylist(
                             name: nameController.text.trim(),
                             dns: dns,
                             username: usernameController.text.trim(),

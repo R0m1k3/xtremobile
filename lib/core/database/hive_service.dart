@@ -20,8 +20,13 @@ class HiveService {
     await Hive.initFlutter();
 
     // Register adapters
-    Hive.registerAdapter(AppUserAdapter());
-    Hive.registerAdapter(PlaylistConfigAdapter());
+    // Register adapters
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(AppUserAdapter());
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(PlaylistConfigAdapter());
+    }
 
     // Open boxes WITHOUT encryption on Web
     // Note: On Web, IndexedDB is already isolated by origin,
