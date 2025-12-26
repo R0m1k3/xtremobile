@@ -185,9 +185,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // VOD PROFILE: Max stability, large buffer
       // VOD PROFILE: Max stability, moderate buffer (reduced from 100MB to fix startup heap issues)
       debugPrint('MediaKitPlayer: Applying VOD optimization profile (FIX)');
-      (_player.platform as dynamic)?.setProperty('cache-secs', '50');
+      (_player.platform as dynamic)?.setProperty('cache-secs', '100');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', '50000000'); // 50MB
+          ?.setProperty('demuxer-max-bytes', '100000000'); // 100MB
       (_player.platform as dynamic)
           ?.setProperty('demuxer-readahead-secs', '60');
       (_player.platform as dynamic)
@@ -356,13 +356,26 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       });
     });
 
-    // Listen for stream completion (live streams shouldn't complete - means it stopped)
+    // Listen for stream completion
     _player.stream.completed.listen((completed) {
-      if (completed && mounted && widget.streamType == StreamType.live) {
-        debugPrint(
-          'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...',
-        );
-        _attemptReconnect();
+      if (completed && mounted) {
+        // Logic for Live TV
+        if (widget.streamType == StreamType.live) {
+          debugPrint(
+            'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...',
+          );
+          _attemptReconnect();
+        }
+        // Logic for VOD/Series: Check if really finished or cut off
+        else if (_duration.inSeconds > 0) {
+          final progress = _position.inSeconds / _duration.inSeconds;
+          if (progress < 0.95) {
+            debugPrint(
+              'MediaKitPlayer: VOD stopped prematurely at ${(progress * 100).toStringAsFixed(1)}%, attempting reconnect...',
+            );
+            _attemptReconnect();
+          }
+        }
       }
     });
 
@@ -568,7 +581,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Delay before reconnect to avoid hammering the server
     Future.delayed(Duration(seconds: 2 * _reconnectAttempts), () {
       if (mounted) {
-        _loadStream();
+        // If VOD/Series, try to resume from current position
+        if (widget.streamType != StreamType.live && _position.inSeconds > 0) {
+          _loadStream(startAt: _position);
+        } else {
+          _loadStream();
+        }
       }
     });
   }
@@ -651,7 +669,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   // ... (existing initState)
 
-  Future<void> _loadStream() async {
+  Future<void> _loadStream({Duration? startAt}) async {
     try {
       if (_xtreamService == null) return;
 
@@ -719,8 +737,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Resume from saved position (VOD/Series only)
       if (widget.streamType != StreamType.live) {
+        // Priority 0: Explicit reconnect position (passed from _attemptReconnect)
+        if (startAt != null && startAt.inSeconds > 0) {
+          debugPrint(
+            'MediaKitPlayer: Resuming after reconnect at: ${startAt.inSeconds}s',
+          );
+          _seekToResume(startAt.inSeconds);
+        }
         // Priority 1: Explicit initial position passed from caller verification
-        if (widget.initialPosition != null &&
+        else if (widget.initialPosition != null &&
             widget.initialPosition!.inSeconds > 0) {
           debugPrint(
             'MediaKitPlayer: Using explicit initial position: ${widget.initialPosition!.inSeconds}s',
