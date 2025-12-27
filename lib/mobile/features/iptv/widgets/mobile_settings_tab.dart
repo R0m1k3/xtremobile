@@ -102,7 +102,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.5.0',
+                      'Version 1.5.1',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -173,6 +173,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             label: 'TV en Direct',
             hint: 'Ex: FR, HD, SPORT',
             icon: Icons.live_tv,
+            currentKeywords: settings.liveTvKeywords,
             controller: _liveTvController,
             onChanged: (val) {
               ref
@@ -185,6 +186,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             label: 'Films',
             hint: 'Ex: FR, VF, 4K',
             icon: Icons.movie,
+            currentKeywords: settings.moviesKeywords,
             controller: _moviesController,
             onChanged: (val) {
               ref
@@ -197,6 +199,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             label: 'Séries',
             hint: 'Ex: FR, VF',
             icon: Icons.tv,
+            currentKeywords: settings.seriesKeywords,
             controller: _seriesController,
             onChanged: (val) {
               ref
@@ -393,9 +396,15 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     required String label,
     required String hint,
     required IconData icon,
+    required List<String> currentKeywords,
     required TextEditingController controller,
     required ValueChanged<String> onChanged,
   }) {
+    final hasFilters = currentKeywords.isNotEmpty;
+    final subtitle = hasFilters
+        ? currentKeywords.join(', ')
+        : 'Aucun filtre (Tout afficher)';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TVFocusable(
@@ -427,12 +436,14 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      controller.text.isEmpty ? hint : controller.text,
+                      subtitle,
                       style: TextStyle(
-                        color: controller.text.isEmpty
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary,
+                        color: hasFilters
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
                         fontSize: 12,
+                        fontWeight:
+                            hasFilters ? FontWeight.w600 : FontWeight.normal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

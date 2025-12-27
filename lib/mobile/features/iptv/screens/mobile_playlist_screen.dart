@@ -134,6 +134,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     onSubmitted: () =>
                         FocusScope.of(context).requestFocus(dnsFocus),
                     focusNode: nameFocus,
+                    nextFocus: dnsFocus,
                   ),
 
                   const SizedBox(height: 16),
@@ -147,6 +148,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     onSubmitted: () =>
                         FocusScope.of(context).requestFocus(usernameFocus),
                     focusNode: dnsFocus,
+                    nextFocus: usernameFocus,
+                    prevFocus: nameFocus,
                   ),
 
                   const SizedBox(height: 16),
@@ -159,6 +162,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     onSubmitted: () =>
                         FocusScope.of(context).requestFocus(passwordFocus),
                     focusNode: usernameFocus,
+                    nextFocus: passwordFocus,
+                    prevFocus: dnsFocus,
                   ),
 
                   const SizedBox(height: 16),
@@ -172,6 +177,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                     onSubmitted: () =>
                         FocusScope.of(context).requestFocus(buttonFocus),
                     focusNode: passwordFocus,
+                    nextFocus: buttonFocus,
+                    prevFocus: usernameFocus,
                   ),
 
                   const SizedBox(height: 32),
@@ -262,6 +269,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     TextInputAction? textAction,
     VoidCallback? onSubmitted,
     FocusNode? focusNode, // This is now the "navigation" focus
+    FocusNode? nextFocus,
+    FocusNode? prevFocus,
   }) {
     // Create a dedicated internal focus node for the actual TextField
     // We don't expose this, allowing us to control when the keyboard opens
@@ -280,6 +289,8 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
       textAction: textAction,
       onSubmitted: onSubmitted,
       navigationFocus: focusNode,
+      nextFocus: nextFocus,
+      prevFocus: prevFocus,
     );
   }
 
@@ -599,6 +610,8 @@ class _TVTextField extends StatefulWidget {
   final TextInputAction? textAction;
   final VoidCallback? onSubmitted;
   final FocusNode? navigationFocus;
+  final FocusNode? nextFocus;
+  final FocusNode? prevFocus;
 
   const _TVTextField({
     required this.controller,
@@ -610,6 +623,8 @@ class _TVTextField extends StatefulWidget {
     this.textAction,
     this.onSubmitted,
     this.navigationFocus,
+    this.nextFocus,
+    this.prevFocus,
   });
 
   @override
@@ -665,6 +680,14 @@ class _TVTextFieldState extends State<_TVTextField> {
               key == LogicalKeyboardKey.gameButtonA ||
               key == LogicalKeyboardKey.numpadEnter) {
             _activateInput();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowDown && widget.nextFocus != null) {
+            widget.nextFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowUp && widget.prevFocus != null) {
+            widget.prevFocus!.requestFocus();
             return KeyEventResult.handled;
           }
         }
