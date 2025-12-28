@@ -164,8 +164,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       debugPrint(
         'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)',
       );
-      (_player.platform as dynamic)
-          ?.setProperty('cache-secs', '15'); // 15s cache
+      (_player.platform as dynamic)?.setProperty(
+          'cache-secs', '10'); // Reduced to 10s for faster startup
       (_player.platform as dynamic)?.setProperty(
         'demuxer-max-bytes',
         '32000000',
@@ -177,10 +177,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Ensure temp files are cleaned up
       (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
 
-      // ALWAYS wait for buffer fill to prevent glitches
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
-      (_player.platform as dynamic)
-          ?.setProperty('cache-pause-wait', '6'); // Wait 6s max
+      // Startup Speed: Disable initial cache pause to allow immediate playback
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+      // (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3');
     } else {
       // VOD PROFILE: Max stability, large buffer
       // VOD PROFILE: Max stability, moderate buffer (reduced from 100MB to fix startup heap issues)
@@ -224,7 +223,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Removed: force-seekable and live_start_index=-1 which caused rollbacks
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=5000000,probesize=2000000',
+      'analyzeduration=2000000,probesize=1000000',
     );
 
     // Optimized for performance and stability on progressive & interlaced streams
@@ -424,14 +423,24 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
-      _player.pause();
+      if (widget.streamType == StreamType.live) {
+        // Force stop for Live TV
+        _player.stop();
+      } else {
+        _player.pause();
+      }
+
+      // Exit player screen so user returns to dashboard on resume
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
   @override
   void dispose() {
     // Remove lifecycle observer
-    // WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
 
     // Unregister keyboard handler
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);

@@ -104,6 +104,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _controller?.pause();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 

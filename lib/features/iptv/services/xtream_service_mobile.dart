@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
 import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
@@ -440,30 +441,29 @@ class XtreamServiceMobile {
     if (query.isEmpty) return [];
 
     try {
-      final categoryMap = await getVodCategories();
+      // Ensure data is loaded in cache
+      if (_cachedMoviesRaw == null) {
+        await getMoviesPaginated(limit: 1);
+      }
 
-      final response = await _dio.get(
-        _effectiveApiBaseUrl,
-        queryParameters: {
-          'username': _currentPlaylist!.username,
-          'password': _currentPlaylist!.password,
-          'action': 'get_vod_streams',
-        },
-        options: _getOptions(),
-      );
+      final allMovies = _cachedMoviesRaw ?? [];
+      final categoryMap = _cachedVodCategories ?? await getVodCategories();
 
-      if (response.data is! List) return [];
-      final List<dynamic> allMovies = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
 
-      // Filter by search query
+      // Filter by search query (Local Cache)
       final List<xm.Movie> results = [];
-      for (final movieData in allMovies.where((m) {
+
+      // Efficient filtering: check name matches, limited to 100 results
+      final matches = allMovies.where((m) {
         final name = (m['name']?.toString() ?? '').toLowerCase();
         return name.contains(queryLower);
-      }).take(100)) {
+      }).take(100);
+
+      for (final movieData in matches) {
         try {
-          final data = movieData as Map<String, dynamic>;
+          final data =
+              Map<String, dynamic>.from(movieData as Map<String, dynamic>);
           final categoryId = data['category_id']?.toString() ?? '';
           data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
           results.add(xm.Movie.fromJson(data));
@@ -473,6 +473,7 @@ class XtreamServiceMobile {
       }
       return results;
     } catch (e) {
+      debugPrint('Search error: $e');
       return [];
     }
   }
@@ -545,30 +546,29 @@ class XtreamServiceMobile {
     if (query.isEmpty) return [];
 
     try {
-      final categoryMap = await _getSeriesCategories();
+      // Ensure data is loaded in cache
+      if (_cachedSeriesRaw == null) {
+        await getSeriesPaginated(limit: 1);
+      }
 
-      final response = await _dio.get(
-        _effectiveApiBaseUrl,
-        queryParameters: {
-          'username': _currentPlaylist!.username,
-          'password': _currentPlaylist!.password,
-          'action': 'get_series',
-        },
-        options: _getOptions(),
-      );
+      final allSeries = _cachedSeriesRaw ?? [];
+      final categoryMap =
+          _cachedSeriesCategories ?? await _getSeriesCategories();
 
-      if (response.data is! List) return [];
-      final List<dynamic> allSeries = response.data as List<dynamic>;
       final queryLower = query.toLowerCase();
 
-      // Filter by search query
+      // Filter by search query (Local Cache)
       final List<xm.Series> results = [];
-      for (final seriesData in allSeries.where((s) {
+
+      final matches = allSeries.where((s) {
         final name = (s['name']?.toString() ?? '').toLowerCase();
         return name.contains(queryLower);
-      }).take(100)) {
+      }).take(100);
+
+      for (final seriesData in matches) {
         try {
-          final data = seriesData as Map<String, dynamic>;
+          final data =
+              Map<String, dynamic>.from(seriesData as Map<String, dynamic>);
           final categoryId = data['category_id']?.toString() ?? '';
           data['category_name'] = categoryMap[categoryId] ?? 'Uncategorized';
           results.add(xm.Series.fromJson(data));
@@ -578,6 +578,7 @@ class XtreamServiceMobile {
       }
       return results;
     } catch (e) {
+      debugPrint('Search series error: $e');
       return [];
     }
   }
