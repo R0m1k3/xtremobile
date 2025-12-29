@@ -391,8 +391,10 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                     fontSize: 14,
                                     color: AppColors.textPrimary,
                                   ),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Rechercher un film...',
+                                  decoration: InputDecoration(
+                                    hintText: _selectedCategoryId != null
+                                        ? 'Recherche Globale (Tout le catalogue)'
+                                        : 'Rechercher un film...',
                                     border: InputBorder.none,
                                     focusedBorder: InputBorder.none,
                                     enabledBorder: InputBorder.none,
