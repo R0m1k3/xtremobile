@@ -11,7 +11,7 @@ import 'package:xtremflow/core/models/playlist_config.dart';
 import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/mobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremflow/features/iptv/screens/native_player_screen.dart';
 import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
 

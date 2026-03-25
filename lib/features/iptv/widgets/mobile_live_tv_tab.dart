@@ -12,7 +12,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/api/dns_resolver.dart';
 import '../../../theme/mobile_theme.dart';
 import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
-import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
+import 'package:xtremflow/features/iptv/screens/lite_player_screen.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/ip_service.dart';
 

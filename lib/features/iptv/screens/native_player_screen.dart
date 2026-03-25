@@ -12,7 +12,7 @@ import 'package:xtremflow/core/models/playlist_config.dart';
 import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/mobile/features/iptv/screens/lite_player_screen.dart';
+import 'package:xtremflow/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
 
