@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../utils/image_cache_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
@@ -104,9 +105,15 @@ class _HeroCarouselState extends State<HeroCarousel> {
                       fit: StackFit.expand,
                       children: [
                         // Background Image
+                        // [P1-2 FIX] Optimize carousel image cache (500x300 display)
                         CachedNetworkImage(
                           imageUrl: item.imageUrl,
                           fit: BoxFit.cover,
+                          memCacheWidth: 600,
+                          memCacheHeight: 360,
+                          maxWidthDiskCache: 600,
+                          maxHeightDiskCache: 360,
+                          cacheManager: AppCacheManager.instance,
                           placeholder: (context, url) => Container(color: AppColors.surfaceVariant),
                           errorWidget: (context, url, error) => Container(
                             color: AppColors.surfaceVariant,

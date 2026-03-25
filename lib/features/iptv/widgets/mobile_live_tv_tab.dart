@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/utils/image_cache_config.dart';
 import 'dart:io';
 import '../../../providers/mobile_xtream_providers.dart';
 import '../../../providers/mobile_settings_providers.dart';
@@ -622,11 +623,17 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                 child: Stack(
                   children: [
                     // Logo
+                    // [P1-2 FIX] Optimize channel icon cache (40x40 display)
                     Center(
                       child: iconUrl != null
                           ? CachedNetworkImage(
                               imageUrl: iconUrl,
                               fit: BoxFit.contain,
+                              memCacheWidth: 50,
+                              memCacheHeight: 50,
+                              maxWidthDiskCache: 50,
+                              maxHeightDiskCache: 50,
+                              cacheManager: AppCacheManager.instance,
                               errorWidget: (_, __, ___) => const Icon(
                                 Icons.tv,
                                 color: Colors.white38,

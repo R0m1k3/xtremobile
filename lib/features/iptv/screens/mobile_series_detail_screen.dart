@@ -7,6 +7,7 @@ import '../../../providers/mobile_xtream_providers.dart';
 import '../../../providers/mobile_settings_providers.dart';
 import 'native_player_screen.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_cache_config.dart';
 
 class MobileSeriesDetailScreen extends ConsumerStatefulWidget {
   final Series series;
@@ -137,9 +138,15 @@ class _MobileSeriesDetailScreenState
               fit: StackFit.expand,
               children: [
                 if (_seriesInfo!.cover != null)
+                  // [P1-2 FIX] Optimize series cover image cache (400x600 display)
                   CachedNetworkImage(
                     imageUrl: _seriesInfo!.cover!,
                     fit: BoxFit.cover,
+                    memCacheWidth: 480,
+                    memCacheHeight: 720,
+                    maxWidthDiskCache: 480,
+                    maxHeightDiskCache: 720,
+                    cacheManager: AppCacheManager.instance,
                     errorWidget: (_, __, ___) =>
                         Container(color: Colors.grey.shade900),
                   ),
