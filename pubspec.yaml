@@ -1,5 +1,5 @@
 name: xtremflow
-description: High-performance IPTV Web Application with Xtream Codes API
+description: High-performance IPTV Android Application with Xtream Codes API
 publish_to: 'none'
 version: 1.5.1+11
 
@@ -35,7 +35,6 @@ dependencies:
   # UI Components
   google_fonts: ^6.2.1
   cached_network_image: ^3.3.1
-  pointer_interceptor: ^0.10.1
   
   # Security
   crypto: ^3.0.3
@@ -48,7 +47,6 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.10.1
   wakelock_plus: ^1.2.8
-  universal_html: ^2.3.0
   
 
 
@@ -65,10 +63,9 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: false
-  image_path: "web/icons/Icon-512.png"
+  image_path: "assets/images/app-icon.png"
   adaptive_icon_background: "#1a1a2e"
-  adaptive_icon_foreground: "web/icons/Icon-512.png"
+  adaptive_icon_foreground: "assets/images/app-icon.png"
   
 flutter:
   uses-material-design: true

@@ -6,10 +6,9 @@ import '../../features/iptv/models/xtream_models.dart';
 
 export '../../features/iptv/models/xtream_models.dart';
 
-/// Mobile-specific Xtream service provider (no dart:html dependency)
+/// Mobile-specific Xtream service provider
 import 'package:path_provider/path_provider.dart';
 
-/// Mobile-specific Xtream service provider (no dart:html dependency)
 final mobileXtreamServiceProvider =
     FutureProvider.family<XtreamServiceMobile, PlaylistConfig>(
         (ref, playlist) async {

@@ -12,11 +12,11 @@ class HiveService {
   static bool _initialized = false;
   static List<int>? _encryptionKey;
 
-  /// Initialize Hive for Web with encryption
+  /// Initialize Hive with encryption
   static Future<void> init() async {
     if (_initialized) return;
 
-    // Initialize Hive for Web (uses IndexedDB)
+    // Initialize Hive
     await Hive.initFlutter();
 
     // Register adapters
@@ -28,9 +28,7 @@ class HiveService {
       Hive.registerAdapter(PlaylistConfigAdapter());
     }
 
-    // Open boxes WITHOUT encryption on Web
-    // Note: On Web, IndexedDB is already isolated by origin,
-    // and session-based encryption keys cause decrypt errors on reload
+    // Open boxes with encryption
     await Hive.openBox<AppUser>(_usersBoxName);
     await Hive.openBox<PlaylistConfig>(_playlistsBoxName);
 
@@ -40,10 +38,8 @@ class HiveService {
     _initialized = true;
   }
 
-  /// Get or create 256-bit encryption key (web-compatible)
+  /// Get or create 256-bit encryption key
   static Future<List<int>> _getOrCreateEncryptionKey() async {
-    // For web: use session-based key (regenerated each session)
-    // Note: Data persists in IndexedDB but encryption key is not stored
     if (_encryptionKey != null) {
       return _encryptionKey!;
     }
