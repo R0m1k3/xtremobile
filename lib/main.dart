@@ -26,15 +26,19 @@ void main() async {
   await HiveService.init();
   StartupProfiler.mark('hive_init');
 
-  // CLEAR CACHE ON STARTUP (Requested by User)
+  // [P0-2 FIX] Implement TTL-based cache instead of destructive clearing
+  // Cache is now persistent with TTL:
+  // - Channel/category lists: 6 hours
+  // - EPG data: 1 hour
+  // - Search results: 30 minutes
+  // Manual cache refresh is available in settings if needed
   try {
-    // Clear API/EPG Cache (using default box name 'dio_cache')
-    await Hive.deleteBoxFromDisk('dio_cache');
-    debugPrint('XtremFlow: API Cache cleared');
+    await HiveService.invalidateExpiredCache();
+    debugPrint('XtremFlow: Expired cache entries invalidated (TTL-based)');
   } catch (e) {
-    debugPrint('XtremFlow: Failed to clear cache: $e');
+    debugPrint('XtremFlow: Cache maintenance skipped: $e');
   }
-  StartupProfiler.mark('cache_clear');
+  StartupProfiler.mark('cache_check');
 
   await StartupProfiler.reportAll();
 

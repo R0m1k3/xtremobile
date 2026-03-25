@@ -93,3 +93,35 @@ class LiveTvUiState {
 
 /// Persistent index for mobile dashboard navigation
 final mobileDashboardIndexProvider = StateProvider<int>((ref) => 0);
+
+/// [P0-1 FIX] Batch EPG provider - Load all EPG data for multiple channels at once
+/// This prevents the N+1 query problem where each channel card makes its own EPG request
+class BatchEpgRequest {
+  final PlaylistConfig playlist;
+  final List<String> streamIds;
+
+  BatchEpgRequest({required this.playlist, required this.streamIds});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BatchEpgRequest &&
+          runtimeType == other.runtimeType &&
+          playlist == other.playlist &&
+          streamIds.toSet() == other.streamIds.toSet();
+
+  @override
+  int get hashCode => playlist.hashCode ^ streamIds.toSet().hashCode;
+}
+
+/// Load EPG data for multiple streams in one batch request
+/// Cache is automatically handled by the service with 1-hour TTL
+final mobileBatchEpgProvider =
+    FutureProvider.family<Map<String, ShortEpg>, BatchEpgRequest>(
+        (ref, request) async {
+  if (request.streamIds.isEmpty) return {};
+
+  final service =
+      await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
+  return service.getBatchEPG(request.streamIds);
+});

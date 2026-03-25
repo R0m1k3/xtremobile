@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import '../models/app_user.dart';
 import '../models/playlist_config.dart';
 
@@ -110,6 +111,75 @@ class HiveService {
   /// Get playlists box
   static Box<PlaylistConfig> get playlistsBox =>
       Hive.box<PlaylistConfig>(_playlistsBoxName);
+
+  /// [P0-2 FIX] Invalidate expired cache entries based on TTL
+  /// Instead of clearing entire cache on startup, use TTL-based invalidation
+  /// This preserves cache data between app launches while removing stale entries
+  static Future<void> invalidateExpiredCache() async {
+    try {
+      final cacheBox = Hive.box('dio_cache');
+
+      // TTL configuration (in seconds)
+      const Map<String, int> cacheTtl = {
+        'channels': 6 * 3600,      // 6 hours for channel lists
+        'epg': 3600,               // 1 hour for EPG data
+        'categories': 6 * 3600,    // 6 hours for categories
+        'search': 1800,            // 30 minutes for search results
+        'default': 6 * 3600,       // 6 hours default
+      };
+
+      int expired = 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      for (var key in cacheBox.keys.toList()) {
+        try {
+          final entry = cacheBox.get(key);
+
+          if (entry is Map && entry.containsKey('timestamp')) {
+            final timestamp = entry['timestamp'] as int;
+            final category = _getCacheCategory(key.toString());
+            final ttl = cacheTtl[category] ?? cacheTtl['default']!;
+
+            // If entry is older than TTL, delete it
+            if ((now - timestamp) > (ttl * 1000)) {
+              await cacheBox.delete(key);
+              expired++;
+            }
+          }
+        } catch (e) {
+          // Skip malformed entries
+        }
+      }
+
+      if (expired > 0) {
+        debugPrint('🗑️  Invalidated $expired expired cache entries');
+      } else {
+        debugPrint('✅ All cache entries valid (within TTL)');
+      }
+    } catch (e) {
+      // Cache box might not exist - that's OK on first startup
+      debugPrint('ℹ️  Cache maintenance: $e');
+    }
+  }
+
+  /// Determine cache category from key for TTL lookup
+  static String _getCacheCategory(String key) {
+    if (key.contains('live') || key.contains('channel')) return 'channels';
+    if (key.contains('epg') || key.contains('now_playing')) return 'epg';
+    if (key.contains('category')) return 'categories';
+    if (key.contains('search')) return 'search';
+    return 'default';
+  }
+
+  /// Manually clear cache (for settings option)
+  static Future<void> clearCache() async {
+    try {
+      await Hive.deleteBoxFromDisk('dio_cache');
+      debugPrint('🗑️  Cache manually cleared by user');
+    } catch (e) {
+      debugPrint('❌ Failed to clear cache: $e');
+    }
+  }
 
   /// Close all boxes (cleanup)
   static Future<void> dispose() async {

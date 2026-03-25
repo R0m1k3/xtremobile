@@ -459,6 +459,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _player.stop();
     _player.dispose();
     _xtreamService?.dispose();
+
+    // [P1-3 FIX] Dispose all focus nodes ONCE (was being disposed twice, causing crash)
     _playPauseFocusNode.dispose();
     _prevFocusNode.dispose();
     _nextFocusNode.dispose();
@@ -474,12 +476,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-    // Dispose focus nodes
-    _playPauseFocusNode.dispose();
-    _prevFocusNode.dispose();
-    _nextFocusNode.dispose();
-    _backFocusNode.dispose();
 
     super.dispose();
   }

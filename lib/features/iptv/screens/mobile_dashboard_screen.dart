@@ -28,25 +28,10 @@ class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mobileDashboardIndexProvider);
 
-    // Determine which tab to show
-    Widget currentTab;
-    switch (currentIndex) {
-      case 0:
-        currentTab = MobileLiveTVTab(playlist: widget.playlist);
-        break;
-      case 1:
-        currentTab = MobileMoviesTab(playlist: widget.playlist);
-        break;
-      case 2:
-        currentTab = MobileSeriesTab(playlist: widget.playlist);
-        break;
-      case 3:
-        currentTab = const MobileSettingsTab();
-        break;
-      default:
-        currentTab = MobileLiveTVTab(playlist: widget.playlist);
-    }
-
+    // [P0-3 FIX] Use IndexedStack to preserve tab state and scroll position
+    // Instead of destroying/recreating tabs on each switch, keep all tabs alive in memory
+    // This enables instant tab switching and preserves user scroll position, search state, etc.
+    // The AutomaticKeepAliveClientMixin in each tab will keep them in the widget tree
     return Theme(
       data: MobileTheme.darkTheme,
       child: MobileScaffold(
@@ -54,7 +39,30 @@ class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
         onIndexChanged: (index) {
           ref.read(mobileDashboardIndexProvider.notifier).state = index;
         },
-        child: currentTab,
+        child: IndexedStack(
+          index: currentIndex,
+          children: [
+            // Tab 0: Live TV - stays alive to preserve channel list scroll position
+            MobileLiveTVTab(
+              key: const PageStorageKey('live_tv_tab'),
+              playlist: widget.playlist,
+            ),
+            // Tab 1: Movies - stays alive to preserve search and filter state
+            MobileMoviesTab(
+              key: const PageStorageKey('movies_tab'),
+              playlist: widget.playlist,
+            ),
+            // Tab 2: Series - stays alive to preserve series browsing state
+            MobileSeriesTab(
+              key: const PageStorageKey('series_tab'),
+              playlist: widget.playlist,
+            ),
+            // Tab 3: Settings - stays alive to preserve settings scroll position
+            const MobileSettingsTab(
+              key: PageStorageKey('settings_tab'),
+            ),
+          ],
+        ),
       ),
     );
   }

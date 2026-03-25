@@ -37,9 +37,16 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   @override
   void initState() {
     super.initState();
+    // [P1-1 FIX] Debounce search input to prevent per-keystroke rebuilds
+    _searchTimer = null;
     _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+      _searchTimer?.cancel();
+      _searchTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {
+            _searchQuery = _searchController.text.toLowerCase();
+          });
+        }
       });
     });
     // Trigger IP fetch for smart sorting
@@ -48,10 +55,13 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     });
   }
 
+  Timer? _searchTimer;
+
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchTimer?.cancel();
     super.dispose();
   }
 
