@@ -15,6 +15,7 @@ import 'package:xtremflow/core/theme/app_colors.dart';
 import 'package:xtremflow/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
+import 'package:xtremflow/core/utils/device_info.dart';
 
 /// Stream type enum for player
 enum StreamType { live, vod, series }
@@ -181,20 +182,27 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
       // (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3');
     } else {
-      // VOD PROFILE: Max stability, large buffer
-      // VOD PROFILE: Max stability, moderate buffer (reduced from 100MB to fix startup heap issues)
-      debugPrint('MediaKitPlayer: Applying VOD optimization profile (FIX)');
+      // [P2-2 FIX] VOD PROFILE: Adaptive buffer size based on device RAM
+      // - Low-end (<2GB): 20MB (conservative, prevent OOM)
+      // - Mid-range (2-6GB): 50MB (balanced)
+      // - High-end (>6GB): 100MB (maximum quality)
+      final deviceInfo = DeviceInfo();
+      final bufferBytes = deviceInfo.getRecommendedVodBufferBytes();
+      final backBytes = (bufferBytes / 10).toInt(); // 10% for backward buffer
+
+      debugPrint(
+          'MediaKitPlayer: VOD profile - ${deviceInfo.getDeviceProfile()}, buffer=${bufferBytes ~/ (1024 * 1024)}MB');
+
       (_player.platform as dynamic)?.setProperty('cache-secs', '100');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', '100000000'); // 100MB
+          ?.setProperty('demuxer-max-bytes', bufferBytes.toString());
       (_player.platform as dynamic)
           ?.setProperty('demuxer-readahead-secs', '60');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', '10000000'); // 10MB back
+          ?.setProperty('demuxer-max-back-bytes', backBytes.toString());
 
       // Disable initial cache pause to allow immediate playback attempt
       (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
-      // (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5');
     }
 
     // Audio/Video Sync - critical for smooth playback
