@@ -1,84 +1,27 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dns_service.dart';
 
-/// DNS Resolver utility using DNS-over-HTTPS
-/// Provides manual hostname resolution when system DNS fails
+/// [P2-1 FIX] DNS Resolver now delegates to Unified DNS Service
+///
+/// This class is now a thin wrapper around UnifiedDnsService
+/// to maintain backward compatibility while consolidating DNS logic.
+/// All DNS calls now share a single cache and request deduplication.
 class DnsResolver {
-  static final Map<String, String> _cache = {};
+  static final UnifiedDnsService _dnsService = UnifiedDnsService();
 
-  /// Resolve hostname to IP address using DoH
+  /// Resolve hostname to IP address using DoH (delegates to unified service)
   /// Returns null if resolution fails
+  /// Uses shared cache to prevent duplicate calls
   static Future<String?> resolve(String hostname) async {
-    // Check cache first
-    if (_cache.containsKey(hostname)) {
-      print('DnsResolver: Cache hit for $hostname -> ${_cache[hostname]}');
-      return _cache[hostname];
-    }
-
-    print('DnsResolver: Attempting to resolve $hostname');
-
-    // Try Google DNS via IP (8.8.8.8) - NO DNS NEEDED!
-    String? ip = await _queryDoH(
-      'https://8.8.8.8/resolve?name=$hostname&type=A',
-    );
-
-    // Fallback to Cloudflare via IP (1.1.1.1)
-    ip ??= await _queryDoH(
-      'https://1.1.1.1/dns-query?name=$hostname&type=A',
-      headers: {'accept': 'application/dns-json'},
-    );
-
-    if (ip != null) {
-      print('DnsResolver: Resolved $hostname -> $ip');
-      _cache[hostname] = ip;
-    } else {
-      print('DnsResolver: Failed to resolve $hostname');
-    }
-
-    return ip;
+    return _dnsService.resolve(hostname);
   }
 
-  static Future<String?> _queryDoH(
-    String url, {
-    Map<String, String>? headers,
-  }) async {
-    try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 10)
-        ..badCertificateCallback = (cert, host, port) => true;
-
-      final request = await client.getUrl(Uri.parse(url));
-      request.headers.add('accept', 'application/dns-json');
-      if (headers != null) {
-        headers.forEach((k, v) => request.headers.add(k, v));
-      }
-
-      final response = await request.close();
-
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final json = jsonDecode(body);
-
-        if (json['Status'] == 0 && json['Answer'] != null) {
-          final answers = json['Answer'] as List;
-          for (final ans in answers) {
-            if (ans['type'] == 1) {
-              // Type A
-              client.close();
-              return ans['data'];
-            }
-          }
-        }
-      }
-      client.close();
-    } catch (e) {
-      print('DnsResolver: DoH query failed: $e');
-    }
-    return null;
-  }
-
-  /// Clear the DNS cache
+  /// Clear the DNS cache (delegates to unified service)
   static void clearCache() {
-    _cache.clear();
+    _dnsService.clearCache();
+  }
+
+  /// Get cache stats for debugging
+  static Map<String, dynamic> getCacheStats() {
+    return _dnsService.getCacheStats();
   }
 }
