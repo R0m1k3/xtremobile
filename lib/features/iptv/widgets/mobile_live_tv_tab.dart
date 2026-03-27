@@ -197,10 +197,10 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                   slivers: [
                     // Floating Header (Search + Navigation)
                     SliverAppBar(
-                      floating: true,
-                      pinned: false,
-                      snap: true,
-                      backgroundColor: Colors.transparent, // Minimal background
+                      floating: false,
+                      pinned: true,
+                      snap: false,
+                      backgroundColor: const Color(0xFF000000), // Opaque black
                       elevation: 0,
                       scrolledUnderElevation: 0,
                       automaticallyImplyLeading: false,
