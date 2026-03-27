@@ -132,7 +132,7 @@ class XtreamServiceMobile {
     return batch[streamId] ??
         model.ShortEPG(
           id: streamId,
-          title: 'No Program',
+          title: '',
           start: DateTime.now().toIso8601String(),
           end: DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
         );
@@ -178,60 +178,71 @@ class XtreamServiceMobile {
     }
   }
 
-  /// Internal: Load EPG batch from API
+  /// Internal: Load EPG for a single stream
+  /// NOTE: Xtream API get_short_epg only returns results for ONE stream_id at a time.
+  /// Response format: {"epg_listings": [...]} where title/description are Base64 encoded.
   Future<Map<String, model.ShortEPG>> _loadEpgBatch(
     List<String> streamIds,
     String cacheKey,
   ) async {
-    try {
-      final result = <String, model.ShortEPG>{};
+    final result = <String, model.ShortEPG>{};
 
-      // Join stream IDs for API call
-      final streamIdParam = streamIds.join(',');
+    // Load EPG for each stream_id individually (API doesn't support true batch)
+    for (final streamId in streamIds) {
+      try {
+        final response = await _dio.get(
+          '$_baseUrl/player_api.php',
+          queryParameters: {
+            'username': _username,
+            'password': _password,
+            'action': 'get_short_epg',
+            'stream_id': streamId,
+          },
+          options: Options(
+            receiveTimeout: const Duration(seconds: 10),
+            sendTimeout: const Duration(seconds: 10),
+          ),
+        ).timeout(const Duration(seconds: 10));
 
-      final response = await _dio.get(
-        '$_baseUrl/player_api.php',
-        queryParameters: {
-          'username': _username,
-          'password': _password,
-          'action': 'get_short_epg',
-          'stream_id': streamIdParam,
-        },
-        options: Options(
-          receiveTimeout: const Duration(seconds: 20),
-          sendTimeout: const Duration(seconds: 20),
-        ),
-      );
+        if (response.statusCode == 200 && response.data is Map) {
+          final data = response.data as Map;
+          final listings = data['epg_listings'];
 
-      if (response.statusCode == 200 && response.data is List) {
-        final items = (response.data as List);
+          if (listings is List && listings.isNotEmpty) {
+            // Find the currently airing program
+            final now = DateTime.now();
+            Map<String, dynamic>? current;
 
-        for (var item in items) {
-          if (item is Map && item.containsKey('stream_id')) {
-            final streamId = item['stream_id'].toString();
-            // Assuming the API returns a list of EPG entries for this stream
-            if (item['epg_listings'] is List &&
-                (item['epg_listings'] as List).isNotEmpty) {
-              final epgJson = (item['epg_listings'] as List).first;
-              result[streamId] = model.ShortEPG.fromJson({
-                ...epgJson,
-                'id': streamId,
-              });
+            for (final item in listings) {
+              if (item is! Map) continue;
+              try {
+                final start = DateTime.parse(item['start'].toString());
+                final end = DateTime.parse(item['end'].toString());
+                if (now.isAfter(start) && now.isBefore(end)) {
+                  current = Map<String, dynamic>.from(item);
+                  break;
+                }
+              } catch (_) {}
             }
+
+            // Fallback to first entry if no current program found
+            current ??= Map<String, dynamic>.from(listings.first as Map);
+
+            result[streamId] = model.ShortEPG.fromJson({
+              ...current,
+              'id': streamId,
+            });
           }
         }
-
-        if (kDebugMode) {
-          print(
-              '✅ Loaded EPG for ${result.length}/${streamIds.length} channels');
-        }
+      } catch (e) {
+        if (kDebugMode) print('⚠️ EPG failed for $streamId: $e');
       }
-
-      return result;
-    } catch (e) {
-      if (kDebugMode) print('❌ Error loading EPG batch: $e');
-      return {};
     }
+
+    if (kDebugMode) {
+      print('✅ EPG loaded: ${result.length}/${streamIds.length} channels');
+    }
+    return result;
   }
 
   /// Get live TV categories

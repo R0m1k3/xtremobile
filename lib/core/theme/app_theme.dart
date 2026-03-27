@@ -179,10 +179,189 @@ class AppTheme {
 
   static const double radiusFull = 999.0;
 
-  // Light theme stub
-  static ThemeData get lightTheme =>
-      ThemeData.light(useMaterial3: true).copyWith(
-        colorScheme: AppColors.lightColorScheme,
-        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
-      );
+  // ============ LIGHT THEME (Apple Clean White) ============
+  static ThemeData get lightTheme {
+    final baseTheme = ThemeData.light(useMaterial3: true);
+
+    // Apple light palette
+    const bgColor = Color(0xFFF2F2F7);       // Apple system grey6
+    const surfaceColor = Color(0xFFFFFFFF);   // Pure white surfaces
+    const primaryColor = Color(0xFF007AFF);   // Apple Blue (light)
+    const textPrimaryColor = Color(0xFF000000);
+    const textSecondaryColor = Color(0x993C3C43); // #3C3C43 @ 60%
+    const textTertiaryColor = Color(0xFFC7C7CC);
+    const borderColor = Color(0x1A000000);    // #000000 @ 10%
+
+    return baseTheme.copyWith(
+      colorScheme: AppColors.lightColorScheme.copyWith(
+        primary: primaryColor,
+        secondary: const Color(0xFF34C759), // Apple green
+        surface: surfaceColor,
+        onPrimary: Colors.white,
+        onSurface: textPrimaryColor,
+        brightness: Brightness.light,
+      ),
+      scaffoldBackgroundColor: bgColor,
+
+      // Text selection — blue cursor on light
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: primaryColor,
+        selectionColor: Color(0x4D007AFF),
+        selectionHandleColor: primaryColor,
+      ),
+
+      // Typography
+      textTheme: TextTheme(
+        displayLarge: GoogleFonts.inter(
+          fontSize: 56,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1.0,
+          color: textPrimaryColor,
+        ),
+        displayMedium: GoogleFonts.inter(
+          fontSize: 48,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+          color: textPrimaryColor,
+        ),
+        displaySmall: GoogleFonts.inter(
+          fontSize: 32,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+        headlineMedium: GoogleFonts.inter(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+        titleLarge: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: textSecondaryColor,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: textSecondaryColor,
+        ),
+        labelLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+      ),
+
+      // AppBar: White with subtle bottom shadow
+      appBarTheme: AppBarTheme(
+        backgroundColor: surfaceColor,
+        foregroundColor: textPrimaryColor,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        shadowColor: borderColor,
+        centerTitle: true,
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryColor,
+        ),
+      ),
+
+      // Bottom Navigation Bar: white, Apple Blue selected
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: surfaceColor,
+        selectedItemColor: primaryColor,
+        unselectedItemColor: textSecondaryColor,
+        selectedLabelStyle: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+      ),
+
+      // Inputs: white fill, subtle border
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceColor,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: spacing24,
+          vertical: spacing16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: borderColor, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: borderColor, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: primaryColor, width: 2),
+        ),
+        hintStyle: GoogleFonts.inter(color: textTertiaryColor),
+      ),
+
+      // Buttons: Apple Blue pill
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+          textStyle:
+              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+      ),
+
+      // Cards: white with subtle shadow
+      cardTheme: const CardThemeData(
+        color: surfaceColor,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(radiusMd)),
+          side: BorderSide(color: borderColor, width: 1),
+        ),
+        shadowColor: borderColor,
+      ),
+
+      // Dialogs: white, clean
+      dialogTheme: DialogThemeData(
+        backgroundColor: surfaceColor,
+        elevation: 8,
+        shadowColor: borderColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLg),
+          side: const BorderSide(color: borderColor, width: 1),
+        ),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: textPrimaryColor,
+        ),
+        contentTextStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: textSecondaryColor,
+        ),
+      ),
+    );
+  }
 }

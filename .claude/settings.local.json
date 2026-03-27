@@ -4,7 +4,22 @@
       "Bash(flutter build:*)",
       "Bash(tee build_apk_output.txt)",
       "Bash(rm -f *.txt)",
-      "Bash(ls -la *.txt)"
+      "Bash(ls -la *.txt)",
+      "WebSearch",
+      "WebFetch(domain:designcode.io)",
+      "WebFetch(domain:www.brightec.co.uk)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:devsign.co)",
+      "WebFetch(domain:marvelapp.com)",
+      "WebFetch(domain:www.colorsandfonts.com)",
+      "WebFetch(domain:mar.codes)",
+      "WebFetch(domain:www.smashingmagazine.com)",
+      "WebFetch(domain:sarunw.com)",
+      "WebFetch(domain:noahgilmore.com)",
+      "WebFetch(domain:www.color-hex.com)",
+      "WebFetch(domain:iosexample.com)",
+      "WebFetch(domain:blog.karenying.com)",
+      "WebFetch(domain:gist.github.com)"
     ]
   }
 }

@@ -203,7 +203,7 @@ class _MobilePlaylistSelectionScreenState
     final playlistsAsync = ref.watch(playlistsProvider);
 
     return Theme(
-      data: MobileTheme.darkTheme,
+      data: MobileTheme.themeOf(context),
       child: Scaffold(
         extendBodyBehindAppBar: true, // For gradient
         appBar: AppBar(

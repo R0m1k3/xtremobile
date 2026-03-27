@@ -145,14 +145,24 @@ final mobileLiveTvUiStateProvider =
     StateProvider<LiveTvUiState>((ref) => LiveTvUiState());
 
 class LiveTvUiState {
-  final String? selectedCategory;
+  final String? selectedCategory; // category NAME (for display)
+  final String? selectedCategoryId; // category ID (for API calls)
   final bool isCategoryView;
 
-  LiveTvUiState({this.selectedCategory, this.isCategoryView = true});
+  LiveTvUiState({
+    this.selectedCategory,
+    this.selectedCategoryId,
+    this.isCategoryView = true,
+  });
 
-  LiveTvUiState copyWith({String? selectedCategory, bool? isCategoryView}) {
+  LiveTvUiState copyWith({
+    String? selectedCategory,
+    String? selectedCategoryId,
+    bool? isCategoryView,
+  }) {
     return LiveTvUiState(
       selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
       isCategoryView: isCategoryView ?? this.isCategoryView,
     );
   }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_decorations.dart';
 
 class MobileScaffold extends ConsumerStatefulWidget {
   final Widget child;
@@ -34,7 +34,7 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // Top Navigation Bar (Redesigned)
@@ -51,19 +51,7 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
               child: Container(
                 height: 64, // Taller pill to accommodate larger logo
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A)
-                      .withOpacity(0.9), // Slightly more opaque pill
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
+                decoration: AppDecorations.navPill(context),
                 child: Row(
                   children: [
                     // --- LEFT: LOGO & BRAND ---
@@ -89,11 +77,11 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
+                          Text(
                             'XtremFlow',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20, // Slightly larger text
+                              color: AppDecorations.textPrimary(context),
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Inter',
                             ),
@@ -127,8 +115,7 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white
-                              .withOpacity(0.08), // Subtle background
+                          color: AppDecorations.divider(context),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: StreamBuilder<DateTime>(
@@ -139,8 +126,8 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                                 DateFormat('HH:mm').format(snapshot.data!);
                             return Text(
                               time,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppDecorations.textPrimary(context),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
@@ -214,11 +201,12 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Selected: Black text on White bg
-    // Focused: White text on Translucent bg
-    // Normal: White70 text on Transparent bg
-    final Color textColor = widget.isSelected ? Colors.black : Colors.white;
-    final Color iconColor = widget.isSelected ? Colors.black : Colors.white;
+    const Color selectedColor = Color(0xFF0A84FF);
+    final Color unselectedColor = AppDecorations.textSecondary(context);
+    final Color textColor =
+        widget.isSelected ? Colors.white : unselectedColor;
+    final Color iconColor =
+        widget.isSelected ? Colors.white : unselectedColor;
     final FontWeight fontWeight =
         widget.isSelected ? FontWeight.w700 : FontWeight.w500;
 
@@ -243,15 +231,13 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: widget.isSelected
-                ? Colors.white
+                ? selectedColor
                 : (_isFocused
-                    ? Colors.white.withOpacity(0.2) // Explicit focus highlight
+                    ? AppDecorations.divider(context).withValues(alpha: 0.2)
                     : Colors.transparent),
-            borderRadius: BorderRadius.circular(20), // Matches pill shape
+            borderRadius: BorderRadius.circular(20),
             border: _isFocused && !widget.isSelected
-                ? Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                  ) // Subtle border for focus
+                ? Border.all(color: AppDecorations.divider(context))
                 : null,
           ),
           child: Row(

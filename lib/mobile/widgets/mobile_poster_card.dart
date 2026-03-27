@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/core/utils/image_cache_config.dart';
 
@@ -26,94 +26,132 @@ class MobilePosterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Focusable Poster
+        // Shadow lives on this outer Container so ClipRRect doesn't swallow it
         Expanded(
-          child: TVFocusable(
-            onPressed: onTap,
-            onLongPress: onLongPress,
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Image
-                // [P1-2 FIX] Optimize image cache: resize to display size (100x150)
-                // Before: Downloads full resolution (1000x1500px), caches at full size
-                // After: Cache only 100x150px needed for display
-                // Impact: -60% disk cache, -40% memory usage
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: imageUrl != null && imageUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl!,
-                          fit: BoxFit.cover,
-                          // Memory cache dimensions (match display size)
-                          memCacheWidth: 120,
-                          memCacheHeight: 180,
-                          // Disk cache dimensions (slightly larger for quality)
-                          maxWidthDiskCache: 120,
-                          maxHeightDiskCache: 180,
-                          cacheManager: AppCacheManager.instance,
-                          errorWidget: (_, __, ___) => Container(
-                            color: AppColors.surface,
-                            child: Icon(placeholderIcon, color: Colors.white38),
-                          ),
-                          placeholder: (_, __) => Container(
-                            color: AppColors.surface,
-                            child: Icon(placeholderIcon, color: Colors.white24),
-                          ),
-                        )
-                      : Container(
-                          color: AppColors.surface,
-                          child: Icon(placeholderIcon, color: Colors.white38),
-                        ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? const Color(0x99000000)
+                      : const Color(0x28000000),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
-                
-                // Overlays
-                if (rating != null)
-                  Positioned(
-                    top: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 10),
-                          const SizedBox(width: 2),
-                          Text(
-                            rating!,
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ],
+            ),
+            child: TVFocusable(
+              onPressed: onTap,
+              onLongPress: onLongPress,
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Image / placeholder (clipped)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: imageUrl != null && imageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl!,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 120,
+                            memCacheHeight: 180,
+                            maxWidthDiskCache: 120,
+                            maxHeightDiskCache: 180,
+                            cacheManager: AppCacheManager.instance,
+                            errorWidget: (_, __, ___) => Container(
+                              decoration:
+                                  AppDecorations.channelCardBase(context),
+                              child: Icon(
+                                placeholderIcon,
+                                color: AppDecorations.iconMuted(context),
+                              ),
+                            ),
+                            placeholder: (_, __) => Container(
+                              decoration:
+                                  AppDecorations.channelCardBase(context),
+                              child: Icon(
+                                placeholderIcon,
+                                color: AppDecorations.iconMuted(context),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            decoration: AppDecorations.channelCardBase(context),
+                            child: Icon(
+                              placeholderIcon,
+                              color: AppDecorations.iconMuted(context),
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
                   ),
 
-                if (isWatched)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
+                  // Rating badge
+                  if (rating != null)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 10,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              rating!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: const Icon(Icons.check, size: 10, color: Colors.white),
                     ),
-                  ),
-              ],
+
+                  // Watched badge
+                  if (isWatched)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF30D158),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+
+        const SizedBox(height: 6),
+
         // Title
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -122,8 +160,8 @@ class MobilePosterCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: AppDecorations.textPrimary(context),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),

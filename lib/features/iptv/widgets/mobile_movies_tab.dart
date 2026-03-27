@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
@@ -257,7 +257,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     }
 
     return Container(
-      decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
+      decoration: AppDecorations.background(context),
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) async {
@@ -318,8 +318,8 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
           bottom: false,
           child: RefreshIndicator(
             onRefresh: _refresh,
-            color: AppColors.primary,
-            backgroundColor: AppColors.surface,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             child: CustomScrollView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -371,30 +371,27 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        decoration: AppDecorations.searchBar(context),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.search,
                               size: 20,
-                              color: AppColors.textSecondary,
+                              color: AppDecorations.textSecondary(context),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: ExcludeFocus(
                                 excluding: !_isSearchEditing,
                                 child: TextField(
-                                  cursorColor: Colors.white,
+                                  cursorColor: AppDecorations.textPrimary(context),
                                   controller: _searchController,
                                   focusNode: _searchFocusNode,
                                   readOnly: !_isSearchEditing,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.textPrimary,
+                                    color: AppDecorations.textPrimary(context),
                                   ),
                                   decoration: InputDecoration(
                                     hintText: _selectedCategoryId != null
@@ -427,10 +424,10 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                   _searchController.clear();
                                   _onSearchChanged('');
                                 },
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close,
                                   size: 16,
-                                  color: AppColors.textSecondary,
+                                  color: AppDecorations.textSecondary(context),
                                 ),
                               ),
                           ],

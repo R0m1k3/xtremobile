@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 // import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
+import 'package:xtremobile/core/providers/theme_provider.dart';
 import 'package:xtremobile/features/iptv/screens/mobile_playlist_selection_screen.dart';
 
 /// Simplified mobile settings tab - optimized for TV remote control
@@ -79,9 +80,9 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   child: Image.asset(
                     'assets/images/logo_xtremobile.png',
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, __, ___) => Icon(
                       Icons.play_circle_filled,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 28,
                     ),
                   ),
@@ -95,14 +96,14 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: AppDecorations.textPrimary(context),
                       ),
                     ),
                     Text(
                       'Version 1.5.1',
                       style: GoogleFonts.inter(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: AppDecorations.textSecondary(context),
                       ),
                     ),
                   ],
@@ -112,6 +113,13 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           ),
 
           const SizedBox(height: 16),
+
+          // === APPARENCE ===
+          _buildSectionHeader('Apparence'),
+
+          _buildThemeSwitcher(),
+
+          const SizedBox(height: 8),
 
           _buildSettingItem(
             icon: Icons.access_time,
@@ -304,6 +312,109 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
   // === UI BUILDERS ===
 
+  Widget _buildThemeSwitcher() {
+    final themeState = ref.watch(themeProvider);
+    final notifier = ref.read(themeProvider.notifier);
+
+    final segments = [
+      (AppThemeMode.dark, Icons.dark_mode_rounded, 'Sombre'),
+      (AppThemeMode.light, Icons.light_mode_rounded, 'Clair'),
+      (AppThemeMode.system, Icons.brightness_auto_rounded, 'Système'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.brightness_6_rounded,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Thème',
+                    style: TextStyle(
+                      color: AppDecorations.textPrimary(context),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Segmented control
+                  LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      return Row(
+                        children: segments.map((seg) {
+                        final (mode, icon, label) = seg;
+                        final selected = themeState.appThemeMode == mode;
+                        final accentColor = Theme.of(context).colorScheme.primary;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => notifier.setThemeMode(mode),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? accentColor
+                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    icon,
+                                    size: 16,
+                                    color: selected
+                                        ? Colors.white
+                                        : AppDecorations.textSecondary(context),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppDecorations.textSecondary(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
@@ -312,7 +423,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
         style: GoogleFonts.inter(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: AppColors.primary,
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 1.2,
         ),
       ),
@@ -334,12 +445,12 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 24),
+              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -347,8 +458,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: AppDecorations.textPrimary(context),
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
                       ),
@@ -356,8 +467,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                     if (subtitle != null)
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: AppDecorations.textSecondary(context),
                           fontSize: 12,
                         ),
                       ),
@@ -370,13 +481,13 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   value,
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -413,12 +524,12 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 24),
+              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -426,8 +537,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: AppDecorations.textPrimary(context),
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
                       ),
@@ -436,8 +547,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       subtitle,
                       style: TextStyle(
                         color: hasFilters
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
+                            ? Theme.of(context).colorScheme.primary
+                            : AppDecorations.textSecondary(context),
                         fontSize: 12,
                         fontWeight:
                             hasFilters ? FontWeight.w600 : FontWeight.normal,
@@ -448,7 +559,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   ],
                 ),
               ),
-              const Icon(Icons.edit, color: AppColors.textSecondary, size: 20),
+              Icon(Icons.edit, color: AppDecorations.textSecondary(context), size: 20),
             ],
           ),
         ),
@@ -466,20 +577,20 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(ctx).colorScheme.surface,
         title: Text(
           'Filtres $label',
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: AppDecorations.textPrimary(ctx)),
         ),
         content: TextField(
           controller: tempController,
           autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: AppDecorations.textPrimary(ctx)),
           decoration: InputDecoration(
             hintText: 'Séparez par des virgules',
-            hintStyle: const TextStyle(color: AppColors.textSecondary),
+            hintStyle: TextStyle(color: AppDecorations.textSecondary(ctx)),
             filled: true,
-            fillColor: AppColors.background,
+            fillColor: Theme.of(ctx).scaffoldBackgroundColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,

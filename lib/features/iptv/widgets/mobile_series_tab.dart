@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/widgets/components/hero_carousel.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
@@ -111,7 +111,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
       // Add timeout to prevent infinite loading state
       final newSeries = await service
           .getSeriesPaginated()
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 45));
 
       if (mounted) {
         setState(() {
@@ -214,7 +214,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
         .toList();
 
     return Container(
-      decoration: const BoxDecoration(gradient: AppColors.appleTvGradient),
+      decoration: AppDecorations.background(context),
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) async {
@@ -268,8 +268,8 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
           bottom: false,
           child: RefreshIndicator(
             onRefresh: _refresh,
-            color: AppColors.primary,
-            backgroundColor: AppColors.surface,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             child: CustomScrollView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -315,31 +315,27 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          // Removed internal editing border here to prevent conflict and "inside frame" look
-                        ),
+                        decoration: AppDecorations.searchBar(context),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.search,
                               size: 20,
-                              color: AppColors.textSecondary,
+                              color: AppDecorations.textSecondary(context),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: ExcludeFocus(
                                 excluding: !_isSearchEditing,
                                 child: TextField(
-                                  cursorColor: Colors.white, // Extra safety
+                                  cursorColor: AppDecorations.textPrimary(context),
                                   controller: _searchController,
                                   focusNode: _searchFocusNode,
                                   readOnly: !_isSearchEditing,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.textPrimary,
+                                    color: AppDecorations.textPrimary(context),
                                   ),
                                   decoration: const InputDecoration(
                                     hintText: 'Rechercher une série...',
@@ -370,10 +366,10 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                                   _searchController.clear();
                                   _onSearchChanged('');
                                 },
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close,
                                   size: 16,
-                                  color: AppColors.textSecondary,
+                                  color: AppDecorations.textSecondary(context),
                                 ),
                               ),
                           ],
@@ -417,6 +413,50 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                     child: Padding(
                       padding: EdgeInsets.all(24),
                       child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+
+                if (!_isLoading && displaySeries.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(48),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.video_library_outlined,
+                            size: 64,
+                            color: AppDecorations.textSecondary(context),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Aucune série chargée',
+                            style: TextStyle(
+                              color: AppDecorations.textPrimary(context),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Le chargement a pris trop de temps ou une erreur est survenue.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppDecorations.textSecondary(context),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: () {
+                              setState(() => _hasMore = true);
+                              _loadMoreSeries();
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Réessayer'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],

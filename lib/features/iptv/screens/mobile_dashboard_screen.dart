@@ -33,7 +33,7 @@ class _MobileDashboardScreenState extends ConsumerState<MobileDashboardScreen> {
     // This enables instant tab switching and preserves user scroll position, search state, etc.
     // The AutomaticKeepAliveClientMixin in each tab will keep them in the widget tree
     return Theme(
-      data: MobileTheme.darkTheme,
+      data: MobileTheme.themeOf(context),
       child: MobileScaffold(
         currentIndex: currentIndex,
         onIndexChanged: (index) {

@@ -388,14 +388,11 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     final playlistsAsync = ref.watch(localPlaylistsProvider);
 
     return Theme(
-      data: MobileTheme.darkTheme,
+      data: MobileTheme.themeOf(context),
       child: Scaffold(
-        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('XtremFlow'),
           centerTitle: true,
-          backgroundColor: AppColors.background,
-          elevation: 0,
         ),
         body: playlistsAsync.when(
           loading: () => const Center(

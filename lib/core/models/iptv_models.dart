@@ -321,12 +321,23 @@ class ShortEPG {
   });
 
   factory ShortEPG.fromJson(Map<String, dynamic> json) {
+    // Xtream API encodes title and description in Base64
+    String decodeBase64(String? value) {
+      if (value == null || value.isEmpty) return '';
+      try {
+        final bytes = base64.decode(value);
+        return utf8.decode(bytes);
+      } catch (_) {
+        return value; // Return as-is if not valid base64
+      }
+    }
+
     return ShortEPG(
       id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
+      title: decodeBase64(json['title']?.toString()),
       start: json['start']?.toString() ?? '',
       end: json['end']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
+      description: decodeBase64(json['description']?.toString()),
     );
   }
 

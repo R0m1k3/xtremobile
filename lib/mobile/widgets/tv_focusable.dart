@@ -23,8 +23,8 @@ class TVFocusable extends StatefulWidget {
     this.onFocus,
     this.focusNode,
     this.autofocus = false,
-    this.scale = 1.08, // More visible scale
-    this.borderWidth = 3.0,
+    this.scale = 1.05, // Apple TV subtle lift
+    this.borderWidth = 2.0,
     this.focusColor = Colors.white,
     this.borderRadius,
     this.longPressDuration = const Duration(seconds: 3),
@@ -157,15 +157,14 @@ class _TVFocusableState extends State<TVFocusable> {
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black
-                                .withOpacity(0.5), // Shadow for depth
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                                .withOpacity(0.5), // Deep shadow for lift
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
                           ),
-                          BoxShadow(
-                            color: widget.focusColor
-                                .withOpacity(0.3), // Glow effect
+                          const BoxShadow(
+                            color: Color(0x40FFFFFF), // White glow
                             blurRadius: 12,
-                            spreadRadius: 2,
+                            spreadRadius: 0,
                           ),
                         ],
                       )

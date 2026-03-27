@@ -1,81 +1,155 @@
 import 'package:flutter/material.dart';
 
-/// XtremFlow Apple TV Style Palette
+/// XtremFlow Apple TV Grey Glossy Palette
 ///
-/// Ultra minimalist, focus-driven palette.
-/// - Background: Pure Black (#000000)
-/// - Focus/Active: Pure White (#FFFFFF)
-/// - Inactive: Grey (#9E9E9E)
-/// - Glass: Heavy blur with low opacity
+/// Premium Apple TV design language:
+/// - Background: Deep dark grey (#1C1C1E) to black (#000000) gradient
+/// - Surface cards: Glossy dark grey (#2C2C2E to #3A3A3C) with glass reflections
+/// - Primary accent: Bright white (#FFFFFF) and light grey (#EBEBF5)
+/// - Secondary accent: Apple Blue (#0A84FF)
+/// - Borders: Subtle white 8% opacity for glass effect
+/// - Glossy highlight: White 10-15% at top fading to transparent
 class AppColors {
   AppColors._();
 
   // ============ BACKGROUNDS ============
-  /// Pure black for that infinite depth look (OLED friendly)
+  /// Pure black — infinite depth, OLED-friendly
   static const Color background = Color(0xFF000000);
 
-  /// Very deep grey for surfaces that need to be distinct but subtle (Apple Dark Grey)
+  /// Apple deep dark grey — primary app background (alias)
+  static const Color backgroundSecondary = Color(0xFF1C1C1E);
+
+  /// Apple deep dark grey — primary surface
   static const Color surface = Color(0xFF1C1C1E);
 
-  /// Slightly lighter grey for secondary surfaces or hover states
-  static const Color surfaceVariant = Color(0xFF3A3A3C);
+  /// Mid grey — elevated cards, sheets
+  static const Color surfaceVariant = Color(0xFF2C2C2E);
 
-  /// Focused element background (often white in tvOS for text, or bright accent)
+  /// Light grey surface — tertiary elevation
+  static const Color surfaceElevated = Color(0xFF3A3A3C);
+
+  /// Focus/selected element background
   static const Color focusColor = Color(0xFFFFFFFF);
 
   // ============ ACCENTS ============
-  /// Minimal white accent. In Apple TV, color is used sparingly.
-  /// We keep a subtle blue only for specific indicators if needed.
+  /// Primary: Pure white — focus rings, active labels
   static const Color primary = Color(0xFFFFFFFF);
-  static const Color accent = Color(0xFFE5E5E5);
 
-  /// Primary Gradient (Subtle silver/white glow)
+  /// Light grey — secondary text / inactive elements
+  static const Color accent = Color(0xFFEBEBF5);
+
+  /// Apple Blue — CTAs, links, active indicators
+  static const Color appleBlue = Color(0xFF0A84FF);
+
+  // ============ GRADIENTS ============
+
+  /// Apple TV background: deep dark top → pure black bottom
+  static const LinearGradient backgroundGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF1C1C1E), // Deep dark grey
+      Color(0xFF000000), // Pure black
+    ],
+    stops: [0.0, 1.0],
+  );
+
+  /// Legacy alias for backward compatibility
+  static const RadialGradient appleTvGradient = RadialGradient(
+    center: Alignment.center,
+    radius: 1.5,
+    colors: [
+      Color(0xFF1A1A1C), // Slightly lighter than pure black
+      Color(0xFF000000), // Pure black edge
+    ],
+    stops: [0.0, 1.0],
+  );
+
+  /// Glossy card gradient: bright highlight at top fading to dark base
+  static const LinearGradient glossyCardGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF484848), // Lighter top for gloss highlight
+      Color(0xFF2C2C2E), // Dark mid
+      Color(0xFF1C1C1E), // Deeper bottom
+    ],
+    stops: [0.0, 0.45, 1.0],
+  );
+
+  /// Glossy inner highlight (white shimmer layer, overlaid on top of card)
+  static const LinearGradient glossyHighlight = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0x26FFFFFF), // White ~15% at top
+      Color(0x00FFFFFF), // Transparent at bottom
+    ],
+    stops: [0.0, 0.5],
+  );
+
+  /// Card glossy gradient (Apple TV spec alias — dark base)
+  static const LinearGradient cardGlossyGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF48484A), Color(0xFF2C2C2E)],
+  );
+
+  /// Card glossy highlight (Apple TV spec alias — top-left shimmer)
+  static const LinearGradient cardGlossyHighlight = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0x26FFFFFF), Color(0x00FFFFFF)],
+    stops: [0.0, 0.5],
+  );
+
+  /// Primary silver gradient (used for buttons/badges)
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFFFFFFFF), Color(0xFFCCCCCC)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  /// Apple TV Style Background Gradient (Visible gradient)
-  static const RadialGradient appleTvGradient = RadialGradient(
-    center: Alignment.center,
-    radius: 1.5,
-    colors: [
-      Color(0xFF151515), // Deep Dark Grey center (barely visible)
-      Color(0xFF000000), // Pure Black edge
-    ],
-    stops: [0.0, 1.0],
-  );
-
   // ============ TEXT ============
+  /// Pure white — headings, active labels
   static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF9E9E9E); // Medium Grey
-  static const Color textTertiary = Color(0xFF616161); // Darker Grey
+
+  /// Light grey 60% — secondary info, captions
+  static const Color textSecondary = Color(0x99EBEBF5); // #EBEBF5 @ 60%
+
+  /// Darker grey — hints, placeholders
+  static const Color textTertiary = Color(0xFF636366);
 
   // ============ FUNCTIONAL COLORS ============
-  static const Color success = Color(0xFF4DB6AC); // Teal-ish
-  static const Color warning = Color(0xFFFFB74D);
-  static const Color error = Color(0xFFEF5350);
-  static const Color live = Color(0xFFFF3B30); // Apple Red
+  static const Color success = Color(0xFF30D158); // Apple Green
+  static const Color warning = Color(0xFFFF9F0A); // Apple Orange
+  static const Color error = Color(0xFFFF453A);   // Apple Red
+  static const Color live = Color(0xFFFF453A);    // Apple Red (live badge)
 
   // ============ BORDERS ============
-  // Borders are usually hidden until focused
-  static const Color border = Color(0xFF1F1F1F);
+  /// Invisible border — unfocused state
+  static const Color border = Color(0xFF2C2C2E);
+
+  /// Glass border: white at 8% opacity for subtle edge definition
+  static const Color glassBorderColor = Color(0x14FFFFFF); // 8% white
+
+  /// Focus border: pure white ring
   static const Color focusBorder = Color(0xFFFFFFFF);
 
+  /// Alias: focused border — pure white (Apple TV spec)
+  static const Color borderFocused = Color(0xFFFFFFFF);
+
   // ============ GLASSMORPHISM ============
-  // Apple TV uses this heavily for headers/overlays
-  static final Color glassBackground = const Color(0xFF1E1E1E).withOpacity(0.6);
-  static final Color glassBorder = const Color(0xFFFFFFFF).withOpacity(0.15);
+  static final Color glassBackground = const Color(0xFF1E1E1E).withValues(alpha: 0.75);
+  static final Color glassBorder = const Color(0xFFFFFFFF).withValues(alpha: 0.08);
 
   // ============ THEME SCHEMES ============
   static ColorScheme get darkColorScheme => const ColorScheme.dark(
-        primary: primary,
+        primary: appleBlue,
         secondary: accent,
         surface: surface,
         error: error,
-        onPrimary: Colors
-            .black, // White text on buttons -> Black text on White buttons
+        onPrimary: Colors.white,
         onSecondary: Colors.black,
         onSurface: textPrimary,
         onError: Colors.white,
