@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 class AppDecorations {
   AppDecorations._();
 
-  static bool _isDark(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark;
+  // Force Dark/Glossy mode for IPTV experience regardless of system theme
+  static bool _isDark(BuildContext context) => true;
 
   // ─── Backgrounds ────────────────────────────────────────────────────────────
 
@@ -86,9 +86,9 @@ class AppDecorations {
         border: Border.all(color: const Color(0x28FFFFFF), width: 1),
         boxShadow: const [
           BoxShadow(
-            color: Color(0xCC000000), // Increased opacity from 0xAA
+            color: Color(0xCC000000),
             blurRadius: 16,
-            spreadRadius: 2, // Added spread to make it visible all around
+            spreadRadius: 2,
             offset: Offset(0, 4),
           ),
         ],
@@ -119,11 +119,10 @@ class AppDecorations {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x25FFFFFF), Color(0x00FFFFFF)], // Reduced from 0x40
-          stops: [0.0, 0.45], // Reduced stop
+          colors: [Color(0x45FFFFFF), Color(0x00FFFFFF)],
+          stops: [0.0, 0.5],
         ),
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(radius)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
       );
     }
     return BoxDecoration(
@@ -133,21 +132,23 @@ class AppDecorations {
         colors: [Color(0x0A000000), Color(0x00000000)],
         stops: [0.0, 0.55],
       ),
-      borderRadius:
-          BorderRadius.vertical(top: Radius.circular(radius)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
     );
   }
 
   /// Smaller channel card base (top area behind the logo).
   static BoxDecoration channelCardBase(BuildContext context) {
     if (_isDark(context)) {
-      return const BoxDecoration(
-        gradient: LinearGradient(
+      return BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF121214), Color(0xFF1C1C1E)], // Top darkened from 3A3A3C
+          colors: [Color(0xFF2C2C2E), Color(0xFF1C1C1E)],
         ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        border: Border(
+          top: BorderSide(color: Colors.white.withOpacity(0.12), width: 0.5),
+        ),
       );
     }
     return const BoxDecoration(

@@ -396,11 +396,15 @@ class XtreamServiceMobile {
           'password': _password,
           'action': 'get_series',
         },
+        options: Options(receiveTimeout: const Duration(seconds: 45)),
       );
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
             .map((e) => model.Series.fromJson(e))
             .toList();
+      }
+      if (kDebugMode) {
+        print('⚠️ get_series returned unexpected status or type: ${response.statusCode}');
       }
       return [];
     } catch (e) {
@@ -408,17 +412,61 @@ class XtreamServiceMobile {
     }
   }
 
-  /// Search series
-  Future<List<model.Series>> searchSeries(String query) async {
-    final all = await getSeries();
-    return all
-        .where((s) => s.name.toLowerCase().contains(query.toLowerCase()))
-        .toList();
+
+  /// Get series paginated / filtered by category
+  Future<List<model.Series>> getSeriesPaginated({String? categoryId}) async {
+    try {
+      final queryParams = {
+        'username': _username,
+        'password': _password,
+        'action': 'get_series',
+      };
+
+      if (categoryId != null && categoryId.isNotEmpty) {
+        queryParams['category_id'] = categoryId;
+      }
+
+      final response = await _dio.get(
+        '$_baseUrl/player_api.php',
+        queryParameters: queryParams,
+        options: Options(receiveTimeout: const Duration(seconds: 30)),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => model.Series.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      if (kDebugMode) print('❌ Error loading series by category: $e');
+      return [];
+    }
   }
 
-  /// Get series paginated
-  Future<List<model.Series>> getSeriesPaginated({int? categoryId}) async {
-    return getSeries(); // Simplified for now, can add filtering by categoryId later
+  /// Get series categories
+  Future<List<model.Category>> getSeriesCategories() async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/player_api.php',
+        queryParameters: {
+          'username': _username,
+          'password': _password,
+          'action': 'get_series_categories',
+        },
+        options: Options(receiveTimeout: const Duration(seconds: 15)),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => model.Category.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      if (kDebugMode) print('❌ Error loading series categories: $e');
+      return [];
+    }
   }
 
   /// Get series info
@@ -480,6 +528,20 @@ class XtreamServiceMobile {
   /// Get Series Stream URL
   String getSeriesStreamUrl(String streamId, String extension) {
     return '$_baseUrl/series/$_username/$_password/$streamId.$extension';
+  }
+
+  /// Search series (local filter on full list)
+  Future<List<model.Series>> searchSeries(String query) async {
+    try {
+      final allSeries = await getSeries();
+      if (query.isEmpty) return allSeries;
+      
+      final normalizedQuery = query.toLowerCase();
+      return allSeries.where((s) => s.name.toLowerCase().contains(normalizedQuery)).toList();
+    } catch (e) {
+      if (kDebugMode) print('❌ Error searching series: $e');
+      return [];
+    }
   }
 
   /// Dispose service resources

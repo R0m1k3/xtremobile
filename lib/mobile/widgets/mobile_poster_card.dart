@@ -26,7 +26,6 @@ class MobilePosterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -34,18 +33,7 @@ class MobilePosterCard extends StatelessWidget {
         // Shadow lives on this outer Container so ClipRRect doesn't swallow it
         Expanded(
           child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? const Color(0x99000000)
-                      : const Color(0x28000000),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
+            decoration: AppDecorations.glossyCard(context, radius: 12),
             child: TVFocusable(
               onPressed: onTap,
               onLongPress: onLongPress,
@@ -144,6 +132,19 @@ class MobilePosterCard extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                  // Glossy highlight overlay (top shimmer)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80, // Taller for posters
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: AppDecorations.glossShimmer(context, radius: 12),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

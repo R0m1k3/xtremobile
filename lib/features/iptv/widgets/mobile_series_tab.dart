@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
+import 'package:xtremobile/mobile/widgets/mobile_category_card.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
-import 'package:xtremobile/core/widgets/components/hero_carousel.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
@@ -25,20 +25,31 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final List<model.Series> _series = [];
+
+  // Data
+  List<MapEntry<String, String>> _categories = [];
+  List<model.Series> _categorySeries = [];
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
+
+  // Search
   List<model.Series>? _searchResults;
   String _searchQuery = '';
   bool _isSearchEditing = false;
-  bool _isLoading = false;
   bool _isSearching = false;
-  bool _hasMore = true;
   Timer? _searchDebounce;
+
+  // State
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMoreSeries();
-    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _categories.isEmpty) {
+        _loadCategories();
+      }
+    });
   }
 
   @override
@@ -48,16 +59,6 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
-  }
-
-  void _onScroll() {
-    // Only trigger load when near bottom and not already loading
-    if (!_isLoading &&
-        _hasMore &&
-        _scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent * 0.8) {
-      _loadMoreSeries();
-    }
   }
 
   void _onSearchChanged(String query) {
@@ -84,12 +85,11 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final results = await service.getSeries(); // Fallback to full list if searchSeries not available
-      final filteredResults = results.where((s) => s.name.toLowerCase().contains(query.toLowerCase())).toList();
+      final results = await service.searchSeries(query);
 
       if (mounted && _searchQuery == query) {
         setState(() {
-          _searchResults = filteredResults;
+          _searchResults = results;
           _isSearching = false;
         });
       }
@@ -98,41 +98,72 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     }
   }
 
-  Future<void> _loadMoreSeries() async {
-    // Prevent race conditions
-    if (_isLoading || !_hasMore || !mounted) return;
-
+  Future<void> _loadCategories() async {
+    if (_isLoading || !mounted) return;
     setState(() => _isLoading = true);
 
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-
-      // Add timeout to prevent infinite loading state
-      final newSeries = await service
-          .getSeriesPaginated()
-          .timeout(const Duration(seconds: 45));
+      final categories = await service.getSeriesCategories();
 
       if (mounted) {
         setState(() {
-          _series.addAll(newSeries);
-          _hasMore = false; // Disable pagination for now as it's not supported by simple getSeries
+          _categories = categories
+              .map((c) => MapEntry(c.categoryId, c.categoryName))
+              .toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading series: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _selectCategory(String id, String name) async {
+    setState(() {
+      _selectedCategoryId = id;
+      _selectedCategoryName = name;
+      _categorySeries = [];
+      _isLoading = true;
+    });
+
+    try {
+      final service =
+          await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      final series = await service.getSeriesPaginated(categoryId: id);
+
       if (mounted) {
         setState(() {
+          _categorySeries = series;
           _isLoading = false;
-          // Do NOT set _hasMore to false on error
         });
       }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onBack() {
+    if (_searchQuery.isNotEmpty) {
+      _onSearchChanged('');
+      _searchController.clear();
+      setState(() => _isSearchEditing = false);
+      return;
+    }
+
+    if (_selectedCategoryId != null) {
+      setState(() {
+        _selectedCategoryId = null;
+        _selectedCategoryName = null;
+        _categorySeries = [];
+      });
+      return;
     }
   }
 
   Future<void> _refresh() async {
-    // Clear service cache to force fresh data
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
@@ -140,14 +171,16 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     } catch (_) {}
 
     setState(() {
-      _series.clear();
-      _hasMore = true;
+      _categories.clear();
+      _selectedCategoryId = null;
+      _selectedCategoryName = null;
+      _categorySeries.clear();
       _searchResults = null;
       _searchQuery = '';
       _searchController.clear();
       _isLoading = false;
     });
-    await _loadMoreSeries();
+    await _loadCategories();
   }
 
   String? _formatRating(String? rating) {
@@ -159,7 +192,6 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     return rating;
   }
 
-  /// On mobile, use direct URLs (no proxy needed)
   String _getImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
     return originalUrl;
@@ -182,36 +214,35 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
     final settings = ref.watch(mobileSettingsProvider);
 
-    List<model.Series> displaySeries;
-    if (_searchQuery.isNotEmpty && _searchResults != null) {
-      displaySeries = _searchResults!;
-    } else {
-      displaySeries = settings.seriesKeywords.isEmpty
-          ? _series
-          : _series
-              .where((s) => settings.matchesSeriesFilter(s.categoryName))
-              .toList();
+    if (_categories.isEmpty && !_isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _categories.isEmpty) {
+          _loadCategories();
+        }
+      });
     }
 
-    // Hero Items (use filtered series)
-    final heroItems = displaySeries
-        .take(3)
-        .map(
-          (s) {
-            final serie = s; // model.Series handle is enough
-            return HeroItem(
-              id: serie.streamId,
-              title: serie.name,
-              imageUrl: _getImageUrl(serie.cover),
-            subtitle: serie.rating.isNotEmpty ? '${_formatRating(serie.rating)} ★' : null,
-              onMoreInfo: () => _openSeries(serie),
-            );
-          },
-        )
+    final bool showingCategories =
+        _searchQuery.isEmpty && _selectedCategoryId == null;
+    final bool showingSeries =
+        _searchQuery.isEmpty && _selectedCategoryId != null;
+    final bool showingSearch = _searchQuery.isNotEmpty;
+
+    final filteredCategories = _categories
+        .where((entry) => settings.matchesSeriesFilter(entry.value))
         .toList();
+
+    int itemCount = 0;
+    if (showingCategories) {
+      itemCount = filteredCategories.length;
+    } else if (showingSeries) {
+      itemCount = _categorySeries.length;
+    } else if (showingSearch) {
+      itemCount = _searchResults?.length ?? 0;
+    }
 
     return Container(
       decoration: AppDecorations.background(context),
@@ -221,40 +252,32 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
           if (didPop) return;
 
           if (_searchQuery.isNotEmpty || _isSearching) {
-            _onSearchChanged(''); // clear search
+            _onSearchChanged('');
             _searchController.clear();
             setState(() => _isSearchEditing = false);
             return;
           }
 
-          // Root View -> Show Exit Dialog
+          if (_selectedCategoryId != null) {
+            _onBack();
+            return;
+          }
+
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
               backgroundColor: Colors.grey[900],
-              title: const Text(
-                "Quitter l'application",
-                style: TextStyle(color: Colors.white),
-              ),
-              content: const Text(
-                "Voulez-vous vraiment quitter l'application ?",
-                style: TextStyle(color: Colors.white70),
-              ),
+              title: const Text("Quitter l'application", style: TextStyle(color: Colors.white)),
+              content: const Text("Voulez-vous vraiment quitter l'application ?", style: TextStyle(color: Colors.white70)),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
                   autofocus: true,
-                  child: const Text(
-                    'Annuler',
-                    style: TextStyle(color: Colors.blueAccent),
-                  ),
+                  child: const Text('Annuler', style: TextStyle(color: Colors.blueAccent)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text(
-                    'Quitter',
-                    style: TextStyle(color: Colors.redAccent),
-                  ),
+                  child: const Text('Quitter', style: TextStyle(color: Colors.redAccent)),
                 ),
               ],
             ),
@@ -268,142 +291,150 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
           bottom: false,
           child: RefreshIndicator(
             onRefresh: _refresh,
-            color: Theme.of(context).colorScheme.primary,
-            backgroundColor: Theme.of(context).colorScheme.surface,
             child: CustomScrollView(
-              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // Hero Section (reduced height, moved above search)
-                if (_searchQuery.isEmpty && heroItems.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 8),
-                      child: SizedBox(
-                        height: 180, // Reduced from 250
-                        child: HeroCarousel(
-                          items: heroItems,
-                          onTap: (item) {
-                            try {
-                              final series = _series.firstWhere(
-                                (s) => s.streamId.toString() == item.id,
-                              );
-                              _openSeries(series);
-                            } catch (e) {
-                              // Fallback logic not critical
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
+                // Pinned Header
+                SliverAppBar(
+                  pinned: true,
+                  floating: true,
+                  backgroundColor: AppDecorations.background(context).gradient is LinearGradient 
+                      ? (AppDecorations.background(context).gradient as LinearGradient).colors.first
+                      : Theme.of(context).scaffoldBackgroundColor,
+                  elevation: 4,
+                  automaticallyImplyLeading: false,
+                  expandedHeight: showingSeries ? 110 : 110,
+                  collapsedHeight: showingSeries ? 110 : 110,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Column(
+                        children: [
+                          if (showingSeries)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                                    onPressed: _onBack,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _selectedCategoryName ?? 'Séries',
+                                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 10),
 
-                // Search Bar (moved below carousel)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: TVFocusable(
-                      scale: 1.0, // Disable scaling to prevent overflow
-                      focusColor: Colors.white, // Solid white selection frame
-                      onPressed: () {
-                        setState(() => _isSearchEditing = true);
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _searchFocusNode.requestFocus();
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        height: 40,
-                        decoration: AppDecorations.searchBar(context),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.search,
-                              size: 20,
-                              color: AppDecorations.textSecondary(context),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ExcludeFocus(
-                                excluding: !_isSearchEditing,
-                                child: TextField(
-                                  cursorColor: AppDecorations.textPrimary(context),
-                                  controller: _searchController,
-                                  focusNode: _searchFocusNode,
-                                  readOnly: !_isSearchEditing,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppDecorations.textPrimary(context),
-                                  ),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Rechercher une série...',
-                                    border: InputBorder.none,
-                                    focusedBorder: InputBorder
-                                        .none, // Explicitly remove focus border
-                                    enabledBorder: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.only(bottom: 11),
-                                  ),
-                                  onChanged: _onSearchChanged,
-                                  onSubmitted: (_) =>
-                                      setState(() => _isSearchEditing = false),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: TVFocusable(
+                              scale: 1.0,
+                              focusColor: Colors.white,
+                              onPressed: () {
+                                setState(() => _isSearchEditing = true);
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  _searchFocusNode.requestFocus();
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                height: 40,
+                                decoration: AppDecorations.searchBar(context),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.search, size: 20, color: AppDecorations.textSecondary(context)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ExcludeFocus(
+                                        excluding: !_isSearchEditing,
+                                        child: TextField(
+                                          cursorColor: AppDecorations.textPrimary(context),
+                                          controller: _searchController,
+                                          focusNode: _searchFocusNode,
+                                          readOnly: !_isSearchEditing,
+                                          style: TextStyle(fontSize: 14, color: AppDecorations.textPrimary(context)),
+                                          decoration: InputDecoration(
+                                            hintText: _selectedCategoryId != null ? 'Rechercher...' : 'Rechercher une série...',
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.only(bottom: 11),
+                                          ),
+                                          onChanged: _onSearchChanged,
+                                          onSubmitted: (_) => setState(() => _isSearchEditing = false),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_isSearching) const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    if (_searchQuery.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: () {
+                                          _searchController.clear();
+                                          _onSearchChanged('');
+                                        },
+                                        child: Icon(Icons.close, size: 16, color: AppDecorations.textSecondary(context)),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                            if (_isSearching)
-                              const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            if (_searchQuery.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  _searchController.clear();
-                                  _onSearchChanged('');
-                                },
-                                child: Icon(
-                                  Icons.close,
-                                  size: 16,
-                                  color: AppDecorations.textSecondary(context),
-                                ),
-                              ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
 
-                // Grid
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 8, // Reduced size further (was 4)
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.7,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: showingCategories ? 3 : 4,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: showingCategories ? 2.0 : 0.67,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        if (index >= displaySeries.length) return null;
-                        final series = displaySeries[index];
-
-                        return MobilePosterCard(
-                          title: series.name,
-                          imageUrl: _getImageUrl(series.cover),
-                          rating: _formatRating(series.rating),
-                          placeholderIcon: Icons.tv,
-                          onTap: () => _openSeries(series),
-                        );
+                        if (showingCategories) {
+                          if (index >= filteredCategories.length) return null;
+                          final cat = filteredCategories[index];
+                          return MobileCategoryCard(
+                            title: cat.value,
+                            icon: Icons.video_library_rounded,
+                            onTap: () => _selectCategory(cat.key, cat.value),
+                          );
+                        } else if (showingSeries) {
+                          if (index >= _categorySeries.length) return null;
+                          final series = _categorySeries[index];
+                          return MobilePosterCard(
+                            title: series.name,
+                            imageUrl: _getImageUrl(series.cover),
+                            rating: _formatRating(series.rating),
+                            placeholderIcon: Icons.tv,
+                            onTap: () => _openSeries(series),
+                          );
+                        } else if (showingSearch) {
+                          if (_searchResults == null || index >= _searchResults!.length) return null;
+                          final series = _searchResults![index];
+                          return MobilePosterCard(
+                            title: series.name,
+                            imageUrl: _getImageUrl(series.cover),
+                            rating: _formatRating(series.rating),
+                            placeholderIcon: Icons.tv,
+                            onTap: () => _openSeries(series),
+                          );
+                        }
+                        return null;
                       },
-                      childCount: displaySeries.length,
+                      childCount: itemCount,
                     ),
                   ),
                 ),
@@ -415,47 +446,13 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                       child: Center(child: CircularProgressIndicator()),
                     ),
                   ),
-
-                if (!_isLoading && displaySeries.isEmpty)
+                
+                if (!_isLoading && itemCount == 0 && (_selectedCategoryId != null || _searchQuery.isNotEmpty))
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(48),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.video_library_outlined,
-                            size: 64,
-                            color: AppDecorations.textSecondary(context),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Aucune série chargée',
-                            style: TextStyle(
-                              color: AppDecorations.textPrimary(context),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Le chargement a pris trop de temps ou une erreur est survenue.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppDecorations.textSecondary(context),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton.icon(
-                            onPressed: () {
-                              setState(() => _hasMore = true);
-                              _loadMoreSeries();
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Réessayer'),
-                          ),
-                        ],
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(48),
+                        child: Text('Aucune série trouvée', style: TextStyle(color: AppDecorations.textSecondary(context))),
                       ),
                     ),
                   ),

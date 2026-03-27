@@ -30,7 +30,7 @@ class _MobileSeriesDetailScreenState
   model.SeriesInfo? _seriesInfo;
   bool _isLoading = true;
   String? _error;
-  int _selectedSeason = 1;
+  String _selectedSeason = "1";
 
   @override
   void initState() {
@@ -64,8 +64,7 @@ class _MobileSeriesDetailScreenState
           _seriesInfo = info;
           _isLoading = false;
           if (_seriesInfo!.episodes.isNotEmpty) {
-            final firstKey = _seriesInfo!.episodes.keys.first;
-            _selectedSeason = int.tryParse(firstKey.toString()) ?? 1;
+            _selectedSeason = _seriesInfo!.episodes.keys.first.toString();
           }
         });
       }
@@ -258,7 +257,7 @@ class _MobileSeriesDetailScreenState
                       selected: isSelected,
                       onSelected: (selected) {
                         if (selected) {
-                          setState(() => _selectedSeason = int.tryParse(seasonNum.toString()) ?? 1);
+                          setState(() => _selectedSeason = seasonNum.toString());
                         }
                       },
                       backgroundColor: isDark
@@ -310,7 +309,7 @@ class _MobileSeriesDetailScreenState
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
     final episodeKey = MobileWatchHistory.episodeKey(
       widget.series.seriesId,
-      _selectedSeason,
+      int.tryParse(_selectedSeason) ?? 1,
       episode.episodeNum,
     );
     final isWatched = watchHistory.isEpisodeWatched(episodeKey);

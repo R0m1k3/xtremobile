@@ -107,11 +107,20 @@ final mobileMoviesProvider =
   return service.getMoviesByCategory(""); // Fetch all or default
 });
 
-/// Mobile-specific series pagination provider
-final mobileSeriesProvider =
-    FutureProvider.family<List<model.Series>, PlaylistConfig>((ref, playlist) async {
+/// Mobile-specific series categories provider
+final mobileSeriesCategoriesProvider =
+    FutureProvider.family<List<model.Category>, PlaylistConfig>(
+        (ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
-  return service.getSeriesPaginated();
+  return service.getSeriesCategories();
+});
+
+/// Mobile-specific series pagination provider
+final mobileSeriesProvider = FutureProvider.family<List<model.Series>,
+    (PlaylistConfig, String?)>((ref, params) async {
+  final (playlist, categoryId) = params;
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
+  return service.getSeriesPaginated(categoryId: categoryId);
 });
 
 /// Series info with playlist context
