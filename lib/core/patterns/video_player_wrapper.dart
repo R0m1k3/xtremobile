@@ -5,11 +5,14 @@ import 'package:media_kit_video/media_kit_video.dart';
 /// Video player selection and wrapper pattern
 /// Abstracts between MediaKit and other video players
 /// Handles fallback logic and player initialization
+/// Enum for supported players
+enum PlayerType { mediakit, native }
+
+/// Video player selection and wrapper pattern
+/// Abstracts between MediaKit and other video players
+/// Handles fallback logic and player initialization
 class VideoPlayerWrapper {
   static const _availablePlayers = ['mediakit'];
-
-  /// Enum for supported players
-  enum PlayerType { mediakit, native }
 
   /// Get the preferred player type based on stream and platform
   static PlayerType getPreferredPlayer({
@@ -50,7 +53,7 @@ class VideoPlayerWrapper {
   }) {
     final player = Player(
       configuration: PlayerConfiguration(
-        logLevel: enableLogs ? MPVLogLevel.debug : MPVLogLevel.no,
+        logLevel: enableLogs ? MPVLogLevel.debug : MPVLogLevel.error,
       ),
     );
     return player;

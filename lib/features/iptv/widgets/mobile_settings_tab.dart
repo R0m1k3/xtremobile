@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:path_provider/path_provider.dart';
 // import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
-import '../../../providers/mobile_settings_providers.dart';
-import '../../../widgets/tv_focusable.dart';
-
-import '../../../../core/theme/app_colors.dart';
-import '../screens/mobile_playlist_selection_screen.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/features/iptv/screens/mobile_playlist_selection_screen.dart';
 
 /// Simplified mobile settings tab - optimized for TV remote control
 class MobileSettingsTab extends ConsumerStatefulWidget {
@@ -80,7 +78,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   height: 48,
                   // No decoration for free-floating logo
                   child: Image.asset(
-                    'assets/images/logo_xtremflow.png',
+                    'assets/images/logo_xtremobile.png',
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.play_circle_filled,
@@ -94,7 +92,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'XtremFlow Mobile',
+                      'Xtremobile Mobile',
                       style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

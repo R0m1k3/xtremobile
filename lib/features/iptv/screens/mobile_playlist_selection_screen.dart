@@ -6,7 +6,7 @@ import '../../../../core/services/playlist_api_service.dart';
 import '../../../../core/models/playlist_config.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../theme/mobile_theme.dart';
+import '../../../mobile/theme/mobile_theme.dart';
 
 final playlistsProvider = FutureProvider<List<PlaylistConfig>>((ref) async {
   final service = PlaylistApiService();

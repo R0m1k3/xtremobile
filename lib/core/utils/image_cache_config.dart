@@ -7,6 +7,7 @@
 /// Solution: Specify memCacheWidth/Height for display size, limiting disk cache.
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Standard cache manager with 200MB size limit
@@ -18,8 +19,6 @@ class AppCacheManager {
       'xtremflow_image_cache',
       stalePeriod: const Duration(days: 7),
       maxNrOfCacheObjects: 500,
-      diskUsagePercentageHigh: 95,
-      diskUsagePercentageGoal: 80,
     ),
   );
 }

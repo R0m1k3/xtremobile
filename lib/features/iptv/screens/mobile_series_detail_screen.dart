@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/models/playlist_config.dart';
-import '../../../providers/mobile_xtream_providers.dart';
-import '../../../providers/mobile_settings_providers.dart';
-import 'native_player_screen.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/utils/image_cache_config.dart';
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/utils/image_cache_config.dart';
+import 'package:xtremobile/core/models/iptv_models.dart' as model;
 
 class MobileSeriesDetailScreen extends ConsumerStatefulWidget {
-  final Series series;
+  final model.Series series;
   final PlaylistConfig playlist;
 
   const MobileSeriesDetailScreen({
@@ -26,7 +27,7 @@ class MobileSeriesDetailScreen extends ConsumerStatefulWidget {
 
 class _MobileSeriesDetailScreenState
     extends ConsumerState<MobileSeriesDetailScreen> {
-  SeriesInfo? _seriesInfo;
+  model.SeriesInfo? _seriesInfo;
   bool _isLoading = true;
   String? _error;
   int _selectedSeason = 1;
@@ -62,8 +63,9 @@ class _MobileSeriesDetailScreenState
         setState(() {
           _seriesInfo = info;
           _isLoading = false;
-          if (info.episodes.isNotEmpty) {
-            _selectedSeason = info.episodes.keys.first;
+          if (_seriesInfo!.episodes.isNotEmpty) {
+            final firstKey = _seriesInfo!.episodes.keys.first;
+            _selectedSeason = int.tryParse(firstKey.toString()) ?? 1;
           }
         });
       }
@@ -137,10 +139,10 @@ class _MobileSeriesDetailScreenState
             background: Stack(
               fit: StackFit.expand,
               children: [
-                if (_seriesInfo!.cover != null)
+                if (_seriesInfo!.coverUrl != null)
                   // [P1-2 FIX] Optimize series cover image cache (400x600 display)
                   CachedNetworkImage(
-                    imageUrl: _seriesInfo!.cover!,
+                    imageUrl: _seriesInfo!.coverUrl!,
                     fit: BoxFit.cover,
                     memCacheWidth: 480,
                     memCacheHeight: 720,
@@ -175,7 +177,7 @@ class _MobileSeriesDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _seriesInfo!.name,
+                        _seriesInfo!.title,
                         style: GoogleFonts.inter(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -224,7 +226,7 @@ class _MobileSeriesDetailScreenState
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                _seriesInfo!.plot!,
+                _seriesInfo?.plot ?? '',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   height: 1.4,
@@ -256,7 +258,7 @@ class _MobileSeriesDetailScreenState
                       selected: isSelected,
                       onSelected: (selected) {
                         if (selected) {
-                          setState(() => _selectedSeason = seasonNum);
+                          setState(() => _selectedSeason = int.tryParse(seasonNum.toString()) ?? 1);
                         }
                       },
                       backgroundColor: isDark
@@ -304,7 +306,7 @@ class _MobileSeriesDetailScreenState
     );
   }
 
-  Widget _buildEpisodeTile(Episode episode) {
+  Widget _buildEpisodeTile(model.Episode episode) {
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
     final episodeKey = MobileWatchHistory.episodeKey(
       widget.series.seriesId,
@@ -316,10 +318,9 @@ class _MobileSeriesDetailScreenState
 
     // Calculate progress
     double progress = 0.0;
-    if (episode.durationSecs != null &&
-        episode.durationSecs! > 0 &&
+    if (episode.duration > 0 &&
         resumePos > 0) {
-      progress = (resumePos / episode.durationSecs!).clamp(0.0, 1.0);
+      progress = (resumePos / episode.duration).clamp(0.0, 1.0);
     }
 
     // Force dark mode colors since background is hardcoded dark
@@ -335,14 +336,14 @@ class _MobileSeriesDetailScreenState
           context,
           MaterialPageRoute(
             builder: (context) => NativePlayerScreen(
-              streamId: episode.streamId,
+              streamId: episode.id,
               title:
-                  "${widget.series.name} S${episode.seasonNum}E${episode.episodeNum}",
+                  "${widget.series.name} S${episode.season}E${episode.episodeNum}",
               playlist: widget.playlist,
-              streamType: StreamType.series,
-              containerExtension: episode.containerExtension ?? 'mp4',
+              streamType: model.StreamType.series,
+              containerExtension: episode.containerExtension,
               seriesId: widget.series.seriesId,
-              season: episode.seasonNum,
+              season: int.tryParse(episode.season.toString()),
               episodeNum: episode.episodeNum,
               // Pass explicit initial position for resume
               initialPosition:
@@ -394,10 +395,9 @@ class _MobileSeriesDetailScreenState
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (episode.durationSecs != null &&
-                          episode.durationSecs! > 0)
+                      if (episode.duration > 0)
                         Text(
-                          _formatDuration(episode.durationSecs!),
+                          _formatDuration(episode.duration),
                           style: TextStyle(
                             color: secondaryTextColor,
                             fontSize: 12,

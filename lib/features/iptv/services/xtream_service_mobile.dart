@@ -5,13 +5,13 @@
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../models/xtream_models.dart';
-import 'package:xtremflow/core/models/playlist_config.dart';
-import 'package:xtremflow/core/api/api_client.dart';
+import '../models/xtream_models.dart' as model;
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/core/api/api_client.dart';
 
 /// EPG cache entry with TTL
 class _EpgCacheEntry {
-  final Map<String, ShortEpg> data;
+  final Map<String, model.ShortEPG> data;
   final DateTime timestamp;
   static const int ttlSeconds = 3600; // 1 hour TTL
 
@@ -38,22 +38,22 @@ class XtreamServiceMobile {
   final Map<String, _EpgCacheEntry> _epgBatchCache = {};
 
   // In-flight batch requests to deduplicate concurrent calls
-  final Map<String, Future<Map<String, ShortEpg>>> _inFlightBatches = {};
+  final Map<String, Future<Map<String, model.ShortEPG>>> _inFlightBatches = {};
 
   XtreamServiceMobile(this.cacheDir);
 
   /// Initialize with playlist configuration
   Future<void> setPlaylistAsync(PlaylistConfig config) async {
-    _baseUrl = config.serverUrl;
+    _baseUrl = config.dns;
     _username = config.username;
     _password = config.password;
 
     // Use shared Dio instance from ApiClient (with DNS resolution, etc.)
-    _dio = ApiClient.instance;
+    _dio = ApiClient().dio;
   }
 
   /// Get live channels for a category (with batch EPG support)
-  Future<List<Channel>> getLiveChannels(String categoryId) async {
+  Future<List<model.Channel>> getLiveChannels(String categoryId) async {
     try {
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
@@ -71,7 +71,7 @@ class XtreamServiceMobile {
 
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
-            .map((e) => Channel.fromJson(e))
+            .map((e) => model.Channel.fromJson(e))
             .toList();
       }
       return [];
@@ -82,10 +82,15 @@ class XtreamServiceMobile {
   }
 
   /// Get SHORT EPG for a SINGLE channel (legacy, avoid - use getBatchEPG instead)
-  Future<ShortEpg> getShortEPG(String streamId) async {
+  Future<model.ShortEPG> getShortEPG(String streamId) async {
     // For backward compatibility, but prefer batch loading
     final batch = await getBatchEPG([streamId]);
-    return batch[streamId] ?? ShortEpg(nowPlaying: null, nextPlaying: null);
+    return batch[streamId] ?? model.ShortEPG(
+      id: streamId,
+      title: 'No Program',
+      start: DateTime.now().toIso8601String(),
+      end: DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+    );
   }
 
   /// Get SHORT EPG for MULTIPLE channels in ONE request
@@ -93,45 +98,46 @@ class XtreamServiceMobile {
   /// This is the optimized method that prevents N+1 queries.
   /// Instead of 50 requests for 50 channels, this loads all at once.
   /// Results are cached for 1 hour to avoid repeated requests.
-  Future<Map<String, ShortEpg>> getBatchEPG(List<String> streamIds) async {
+  Future<Map<String, model.ShortEPG>> getBatchEPG(List<String> streamIds) async {
     if (streamIds.isEmpty) return {};
 
     // Create cache key from sorted IDs for consistency
-    final cacheKey = streamIds.toSet().toString();
+    final cacheKey = streamIds.toSet().toList()..sort();
+    final cacheKeyStr = cacheKey.join(',');
 
     // Check if we have valid cached data
-    final cached = _epgBatchCache[cacheKey];
+    final cached = _epgBatchCache[cacheKeyStr];
     if (cached != null && !cached.isExpired) {
       if (kDebugMode) print('✅ EPG batch cache hit: ${streamIds.length} channels');
       return cached.data;
     }
 
     // Check if this batch is already being loaded (deduplication)
-    if (_inFlightBatches.containsKey(cacheKey)) {
+    if (_inFlightBatches.containsKey(cacheKeyStr)) {
       if (kDebugMode) print('⏳ Reusing in-flight EPG batch request');
-      return _inFlightBatches[cacheKey]!;
+      return _inFlightBatches[cacheKeyStr]!;
     }
 
     // Load the batch
-    final future = _loadEpgBatch(streamIds, cacheKey);
-    _inFlightBatches[cacheKey] = future;
+    final future = _loadEpgBatch(streamIds, cacheKeyStr);
+    _inFlightBatches[cacheKeyStr] = future;
 
     try {
       final result = await future;
-      _epgBatchCache[cacheKey] = _EpgCacheEntry(result);
+      _epgBatchCache[cacheKeyStr] = _EpgCacheEntry(result);
       return result;
     } finally {
-      _inFlightBatches.remove(cacheKey);
+      _inFlightBatches.remove(cacheKeyStr);
     }
   }
 
   /// Internal: Load EPG batch from API
-  Future<Map<String, ShortEpg>> _loadEpgBatch(
+  Future<Map<String, model.ShortEPG>> _loadEpgBatch(
       List<String> streamIds, String cacheKey) async {
     try {
-      final result = <String, ShortEpg>{};
+      final result = <String, model.ShortEPG>{};
 
-      // Join stream IDs for API call (or use multiple calls if API limits)
+      // Join stream IDs for API call
       final streamIdParam = streamIds.join(',');
 
       final response = await _dio.get(
@@ -154,10 +160,14 @@ class XtreamServiceMobile {
         for (var item in items) {
           if (item is Map && item.containsKey('stream_id')) {
             final streamId = item['stream_id'].toString();
-            result[streamId] = ShortEpg(
-              nowPlaying: item['now_playing'] ?? item['now'],
-              nextPlaying: item['next_playing'] ?? item['next'],
-            );
+            // Assuming the API returns a list of EPG entries for this stream
+            if (item['epg_listings'] is List && (item['epg_listings'] as List).isNotEmpty) {
+               final epgJson = (item['epg_listings'] as List).first;
+               result[streamId] = model.ShortEPG.fromJson({
+                 ...epgJson,
+                 'id': streamId,
+               });
+            }
           }
         }
 
@@ -169,13 +179,12 @@ class XtreamServiceMobile {
       return result;
     } catch (e) {
       if (kDebugMode) print('❌ Error loading EPG batch: $e');
-      // Return empty map on error - EPG is optional
       return {};
     }
   }
 
   /// Get VOD categories
-  Future<List<Category>> getVodCategories() async {
+  Future<List<model.Category>> getVodCategories() async {
     try {
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
@@ -189,7 +198,7 @@ class XtreamServiceMobile {
 
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
-            .map((e) => Category.fromJson(e))
+            .map((e) => model.Category.fromJson(e))
             .toList();
       }
       return [];
@@ -199,60 +208,153 @@ class XtreamServiceMobile {
     }
   }
 
-  /// Search VOD movies
-  Future<List<Movie>> searchMovies(String query) async {
+  /// Get movies by category
+  Future<List<model.VodItem>> getMoviesByCategory(String categoryId) async {
     try {
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
         queryParameters: {
           'username': _username,
           'password': _password,
-          'action': 'search',
-          'search': query,
+          'action': 'get_vod_streams',
+          'category_id': categoryId,
         },
-        options: Options(receiveTimeout: const Duration(seconds: 15)),
       );
-
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
-            .map((e) => Movie.fromJson(e))
+            .map((e) => model.VodItem.fromJson(e))
             .toList();
       }
       return [];
     } catch (e) {
-      if (kDebugMode) print('❌ Error searching movies: $e');
       return [];
     }
   }
 
-  /// Clear EPG cache (for manual refresh)
-  void clearEpgCache() {
+  /// Get all movies
+  Future<List<model.VodItem>> getMovies() async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/player_api.php',
+        queryParameters: {
+          'username': _username,
+          'password': _password,
+          'action': 'get_vod_streams',
+        },
+      );
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => model.VodItem.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Search VOD movies
+  Future<List<model.VodItem>> searchMovies(String query) async {
+    final all = await getMovies();
+    return all.where((m) => m.name.toLowerCase().contains(query.toLowerCase())).toList();
+  }
+
+  /// Get all series
+  Future<List<model.Series>> getSeries() async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/player_api.php',
+        queryParameters: {
+          'username': _username,
+          'password': _password,
+          'action': 'get_series',
+        },
+      );
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => model.Series.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Search series
+  Future<List<model.Series>> searchSeries(String query) async {
+    final all = await getSeries();
+    return all.where((s) => s.name.toLowerCase().contains(query.toLowerCase())).toList();
+  }
+
+  /// Get series paginated
+  Future<List<model.Series>> getSeriesPaginated({int? categoryId}) async {
+    return getSeries(); // Simplified for now, can add filtering by categoryId later
+  }
+
+  /// Get series info
+  Future<model.SeriesInfo?> getSeriesInfo(String seriesId) async {
+     try {
+      final response = await _dio.get(
+        '$_baseUrl/player_api.php',
+        queryParameters: {
+          'username': _username,
+          'password': _password,
+          'action': 'get_series_info',
+          'series_id': seriesId,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map<String, dynamic>;
+        final seriesModel = model.Series.fromJson(data['info'] ?? {});
+        
+        final episodesMap = <String, List<model.Episode>>{};
+        if (data['episodes'] is Map) {
+          final seasons = data['episodes'] as Map<String, dynamic>;
+          seasons.forEach((seasonNum, episodesList) {
+            if (episodesList is List) {
+              episodesMap[seasonNum] = episodesList
+                  .map((e) => model.Episode.fromJson(e as Map<String, dynamic>))
+                  .toList();
+            }
+          });
+        }
+        
+        return model.SeriesInfo(
+          series: seriesModel,
+          episodes: episodesMap,
+        );
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Clear cache
+  void clearCache() {
     _epgBatchCache.clear();
     _inFlightBatches.clear();
-    if (kDebugMode) print('🗑️  EPG cache cleared');
   }
 
-  /// Get cache stats for debugging
-  Map<String, dynamic> getCacheStats() {
-    return {
-      'epg_cache_entries': _epgBatchCache.length,
-      'in_flight_batches': _inFlightBatches.length,
-      'expired_entries': _epgBatchCache.values.where((e) => e.isExpired).length,
-    };
+  /// Get Live Stream URL
+  String getLiveStreamUrl(String streamId) {
+    return '$_baseUrl/live/$_username/$_password/$streamId.ts';
   }
-}
 
-/// Short EPG for a channel (now playing + next up)
-class ShortEpg {
-  final String? nowPlaying;
-  final String? nextPlaying;
+  /// Get VOD Stream URL
+  String getVodStreamUrl(String streamId, String extension) {
+    return '$_baseUrl/movie/$_username/$_password/$streamId.$extension';
+  }
 
-  ShortEpg({required this.nowPlaying, required this.nextPlaying});
+  /// Get Series Stream URL
+  String getSeriesStreamUrl(String streamId, String extension) {
+    return '$_baseUrl/series/$_username/$_password/$streamId.$extension';
+  }
 
-  factory ShortEpg.fromJson(Map<String, dynamic> json) {
-    return ShortEpg(
-      nowPlaying: json['now_playing'] ?? json['now'],
-      nextPlaying: json['next_playing'] ?? json['next'],
-    );
+  /// Dispose service resources
+  void dispose() {
+    clearCache();
   }
 }

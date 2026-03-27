@@ -5,30 +5,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:xtremflow/core/models/iptv_models.dart';
-import 'package:xtremflow/core/models/playlist_config.dart';
-import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
-import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
-import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/features/iptv/screens/lite_player_screen.dart';
+import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/features/iptv/services/xtream_service_mobile.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremflow/mobile/providers/mobile_xtream_providers.dart';
-import 'package:xtremflow/core/utils/device_info.dart';
+import 'package:xtremobile/core/utils/device_info.dart';
 
-/// Stream type enum for player
-enum StreamType { live, vod, series }
+/// Stream type enum for player 
+// (Moved to global or imported from iptv_models if available)
 
 /// Native video player screen for Android/iOS
 /// Uses media_kit (FFmpeg) for full codec support (AC3, EAC3, DTS, etc.)
 class NativePlayerScreen extends ConsumerStatefulWidget {
   final String streamId;
   final String title;
-  final StreamType streamType;
+  final model.StreamType streamType;
   final String? containerExtension;
   final PlaylistConfig playlist;
-  final List<Channel>? channels;
+  final List<model.Channel>? channels;
   final int initialIndex;
 
   // For series episodes (to track watch history)
@@ -160,7 +159,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Unified Buffering Logic (Live vs VOD)
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
 
-    if (widget.streamType == StreamType.live) {
+    if (widget.streamType == model.StreamType.live) {
       // LIVE PROFILE: Increased stability, no longer low-latency (prevents cuts)
       debugPrint(
         'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)',
@@ -246,7 +245,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // Low-latency intentionally removed for stability
     /*
-    if (widget.streamType == StreamType.live) {
+    if (widget.streamType == model.StreamType.live) {
       (_player.platform as dynamic)?.setProperty('profile', 'low-latency');
     }
     */
@@ -310,7 +309,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _checkAndMarkWatched(position);
 
         // Auto-save position every 10 seconds (resilience against app kill/crash)
-        if (widget.streamType != StreamType.live && !_hasMarkedAsWatched) {
+        if (widget.streamType != model.StreamType.live && !_hasMarkedAsWatched) {
           final now = DateTime.now();
           if (_lastSaveTime == null ||
               now.difference(_lastSaveTime!) > const Duration(seconds: 10)) {
@@ -367,7 +366,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _player.stream.completed.listen((completed) {
       if (completed && mounted) {
         // Logic for Live TV
-        if (widget.streamType == StreamType.live) {
+        if (widget.streamType == model.StreamType.live) {
           debugPrint(
             'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...',
           );
@@ -431,7 +430,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         // Force stop for Live TV
         _player.stop();
       } else {
@@ -490,7 +489,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   /// Get content ID for resume position storage
   String get _contentId {
-    if (widget.streamType == StreamType.series &&
+    if (widget.streamType == model.StreamType.series &&
         widget.seriesId != null &&
         widget.season != null &&
         widget.episodeNum != null) {
@@ -505,7 +504,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   /// Save resume position when exiting player
   void _saveResumePositionOnExit() {
-    if (widget.streamType == StreamType.live) return;
+    if (widget.streamType == model.StreamType.live) return;
 
     debugPrint(
       'MediaKitPlayer: Saving position - pos: ${_position.inSeconds}s, dur: ${_duration.inSeconds}s, contentId: $_contentId',
@@ -595,7 +594,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     Future.delayed(Duration(seconds: 2 * _reconnectAttempts), () {
       if (mounted) {
         // If VOD/Series, try to resume from current position
-        if (widget.streamType != StreamType.live && _position.inSeconds > 0) {
+        if (widget.streamType != model.StreamType.live && _position.inSeconds > 0) {
           _loadStream(startAt: _position);
         } else {
           _loadStream();
@@ -608,7 +607,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _checkAndMarkWatched(Duration position) {
     // Skip if already marked, live TV, or no duration
     if (_hasMarkedAsWatched) return;
-    if (widget.streamType == StreamType.live) return;
+    if (widget.streamType == model.StreamType.live) return;
     if (_duration.inSeconds <= 0) return;
 
     final progress = position.inSeconds / _duration.inSeconds;
@@ -617,12 +616,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       _hasMarkedAsWatched = true;
       debugPrint('MediaKitPlayer: 80% reached, marking as watched');
 
-      if (widget.streamType == StreamType.vod) {
+      if (widget.streamType == model.StreamType.vod) {
         // Mark movie as watched
         ref
             .read(mobileWatchHistoryProvider.notifier)
             .markMovieWatched(widget.streamId);
-      } else if (widget.streamType == StreamType.series &&
+      } else if (widget.streamType == model.StreamType.series &&
           widget.seriesId != null &&
           widget.season != null &&
           widget.episodeNum != null) {
@@ -642,7 +641,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   /// Start watchdog timer for live streams
   void _startLiveWatchdog() {
     _liveWatchdog?.cancel();
-    if (widget.streamType != StreamType.live) return;
+    if (widget.streamType != model.StreamType.live) return;
 
     // Check every 30 seconds if stream is still playing
     _liveWatchdog = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -678,7 +677,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
   }
 
-  ShortEPG? _epg;
+  model.ShortEPG? _epg;
 
   // ... (existing initState)
 
@@ -699,7 +698,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               : widget.streamId;
 
       // Load EPG if Live TV
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         _loadEpg(currentStreamId);
       }
 
@@ -707,9 +706,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Build stream URL based on type
       String streamUrl;
 
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         streamUrl = _xtreamService!.getLiveStreamUrl(currentStreamId);
-      } else if (widget.streamType == StreamType.vod) {
+      } else if (widget.streamType == model.StreamType.vod) {
         streamUrl = _xtreamService!.getVodStreamUrl(
           currentStreamId,
           widget.containerExtension ?? 'mp4',
@@ -744,12 +743,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       });
 
       // Show watchdog for live streams
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         _startLiveWatchdog();
       }
 
       // Resume from saved position (VOD/Series only)
-      if (widget.streamType != StreamType.live) {
+      if (widget.streamType != model.StreamType.live) {
         // Priority 0: Explicit reconnect position (passed from _attemptReconnect)
         if (startAt != null && startAt.inSeconds > 0) {
           debugPrint(
@@ -835,7 +834,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (_isPlaying) {
       _player.pause();
       // Save position on pause
-      if (widget.streamType != StreamType.live) {
+      if (widget.streamType != model.StreamType.live) {
         ref
             .read(mobileWatchHistoryProvider.notifier)
             .saveResumePosition(_contentId, _position.inSeconds);
@@ -913,7 +912,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Left Arrow - Show controls or navigate, seek in VOD when hidden
       if (key == LogicalKeyboardKey.arrowLeft) {
         if (!_showControls) {
-          if (widget.streamType != StreamType.live) {
+          if (widget.streamType != model.StreamType.live) {
             final newPos = _position - const Duration(seconds: 10);
             _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
           }
@@ -926,7 +925,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Right Arrow - Show controls or navigate, seek in VOD when hidden
       if (key == LogicalKeyboardKey.arrowRight) {
         if (!_showControls) {
-          if (widget.streamType != StreamType.live) {
+          if (widget.streamType != model.StreamType.live) {
             final newPos = _position + const Duration(seconds: 10);
             if (newPos < _duration) {
               _player.seek(newPos);
@@ -950,7 +949,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Channel Down = Previous Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelDown) {
-        if (widget.streamType == StreamType.live && widget.channels != null) {
+        if (widget.streamType == model.StreamType.live && widget.channels != null) {
           _playPrevious();
           _onUserInteraction();
           return true;
@@ -959,7 +958,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Channel Up = Next Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelUp) {
-        if (widget.streamType == StreamType.live && widget.channels != null) {
+        if (widget.streamType == model.StreamType.live && widget.channels != null) {
           _playNext();
           _onUserInteraction();
           return true;
@@ -1128,7 +1127,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              if (widget.streamType == StreamType.live)
+                              if (widget.streamType == model.StreamType.live)
                                 Text(
                                   _currentTime,
                                   style: const TextStyle(
@@ -1387,7 +1386,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   }
 
   Widget _buildControlsOverlay(String title) {
-    if (widget.streamType == StreamType.live) {
+    if (widget.streamType == model.StreamType.live) {
       return _buildUnifiedOSD(title);
     }
 

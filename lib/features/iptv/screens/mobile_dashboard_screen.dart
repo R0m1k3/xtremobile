@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/models/playlist_config.dart';
-import '../../../widgets/mobile_scaffold.dart';
-import '../../../theme/mobile_theme.dart';
-import '../widgets/mobile_live_tv_tab.dart';
-import '../widgets/mobile_movies_tab.dart';
-import '../widgets/mobile_series_tab.dart';
-import '../widgets/mobile_settings_tab.dart';
-import '../../../providers/mobile_xtream_providers.dart';
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/mobile/widgets/mobile_scaffold.dart';
+import 'package:xtremobile/mobile/theme/mobile_theme.dart';
+import 'package:xtremobile/features/iptv/widgets/mobile_live_tv_tab.dart';
+import 'package:xtremobile/features/iptv/widgets/mobile_movies_tab.dart';
+import 'package:xtremobile/features/iptv/widgets/mobile_series_tab.dart';
+import 'package:xtremobile/features/iptv/widgets/mobile_settings_tab.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 
 class MobileDashboardScreen extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;

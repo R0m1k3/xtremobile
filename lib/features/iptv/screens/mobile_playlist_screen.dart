@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/playlist_config.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../theme/mobile_theme.dart';
+import '../../../mobile/theme/mobile_theme.dart';
 import '../../../../core/services/playlist_api_service.dart';
 import 'mobile_dashboard_screen.dart';
 

@@ -139,14 +139,6 @@ class UnifiedDnsService {
     return null;
   }
 
-  /// Clear DNS cache
-  void clearCache() {
-    _cache.clear();
-    if (kDebugMode) {
-      debugPrint('🗑️  DNS cache cleared');
-    }
-  }
-
   /// Get cache stats for debugging
   Map<String, dynamic> getCacheStats() {
     final expiredCount = _cache.values.where((e) => e.isExpired).length;
@@ -158,14 +150,22 @@ class UnifiedDnsService {
     };
   }
 
-  /// Cache entry with TTL
-  static class _DnsCacheEntry {
-    final String ip;
-    final DateTime timestamp;
-
-    _DnsCacheEntry(this.ip) : timestamp = DateTime.now();
-
-    bool get isExpired =>
-        DateTime.now().difference(timestamp).inSeconds > _cacheTtlSeconds;
+  /// Clear DNS cache
+  void clearCache() {
+    _cache.clear();
+    if (kDebugMode) {
+      debugPrint('🗑️  DNS cache cleared');
+    }
   }
+}
+
+/// Cache entry with TTL
+class _DnsCacheEntry {
+  final String ip;
+  final DateTime timestamp;
+
+  _DnsCacheEntry(this.ip) : timestamp = DateTime.now();
+
+  bool get isExpired =>
+      DateTime.now().difference(timestamp).inSeconds > 3600;
 }

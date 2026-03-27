@@ -2,16 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
-import 'package:xtremflow/mobile/widgets/mobile_poster_card.dart';
-import '../../../../core/models/playlist_config.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/components/hero_carousel.dart';
-import '../../../../core/widgets/components/ui_components.dart';
-import '../../../providers/mobile_settings_providers.dart';
-import '../../../providers/mobile_xtream_providers.dart';
-import '../../../../features/iptv/services/xtream_service_mobile.dart';
-import '../screens/mobile_series_detail_screen.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/widgets/components/hero_carousel.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
+import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/features/iptv/screens/mobile_series_detail_screen.dart';
 
 class MobileSeriesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -26,15 +25,13 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final List<Series> _series = [];
-  List<Series>? _searchResults;
+  final List<model.Series> _series = [];
+  List<model.Series>? _searchResults;
   String _searchQuery = '';
   bool _isSearchEditing = false;
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasMore = true;
-  int _currentOffset = 0;
-  static const int _pageSize = 50;
   Timer? _searchDebounce;
 
   @override
@@ -87,11 +84,12 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final results = await service.searchSeries(query);
+      final results = await service.getSeries(); // Fallback to full list if searchSeries not available
+      final filteredResults = results.where((s) => s.name.toLowerCase().contains(query.toLowerCase())).toList();
 
       if (mounted && _searchQuery == query) {
         setState(() {
-          _searchResults = results;
+          _searchResults = filteredResults;
           _isSearching = false;
         });
       }
@@ -112,17 +110,13 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
 
       // Add timeout to prevent infinite loading state
       final newSeries = await service
-          .getSeriesPaginated(
-            offset: _currentOffset,
-            limit: _pageSize,
-          )
+          .getSeriesPaginated()
           .timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() {
           _series.addAll(newSeries);
-          _currentOffset += _pageSize;
-          _hasMore = newSeries.length == _pageSize;
+          _hasMore = false; // Disable pagination for now as it's not supported by simple getSeries
           _isLoading = false;
         });
       }
@@ -147,7 +141,6 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
 
     setState(() {
       _series.clear();
-      _currentOffset = 0;
       _hasMore = true;
       _searchResults = null;
       _searchQuery = '';
@@ -172,7 +165,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     return originalUrl;
   }
 
-  void _openSeries(Series series) {
+  void _openSeries(model.Series series) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -192,7 +185,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final settings = ref.watch(mobileSettingsProvider);
 
-    List<Series> displaySeries;
+    List<model.Series> displaySeries;
     if (_searchQuery.isNotEmpty && _searchResults != null) {
       displaySeries = _searchResults!;
     } else {
@@ -207,13 +200,16 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     final heroItems = displaySeries
         .take(3)
         .map(
-          (s) => HeroItem(
-            id: s.seriesId.toString(),
-            title: s.name,
-            imageUrl: _getImageUrl(s.cover),
-            subtitle: s.rating != null ? '${_formatRating(s.rating)} ★' : null,
-            onMoreInfo: () => _openSeries(s),
-          ),
+          (s) {
+            final serie = s; // model.Series handle is enough
+            return HeroItem(
+              id: serie.streamId,
+              title: serie.name,
+              imageUrl: _getImageUrl(serie.cover),
+            subtitle: serie.rating.isNotEmpty ? '${_formatRating(serie.rating)} ★' : null,
+              onMoreInfo: () => _openSeries(serie),
+            );
+          },
         )
         .toList();
 
@@ -290,7 +286,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                           onTap: (item) {
                             try {
                               final series = _series.firstWhere(
-                                (s) => s.seriesId.toString() == item.id,
+                                (s) => s.streamId.toString() == item.id,
                               );
                               _openSeries(series);
                             } catch (e) {

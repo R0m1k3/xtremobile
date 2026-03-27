@@ -2,14 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
-import 'package:xtremflow/mobile/widgets/mobile_poster_card.dart';
-import '../../../../core/models/playlist_config.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../providers/mobile_settings_providers.dart';
-import '../../../providers/mobile_xtream_providers.dart';
-
-import '../screens/native_player_screen.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
+import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -27,12 +27,12 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
 
   // Data
   List<MapEntry<String, String>> _categories = [];
-  List<Movie> _categoryMovies = [];
+  List<model.VodItem> _categoryMovies = [];
   String? _selectedCategoryId;
   String? _selectedCategoryName;
 
   // Search
-  List<Movie>? _searchResults;
+  List<model.VodItem>? _searchResults;
   String _searchQuery = '';
   bool _isSearchEditing = false;
   bool _isSearching = false;
@@ -85,7 +85,8 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final results = await service.searchMovies(query);
+      final movies = await service.getMovies();
+      final results = movies.where((m) => m.name.toLowerCase().contains(query.toLowerCase())).toList();
 
       if (mounted && _searchQuery == query) {
         setState(() {
@@ -105,11 +106,11 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     try {
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final categoriesMap = await service.getVodCategories();
+      final categories = await service.getVodCategories();
 
       if (mounted) {
         setState(() {
-          _categories = categoriesMap.entries.toList()
+          _categories = categories.map((c) => MapEntry(c.categoryId, c.categoryName)).toList()
             ..sort((a, b) => a.value.compareTo(b.value));
           _isLoading = false;
         });
@@ -197,7 +198,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     return originalUrl;
   }
 
-  void _playMovie(BuildContext context, Movie movie) {
+  void _playMovie(BuildContext context, model.VodItem movie) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -205,7 +206,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
           streamId: movie.streamId,
           title: movie.name,
           playlist: widget.playlist,
-          streamType: StreamType.vod,
+          streamType: model.StreamType.vod,
           containerExtension: movie.containerExtension,
         ),
       ),

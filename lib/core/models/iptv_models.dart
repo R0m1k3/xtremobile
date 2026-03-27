@@ -1,4 +1,7 @@
 import 'dart:convert';
+
+enum StreamType { live, vod, series }
+
 /// Channel model for Live TV
 class Channel {
   final String streamId;
@@ -101,6 +104,7 @@ class Series {
   final String plot;
   final String categoryId;
   final String categoryName;
+  final String rating;
 
   const Series({
     required this.seriesId,
@@ -109,6 +113,7 @@ class Series {
     this.plot = '',
     required this.categoryId,
     required this.categoryName,
+    this.rating = '0',
   });
 
   factory Series.fromJson(Map<String, dynamic> json) {
@@ -119,6 +124,7 @@ class Series {
       plot: json['plot']?.toString() ?? '',
       categoryId: json['category_id']?.toString() ?? '',
       categoryName: json['category_name']?.toString() ?? '',
+      rating: json['rating']?.toString() ?? '0',
     );
   }
 
@@ -130,8 +136,14 @@ class Series {
       'plot': plot,
       'category_id': categoryId,
       'category_name': categoryName,
+      'rating': rating,
     };
   }
+
+  /// UI Compatibility getters
+  String get streamId => seriesId;
+  String get coverUrl => cover;
+  String get title => name;
 }
 
 /// EPG (Electronic Program Guide) entry
@@ -192,9 +204,152 @@ class EpgEntry {
       final totalDuration = endTime.difference(startTime).inSeconds;
       final elapsed = now.difference(startTime).inSeconds;
 
+      if (totalDuration == 0) return 0.0;
       return elapsed / totalDuration;
     } catch (e) {
       return 0.0;
     }
   }
+}
+
+/// Category model
+class Category {
+  final String categoryId;
+  final String categoryName;
+  final int parentId;
+
+  const Category({
+    required this.categoryId,
+    required this.categoryName,
+    this.parentId = 0,
+  });
+
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      categoryId: json['category_id']?.toString() ?? '',
+      categoryName: json['category_name']?.toString() ?? '',
+      parentId: int.tryParse(json['parent_id']?.toString() ?? '0') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'category_id': categoryId,
+      'category_name': categoryName,
+      'parent_id': parentId,
+    };
+  }
+}
+
+/// Series Episode model
+class Episode {
+  final String id;
+  final String title;
+  final String containerExtension;
+  final String season;
+  final int episodeNum;
+  final int duration;
+
+  const Episode({
+    required this.id,
+    required this.title,
+    this.containerExtension = 'mp4',
+    this.season = '1',
+    this.episodeNum = 1,
+    this.duration = 0,
+  });
+
+  /// UI Compatibility getters
+  String get streamId => id;
+  int? get durationSecs => duration;
+  int get seasonNum => int.tryParse(season) ?? 1;
+
+  factory Episode.fromJson(Map<String, dynamic> json) {
+    return Episode(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      containerExtension: json['container_extension']?.toString() ?? 'mp4',
+      season: json['season']?.toString() ?? '1',
+      episodeNum: int.tryParse(json['episode_num']?.toString() ?? '1') ?? 1,
+      duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'container_extension': containerExtension,
+      'season': season,
+      'episode_num': episodeNum,
+      'duration': duration,
+    };
+  }
+}
+
+/// Detailed Series Info
+class SeriesInfo {
+  final Series series;
+  final Map<String, List<Episode>> episodes;
+
+  const SeriesInfo({
+    required this.series,
+    required this.episodes,
+  });
+
+  /// UI Compatibility getters
+  String? get coverUrl => series.cover;
+  String get title => series.name;
+  String? get rating => series.rating;
+  String? get plot => series.plot;
+}
+
+/// Short EPG model
+class ShortEPG {
+  final String id;
+  final String title;
+  final String start;
+  final String end;
+  final String description;
+
+  const ShortEPG({
+    required this.id,
+    required this.title,
+    required this.start,
+    required this.end,
+    this.description = '',
+  });
+
+  factory ShortEPG.fromJson(Map<String, dynamic> json) {
+    return ShortEPG(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      start: json['start']?.toString() ?? '',
+      end: json['end']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+    );
+  }
+
+  /// Get progress percentage (compatibility with UI expectations)
+  double get progress {
+    try {
+      final startTime = DateTime.parse(start);
+      final endTime = DateTime.parse(end);
+      final now = DateTime.now();
+      if (now.isBefore(startTime)) return 0.0;
+      if (now.isAfter(endTime)) return 1.0;
+      final total = endTime.difference(startTime).inSeconds;
+      final elapsed = now.difference(startTime).inSeconds;
+      if (total == 0) return 0.0;
+      return elapsed / total;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  /// Get current program title
+  String get nowPlaying => title;
+
+  /// Get next program info (mocked or from data if available)
+  String get nextPlaying => "Next Program";
 }

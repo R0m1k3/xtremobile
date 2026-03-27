@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
-import 'package:xtremflow/core/utils/image_cache_config.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/core/utils/image_cache_config.dart';
 
 class MobilePosterCard extends StatelessWidget {
   final String title;

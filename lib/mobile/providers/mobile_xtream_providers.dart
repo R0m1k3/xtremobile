@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/playlist_config.dart';
-import '../../core/models/iptv_models.dart' show Channel;
+import '../../core/models/iptv_models.dart' as model;
 import '../../features/iptv/services/xtream_service_mobile.dart';
-import '../../features/iptv/models/xtream_models.dart';
-
-export '../../features/iptv/models/xtream_models.dart';
 
 /// Mobile-specific Xtream service provider
 import 'package:path_provider/path_provider.dart';
@@ -21,30 +18,27 @@ final mobileXtreamServiceProvider =
 
 /// Mobile-specific live channels provider
 final mobileLiveChannelsProvider =
-    FutureProvider.family<Map<String, List<Channel>>, PlaylistConfig>(
+    FutureProvider.family<List<model.Channel>, PlaylistConfig>(
         (ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
-  return service.getLiveChannels();
+  // Correction: getLiveChannels returns List<Channel>, and we now need a selected category
+  // If no category is selected, we might want to load all or first category.
+  // For now, let's assume it should return all channels or handle category selection elsewhere.
+  return service.getLiveChannels(""); 
 });
 
-/// Mobile-specific movies pagination provider
+/// Mobile-specific movies provider
 final mobileMoviesProvider =
-    FutureProvider.family<List<Movie>, PlaylistConfig>((ref, playlist) async {
+    FutureProvider.family<List<model.VodItem>, PlaylistConfig>((ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
-  return service.getMoviesPaginated(offset: 0, limit: 100);
+  return service.getMoviesByCategory(""); // Fetch all or default
 });
 
 /// Mobile-specific series pagination provider
 final mobileSeriesProvider =
-    FutureProvider.family<List<Series>, PlaylistConfig>((ref, playlist) async {
+    FutureProvider.family<List<model.Series>, PlaylistConfig>((ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
-  return service.getSeriesPaginated(offset: 0, limit: 100);
-});
-
-/// Mobile-specific series info provider
-final mobileSeriesInfoProvider =
-    FutureProvider.family<SeriesInfo, String>((ref, seriesId) {
-  throw UnimplementedError('Use mobileSeriesInfoByPlaylistProvider instead');
+  return service.getSeriesPaginated();
 });
 
 /// Series info with playlist context
@@ -67,7 +61,7 @@ class SeriesInfoRequest {
 }
 
 final mobileSeriesInfoByPlaylistProvider =
-    FutureProvider.family<SeriesInfo, SeriesInfoRequest>((ref, request) async {
+    FutureProvider.family<model.SeriesInfo?, SeriesInfoRequest>((ref, request) async {
   final service =
       await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
   return service.getSeriesInfo(request.seriesId);
@@ -94,8 +88,7 @@ class LiveTvUiState {
 /// Persistent index for mobile dashboard navigation
 final mobileDashboardIndexProvider = StateProvider<int>((ref) => 0);
 
-/// [P0-1 FIX] Batch EPG provider - Load all EPG data for multiple channels at once
-/// This prevents the N+1 query problem where each channel card makes its own EPG request
+/// Batch EPG provider
 class BatchEpgRequest {
   final PlaylistConfig playlist;
   final List<String> streamIds;
@@ -108,16 +101,15 @@ class BatchEpgRequest {
       other is BatchEpgRequest &&
           runtimeType == other.runtimeType &&
           playlist == other.playlist &&
-          streamIds.toSet() == other.streamIds.toSet();
+          streamIds.toSet().toString() == other.streamIds.toSet().toString();
 
   @override
-  int get hashCode => playlist.hashCode ^ streamIds.toSet().hashCode;
+  int get hashCode => playlist.hashCode ^ streamIds.toSet().toString().hashCode;
 }
 
 /// Load EPG data for multiple streams in one batch request
-/// Cache is automatically handled by the service with 1-hour TTL
 final mobileBatchEpgProvider =
-    FutureProvider.family<Map<String, ShortEpg>, BatchEpgRequest>(
+    FutureProvider.family<Map<String, model.ShortEPG>, BatchEpgRequest>(
         (ref, request) async {
   if (request.streamIds.isEmpty) return {};
 

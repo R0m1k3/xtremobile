@@ -52,6 +52,9 @@ class ApiClient {
     return _token;
   }
 
+  /// Get underlying Dio instance for direct use
+  Dio get dio => _dio;
+
   /// Restore token from SharedPreferences
   Future<void> restoreToken() async {
     final prefs = await SharedPreferences.getInstance();

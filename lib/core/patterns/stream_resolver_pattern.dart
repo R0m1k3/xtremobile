@@ -40,8 +40,8 @@ class StreamResolverPattern {
         _performDnsResolution(streamUrl).timeout(timeout, onTimeout: () => false),
       ], eagerError: false).catchError((_) => [false, false]);
 
-      final isValid = results[0] as bool;
-      final dnsResolved = results[1] as bool;
+      final isValid = results[0];
+      final dnsResolved = results[1];
 
       if (!isValid) {
         return StreamResolverPattern(

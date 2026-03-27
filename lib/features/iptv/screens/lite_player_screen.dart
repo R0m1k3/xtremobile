@@ -6,22 +6,21 @@ import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:xtremflow/core/models/iptv_models.dart';
-import 'package:xtremflow/core/models/playlist_config.dart';
-import 'package:xtremflow/features/iptv/services/xtream_service_mobile.dart';
-import 'package:xtremflow/mobile/providers/mobile_settings_providers.dart';
-import 'package:xtremflow/core/theme/app_colors.dart';
-import 'package:xtremflow/features/iptv/screens/native_player_screen.dart';
-import 'package:xtremflow/features/iptv/models/xtream_models.dart' as xm;
-import 'package:xtremflow/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/features/iptv/services/xtream_service_mobile.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 
 class LitePlayerScreen extends ConsumerStatefulWidget {
   final String streamId;
   final String title;
-  final StreamType streamType;
+  final model.StreamType streamType;
   final String? containerExtension;
   final PlaylistConfig playlist;
-  final List<Channel>? channels;
+  final List<model.Channel>? channels;
   final int initialIndex;
 
   // For series episodes
@@ -59,7 +58,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   bool _isPlaying = false;
 
   // EPG & Clock
-  xm.ShortEPG? _epg;
+  model.ShortEPG? _epg;
   Timer? _epgTimer;
   String _currentTime = "";
   Timer? _clockTimer;
@@ -135,7 +134,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       await _xtreamService!.setPlaylistAsync(widget.playlist);
       _loadStream();
 
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         _updateEPG();
         _epgTimer = Timer.periodic(
           const Duration(minutes: 5),
@@ -148,7 +147,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   }
 
   Future<void> _updateEPG() async {
-    if (widget.streamType != StreamType.live || _xtreamService == null) return;
+    if (widget.streamType != model.StreamType.live || _xtreamService == null) return;
     try {
       final currentChannelId =
           widget.channels?[_currentIndex].streamId ?? widget.streamId;
@@ -179,11 +178,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
               ? widget.channels![_currentIndex].streamId
               : widget.streamId;
 
-      if (widget.streamType == StreamType.live) _updateEPG();
+      if (widget.streamType == model.StreamType.live) _updateEPG();
 
-      final streamUrl = widget.streamType == StreamType.live
+      final streamUrl = widget.streamType == model.StreamType.live
           ? _xtreamService!.getLiveStreamUrl(currentStreamId)
-          : (widget.streamType == StreamType.vod
+          : (widget.streamType == model.StreamType.vod
               ? _xtreamService!.getVodStreamUrl(
                   currentStreamId,
                   widget.containerExtension ?? 'mp4',
@@ -210,7 +209,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       }
 
       // Buffer Optimization: Pre-roll delay for TS streams
-      if (widget.streamType == StreamType.live) {
+      if (widget.streamType == model.StreamType.live) {
         await Future.delayed(const Duration(milliseconds: 2000));
       }
 
@@ -489,7 +488,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           // Seeker (VOD)
-          if (widget.streamType != StreamType.live) _buildSeeker(),
+          if (widget.streamType != model.StreamType.live) _buildSeeker(),
 
           // Unified Box: EPG & Controls
           Container(
@@ -511,7 +510,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      if (widget.streamType == StreamType.live)
+                      if (widget.streamType == model.StreamType.live)
                         TVFocusable(
                           focusNode: _prevFocusNode,
                           onPressed: () => _switchChannel(
@@ -539,7 +538,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                         ),
                       ),
                       const SizedBox(width: 16),
-                      if (widget.streamType == StreamType.live)
+                      if (widget.streamType == model.StreamType.live)
                         TVFocusable(
                           focusNode: _nextFocusNode,
                           onPressed: () => _switchChannel(
@@ -601,7 +600,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   }
 
   Widget _buildEPGBox(String title) {
-    String program = widget.streamType == StreamType.live
+    String program = widget.streamType == model.StreamType.live
         ? (_epg?.nowPlaying ?? "Pas d'infos EPG")
         : title;
     String next =
@@ -646,7 +645,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (widget.streamType == StreamType.live &&
+        if (widget.streamType == model.StreamType.live &&
             _epg?.nowPlaying != null) ...[
           const SizedBox(height: 6),
           ClipRRect(
