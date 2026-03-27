@@ -35,10 +35,14 @@ class StreamResolverPattern {
       }
 
       // Parallel resolution attempts
-      final results = await Future.wait([
-        _validateUrl(streamUrl).timeout(timeout, onTimeout: () => false),
-        _performDnsResolution(streamUrl).timeout(timeout, onTimeout: () => false),
-      ], eagerError: false).catchError((_) => [false, false]);
+      final results = await Future.wait(
+        [
+          _validateUrl(streamUrl).timeout(timeout, onTimeout: () => false),
+          _performDnsResolution(streamUrl)
+              .timeout(timeout, onTimeout: () => false),
+        ],
+        eagerError: false,
+      ).catchError((_) => [false, false]);
 
       final isValid = results[0];
       final dnsResolved = results[1];

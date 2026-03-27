@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremobile/core/utils/image_cache_config.dart';
-import 'dart:io';
 import 'dart:async';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
@@ -11,8 +10,6 @@ import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
 import 'package:xtremobile/core/models/iptv_models.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
-import 'package:xtremobile/core/api/dns_resolver.dart';
-import 'package:xtremobile/mobile/theme/mobile_theme.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:flutter/services.dart';
@@ -158,7 +155,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             ),
             data: (groupedChannels) {
               // Prepare categories
-              var categories = groupedChannels.map((c) => c.categoryName).toSet().toList();
+              var categories =
+                  groupedChannels.map((c) => c.categoryName).toSet().toList();
               if (settings.liveTvKeywords.isNotEmpty) {
                 categories = categories
                     .where((cat) => settings.matchesLiveTvFilter(cat))
@@ -198,8 +196,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                       .where((c) => favorites.contains(c.streamId))
                       .toList();
                 } else if (uiState.selectedCategory != null) {
-                  displayedChannels =
-                      groupedChannels.where((c) => c.categoryName == uiState.selectedCategory).toList();
+                  displayedChannels = groupedChannels
+                      .where((c) => c.categoryName == uiState.selectedCategory)
+                      .toList();
                 }
               }
 

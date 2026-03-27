@@ -2,6 +2,7 @@
 ///
 /// Detects device RAM and adjusts player buffer size accordingly
 /// to prevent OOM crashes on low-end devices
+library;
 
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';

@@ -35,7 +35,7 @@ class StartupProfiler {
   /// Report all metrics
   static Future<void> reportAll() async {
     if (kDebugMode) {
-      print('\n' + ('=' * 50));
+      print('\n${'=' * 50}');
       print('⏱️  STARTUP METRICS');
       print('=' * 50);
       _timings.forEach((key, watch) {

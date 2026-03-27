@@ -32,8 +32,7 @@ class VideoProfiler {
   static void markFirstFrame(String streamName) {
     final m = metrics[streamName];
     if (m != null) {
-      m.firstFrameTime =
-          DateTime.now().difference(m.loadStart).inMilliseconds;
+      m.firstFrameTime = DateTime.now().difference(m.loadStart).inMilliseconds;
       if (kDebugMode) {
         print('🎬 FIRST FRAME: ${m.firstFrameTime}ms');
       }
@@ -78,10 +77,9 @@ class VideoProfiler {
     final m = metrics[streamName];
     if (m != null) {
       m.endTime = DateTime.now();
-      m.totalDurationMs =
-          m.endTime!.difference(m.startTime).inMilliseconds;
+      m.totalDurationMs = m.endTime!.difference(m.startTime).inMilliseconds;
       if (kDebugMode) {
-        print('\n' + ('=' * 50));
+        print('\n${'=' * 50}');
         print('📊 VIDEO METRICS: $streamName');
         print('=' * 50);
         m.printMetrics();
@@ -93,7 +91,7 @@ class VideoProfiler {
   /// Get summary of all metrics
   static void printSummary() {
     if (kDebugMode) {
-      print('\n' + ('=' * 50));
+      print('\n${'=' * 50}');
       print('📈 VIDEO PROFILING SUMMARY');
       print('=' * 50);
       metrics.forEach((key, m) {

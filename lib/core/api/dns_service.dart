@@ -9,6 +9,7 @@
 /// - Result: Same hostname resolved twice, wasting network calls
 ///
 /// Solution: Single unified service with shared cache
+library;
 
 import 'dart:convert';
 import 'dart:io';
@@ -166,6 +167,5 @@ class _DnsCacheEntry {
 
   _DnsCacheEntry(this.ip) : timestamp = DateTime.now();
 
-  bool get isExpired =>
-      DateTime.now().difference(timestamp).inSeconds > 3600;
+  bool get isExpired => DateTime.now().difference(timestamp).inSeconds > 3600;
 }

@@ -16,7 +16,7 @@ import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremobile/core/utils/device_info.dart';
 
-/// Stream type enum for player 
+/// Stream type enum for player
 // (Moved to global or imported from iptv_models if available)
 
 /// Native video player screen for Android/iOS
@@ -165,7 +165,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)',
       );
       (_player.platform as dynamic)?.setProperty(
-          'cache-secs', '10'); // Reduced to 10s for faster startup
+        'cache-secs',
+        '10',
+      ); // Reduced to 10s for faster startup
       (_player.platform as dynamic)?.setProperty(
         'demuxer-max-bytes',
         '32000000',
@@ -190,7 +192,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       final backBytes = (bufferBytes / 10).toInt(); // 10% for backward buffer
 
       debugPrint(
-          'MediaKitPlayer: VOD profile - ${deviceInfo.getDeviceProfile()}, buffer=${bufferBytes ~/ (1024 * 1024)}MB');
+        'MediaKitPlayer: VOD profile - ${deviceInfo.getDeviceProfile()}, buffer=${bufferBytes ~/ (1024 * 1024)}MB',
+      );
 
       (_player.platform as dynamic)?.setProperty('cache-secs', '100');
       (_player.platform as dynamic)
@@ -309,7 +312,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _checkAndMarkWatched(position);
 
         // Auto-save position every 10 seconds (resilience against app kill/crash)
-        if (widget.streamType != model.StreamType.live && !_hasMarkedAsWatched) {
+        if (widget.streamType != model.StreamType.live &&
+            !_hasMarkedAsWatched) {
           final now = DateTime.now();
           if (_lastSaveTime == null ||
               now.difference(_lastSaveTime!) > const Duration(seconds: 10)) {
@@ -594,7 +598,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     Future.delayed(Duration(seconds: 2 * _reconnectAttempts), () {
       if (mounted) {
         // If VOD/Series, try to resume from current position
-        if (widget.streamType != model.StreamType.live && _position.inSeconds > 0) {
+        if (widget.streamType != model.StreamType.live &&
+            _position.inSeconds > 0) {
           _loadStream(startAt: _position);
         } else {
           _loadStream();
@@ -949,7 +954,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Channel Down = Previous Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelDown) {
-        if (widget.streamType == model.StreamType.live && widget.channels != null) {
+        if (widget.streamType == model.StreamType.live &&
+            widget.channels != null) {
           _playPrevious();
           _onUserInteraction();
           return true;
@@ -958,7 +964,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Channel Up = Next Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelUp) {
-        if (widget.streamType == model.StreamType.live && widget.channels != null) {
+        if (widget.streamType == model.StreamType.live &&
+            widget.channels != null) {
           _playNext();
           _onUserInteraction();
           return true;
@@ -1522,9 +1529,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                   LogicalKeyboardKey.arrowLeft) {
                                 final newPos =
                                     _position - const Duration(seconds: 10);
-                                _player.seek(newPos < Duration.zero
-                                    ? Duration.zero
-                                    : newPos);
+                                _player.seek(
+                                  newPos < Duration.zero
+                                      ? Duration.zero
+                                      : newPos,
+                                );
                                 _resetControlsTimer();
                                 return KeyEventResult.handled;
                               }

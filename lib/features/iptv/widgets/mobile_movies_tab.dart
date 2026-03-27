@@ -86,7 +86,9 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
       final service =
           await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
       final movies = await service.getMovies();
-      final results = movies.where((m) => m.name.toLowerCase().contains(query.toLowerCase())).toList();
+      final results = movies
+          .where((m) => m.name.toLowerCase().contains(query.toLowerCase()))
+          .toList();
 
       if (mounted && _searchQuery == query) {
         setState(() {
@@ -110,7 +112,9 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
 
       if (mounted) {
         setState(() {
-          _categories = categories.map((c) => MapEntry(c.categoryId, c.categoryName)).toList()
+          _categories = categories
+              .map((c) => MapEntry(c.categoryId, c.categoryName))
+              .toList()
             ..sort((a, b) => a.value.compareTo(b.value));
           _isLoading = false;
         });
@@ -400,7 +404,8 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                     focusedBorder: InputBorder.none,
                                     enabledBorder: InputBorder.none,
                                     isDense: true,
-                                    contentPadding: EdgeInsets.only(bottom: 11),
+                                    contentPadding:
+                                        const EdgeInsets.only(bottom: 11),
                                   ),
                                   onChanged: _onSearchChanged,
                                   onSubmitted: (_) =>

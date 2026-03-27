@@ -147,7 +147,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   }
 
   Future<void> _updateEPG() async {
-    if (widget.streamType != model.StreamType.live || _xtreamService == null) return;
+    if (widget.streamType != model.StreamType.live || _xtreamService == null)
+      return;
     try {
       final currentChannelId =
           widget.channels?[_currentIndex].streamId ?? widget.streamId;
@@ -198,10 +199,12 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       );
 
       _controller = controller;
-      await controller.initialize().timeout(const Duration(seconds: 15),
-          onTimeout: () {
-        throw Exception('Connection timed out');
-      });
+      await controller.initialize().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Connection timed out');
+        },
+      );
 
       if (!mounted) {
         await controller.dispose();
@@ -221,11 +224,12 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       _resetControlsTimer();
       controller.addListener(_videoListener);
     } catch (e) {
-      if (mounted && currentLoadId == _loadId)
+      if (mounted && currentLoadId == _loadId) {
         setState(() {
           _isLoading = false;
           _errorMessage = "Playback Error: $e";
         });
+      }
     }
   }
 
@@ -233,8 +237,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     if (_controller == null || !mounted) return;
     final value = _controller!.value;
 
-    if (value.isPlaying != _isPlaying)
+    if (value.isPlaying != _isPlaying) {
       setState(() => _isPlaying = value.isPlaying);
+    }
 
     // Stabilization Masking: spinner stays until 1.5s of smooth play
     // Fix: If playing, ignore isBuffering to prevent infinite spinner on some TS streams
@@ -302,16 +307,18 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.channelUp) {
-      if (widget.channels != null)
+      if (widget.channels != null) {
         _switchChannel((_currentIndex + 1) % widget.channels!.length);
+      }
       return true;
     }
     if (key == LogicalKeyboardKey.channelDown) {
-      if (widget.channels != null)
+      if (widget.channels != null) {
         _switchChannel(
           (_currentIndex - 1 + widget.channels!.length) %
               widget.channels!.length,
         );
+      }
       return true;
     }
 
@@ -393,7 +400,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                           borderRadius: BorderRadius.circular(50),
                           child: Container(
                             padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.black45,
                               shape: BoxShape.circle,
                             ),
@@ -408,7 +415,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                         if (settings.showClock)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black45,
                               borderRadius: BorderRadius.circular(20),
@@ -460,9 +469,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
   Widget _buildAspectRatioWrapper() {
     final mode = ref.read(mobileSettingsProvider).aspectRatioMode;
-    if (mode == 'fill')
+    if (mode == 'fill') {
       return SizedBox.expand(child: VideoPlayer(_controller!));
-    if (mode == 'cover')
+    }
+    if (mode == 'cover') {
       return SizedBox.expand(
         child: FittedBox(
           fit: BoxFit.cover,
@@ -473,6 +483,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
           ),
         ),
       );
+    }
     return AspectRatio(
       aspectRatio: _controller!.value.aspectRatio,
       child: VideoPlayer(_controller!),

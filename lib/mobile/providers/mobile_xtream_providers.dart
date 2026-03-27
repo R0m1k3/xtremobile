@@ -16,35 +16,88 @@ final mobileXtreamServiceProvider =
   return service;
 });
 
-/// Mobile-specific live channels provider
-/// Loads ALL channels from ALL categories
+/// Mobile-specific live categories provider (for Live TV category grid)
+final mobileLiveCategoriesProvider =
+    FutureProvider.family<List<model.Category>, PlaylistConfig>(
+        (ref, playlist) async {
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
+  return service.getLiveCategories();
+});
+
+/// Mobile-specific live channels provider (loads channels for a specific category)
+final mobileLiveChannelsByCategoryProvider = FutureProvider.family<
+    List<model.Channel>,
+    (PlaylistConfig, String)>((ref, params) async {
+  final (playlist, categoryId) = params;
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
+  return service.getLiveChannels(categoryId);
+});
+
+/// Load ALL live channels efficiently
+/// Strategy: Load categories, then load channels in SMALL BATCHES (5 at a time)
+/// This balances speed with robustness - not too slow, not too many parallel requests
 final mobileLiveChannelsProvider =
     FutureProvider.family<List<model.Channel>, PlaylistConfig>(
         (ref, playlist) async {
+  print('📺 [LiveTV] Starting to load ALL channels...');
+
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
 
-  // Strategy: Try to load categories first (with timeout)
-  // If categories load successfully, load channels for each category
-  // If categories fail/timeout, load all channels at once
-  List<model.Category> categories = [];
-  try {
-    categories = await service.getLiveCategories();
-  } catch (e) {
-    // Silently fall back to loading all channels
+  // Step 1: Load categories
+  print('🔄 [LiveTV] Loading categories...');
+  final categories = await service.getLiveCategories();
+  print('✅ [LiveTV] Loaded ${categories.length} categories');
+
+  if (categories.isEmpty) {
+    print('❌ [LiveTV] No categories found!');
+    return [];
   }
 
-  if (categories.isNotEmpty) {
-    // Load channels from each category and combine them
-    final allChannels = <model.Channel>[];
-    for (final category in categories) {
-      final channels = await service.getLiveChannels(category.categoryId);
+  // Step 2: Load channels in SMALL BATCHES (5 at a time for balance)
+  final allChannels = <model.Channel>[];
+  const batchSize = 5;
+  int loaded = 0;
+  int totalBatches = (categories.length / batchSize).ceil();
+
+  for (int batchNum = 0; batchNum < totalBatches; batchNum++) {
+    int startIdx = batchNum * batchSize;
+    int endIdx =
+        (startIdx + batchSize < categories.length) ? startIdx + batchSize : categories.length;
+    final batch = categories.sublist(startIdx, endIdx);
+
+    print(
+      '🔄 [LiveTV] Batch ${batchNum + 1}/$totalBatches (${batch.length} categories)...',
+    );
+
+    // Load this batch in parallel
+    final futures = batch
+        .map(
+          (cat) => service
+              .getLiveChannels(cat.categoryId)
+              .timeout(const Duration(seconds: 15))
+              .catchError((_) => <model.Channel>[]),
+        )
+        .toList();
+
+    final batchResults = await Future.wait(futures);
+
+    // Combine results from this batch
+    for (final channels in batchResults) {
       allChannels.addAll(channels);
     }
-    return allChannels;
+
+    loaded += batch.length;
+    print(
+      '✅ [LiveTV] Batch complete: $loaded/${categories.length} categories, '
+      '${allChannels.length} total channels',
+    );
   }
 
-  // Fallback: Load all channels without category filter
-  return service.getLiveChannels("");
+  print(
+    '🎉 [LiveTV] ALL DONE! ${categories.length} categories, '
+    '${allChannels.length} total channels',
+  );
+  return allChannels;
 });
 
 /// Mobile-specific movies provider

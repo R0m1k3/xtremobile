@@ -13,7 +13,7 @@ class HiveEncryptionBenchmark {
     String valueSize = 'medium', // small, medium, large
   }) async {
     if (kDebugMode) {
-      print('\n' + ('=' * 60));
+      print('\n${'=' * 60}');
       print('🔐 HIVE ENCRYPTION BENCHMARK');
       print('=' * 60);
       print('Write Operations: $writeCount');
@@ -42,7 +42,10 @@ class HiveEncryptionBenchmark {
   }
 
   static Future<void> _benchmarkUnencrypted(
-      int writes, int reads, String testValue) async {
+    int writes,
+    int reads,
+    String testValue,
+  ) async {
     const boxName = 'benchmark_unencrypted';
     try {
       // Clean up if exists
@@ -62,7 +65,7 @@ class HiveEncryptionBenchmark {
       // Read benchmark
       final readStop = Stopwatch()..start();
       for (int i = 0; i < reads; i++) {
-        await box.get('key_${i % writes}');
+        box.get('key_${i % writes}');
       }
       readStop.stop();
 
@@ -93,7 +96,10 @@ class HiveEncryptionBenchmark {
   }
 
   static Future<void> _benchmarkEncrypted(
-      int writes, int reads, String testValue) async {
+    int writes,
+    int reads,
+    String testValue,
+  ) async {
     const boxName = 'benchmark_encrypted';
     try {
       // Clean up if exists
@@ -118,7 +124,7 @@ class HiveEncryptionBenchmark {
       // Read benchmark
       final readStop = Stopwatch()..start();
       for (int i = 0; i < reads; i++) {
-        await box.get('key_${i % writes}');
+        box.get('key_${i % writes}');
       }
       readStop.stop();
 
@@ -157,21 +163,25 @@ class HiveEncryptionBenchmark {
       final readOverhead = ((enc.readTimeMs / unenc.readTimeMs - 1) * 100);
 
       if (kDebugMode) {
-        print('\n' + ('=' * 60));
+        print('\n${'=' * 60}');
         print('📊 PERFORMANCE COMPARISON');
         print('=' * 60);
         print('\nWrite Performance:');
         print(
-            '  Unencrypted: ${unenc.writeTimeMs}ms (${(unenc.writeTimeMs / unenc.operationCount).toStringAsFixed(2)}µs/op)');
+          '  Unencrypted: ${unenc.writeTimeMs}ms (${(unenc.writeTimeMs / unenc.operationCount).toStringAsFixed(2)}µs/op)',
+        );
         print(
-            '  Encrypted:   ${enc.writeTimeMs}ms (${(enc.writeTimeMs / enc.operationCount).toStringAsFixed(2)}µs/op)');
+          '  Encrypted:   ${enc.writeTimeMs}ms (${(enc.writeTimeMs / enc.operationCount).toStringAsFixed(2)}µs/op)',
+        );
         print('  Overhead:    ${writeOverhead.toStringAsFixed(1)}%');
 
         print('\nRead Performance:');
         print(
-            '  Unencrypted: ${unenc.readTimeMs}ms (${(unenc.readTimeMs / unenc.operationCount).toStringAsFixed(2)}µs/op)');
+          '  Unencrypted: ${unenc.readTimeMs}ms (${(unenc.readTimeMs / unenc.operationCount).toStringAsFixed(2)}µs/op)',
+        );
         print(
-            '  Encrypted:   ${enc.readTimeMs}ms (${(enc.readTimeMs / enc.operationCount).toStringAsFixed(2)}µs/op)');
+          '  Encrypted:   ${enc.readTimeMs}ms (${(enc.readTimeMs / enc.operationCount).toStringAsFixed(2)}µs/op)',
+        );
         print('  Overhead:    ${readOverhead.toStringAsFixed(1)}%');
 
         // Status
@@ -180,8 +190,10 @@ class HiveEncryptionBenchmark {
         final readStatus = readOverhead > acceptableThreshold ? '⚠️' : '✅';
 
         print('\nStatus:');
-        print('  $writeStatus Write overhead: ${writeOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
-        print('  $readStatus Read overhead: ${readOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
+        print(
+            '  $writeStatus Write overhead: ${writeOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
+        print(
+            '  $readStatus Read overhead: ${readOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
         print('=' * 60 + '\n');
       }
     }
@@ -229,7 +241,8 @@ class EncryptionBenchmarkResult {
 
   void print() {
     print('  Name: $name');
-    print('  Write: ${writeTimeMs}ms (${writePerOpUs.toStringAsFixed(2)}µs/op)');
+    print(
+        '  Write: ${writeTimeMs}ms (${writePerOpUs.toStringAsFixed(2)}µs/op)');
     print('  Read: ${readTimeMs}ms (${readPerOpUs.toStringAsFixed(2)}µs/op)');
     print('  Delete: ${deleteTimeMs}ms');
   }

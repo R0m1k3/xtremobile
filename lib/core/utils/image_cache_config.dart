@@ -5,6 +5,7 @@
 /// but displays them at 40-100px sizes, wasting memory and disk space.
 ///
 /// Solution: Specify memCacheWidth/Height for display size, limiting disk cache.
+library;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -29,7 +30,7 @@ class ImageCacheConfigs {
   static const ImageCacheConfig channelIcon = ImageCacheConfig(
     displayWidth: 40,
     displayHeight: 40,
-    cacheWidth: 50,    // Slight buffer for upscaling
+    cacheWidth: 50, // Slight buffer for upscaling
     cacheHeight: 50,
   );
 

@@ -2,13 +2,13 @@
 ///
 /// Handles Xtream API communication with batching and caching optimizations
 /// for mobile platforms. Designed for performance with TiviMate-level efficiency.
+library;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../models/xtream_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
-import 'package:xtremobile/core/api/api_client.dart';
 
 /// EPG cache entry with TTL
 class _EpgCacheEntry {
@@ -18,7 +18,8 @@ class _EpgCacheEntry {
 
   _EpgCacheEntry(this.data) : timestamp = DateTime.now();
 
-  bool get isExpired => DateTime.now().difference(timestamp).inSeconds > ttlSeconds;
+  bool get isExpired =>
+      DateTime.now().difference(timestamp).inSeconds > ttlSeconds;
 }
 
 /// Xtream API Service for Mobile
@@ -49,8 +50,18 @@ class XtreamServiceMobile {
     _username = config.username;
     _password = config.password;
 
-    // Use shared Dio instance from ApiClient (with DNS resolution, etc.)
-    _dio = ApiClient().dio;
+    // Create independent Dio for Xtream API (avoid ApiClient baseUrl issues)
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 15),
+      ),
+    );
+
+    if (kDebugMode) {
+      print('✅ [XtreamServiceMobile] Initialized with URL: $_baseUrl');
+    }
   }
 
   /// Get live channels for a category (with batch EPG support)
@@ -81,23 +92,31 @@ class XtreamServiceMobile {
         ),
       );
 
-      if (response.statusCode == 200 && response.data is List) {
-        final channels = (response.data as List)
-            .map((e) => model.Channel.fromJson(e))
-            .toList();
+      if (response.statusCode == 200) {
+        if (response.data is List) {
+          final channels = (response.data as List)
+              .map((e) => model.Channel.fromJson(e))
+              .toList();
 
-        if (kDebugMode) {
-          final categories = channels.map((c) => c.categoryName).toSet();
-          print(
-            '✅ Loaded ${channels.length} channels with ${categories.length} categories: $categories',
-          );
+          if (kDebugMode) {
+            final categories = channels.map((c) => c.categoryName).toSet();
+            print(
+              '✅ Loaded ${channels.length} channels with ${categories.length} categories: $categories',
+            );
+          }
+
+          return channels;
+        } else if (response.data is Map) {
+          if (kDebugMode) print('⚠️ API returned a Map instead of List: ${response.data}');
+          return [];
+        } else {
+          if (kDebugMode) print('⚠️ API returned unexpected type: ${response.data.runtimeType}');
+          return [];
         }
-
-        return channels;
       }
 
       if (kDebugMode) {
-        print('⚠️ Unexpected response status: ${response.statusCode}');
+        print('⚠️ Unexpected response status: ${response.statusCode}, body: ${response.data}');
       }
       return [];
     } catch (e) {
@@ -110,12 +129,13 @@ class XtreamServiceMobile {
   Future<model.ShortEPG> getShortEPG(String streamId) async {
     // For backward compatibility, but prefer batch loading
     final batch = await getBatchEPG([streamId]);
-    return batch[streamId] ?? model.ShortEPG(
-      id: streamId,
-      title: 'No Program',
-      start: DateTime.now().toIso8601String(),
-      end: DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
-    );
+    return batch[streamId] ??
+        model.ShortEPG(
+          id: streamId,
+          title: 'No Program',
+          start: DateTime.now().toIso8601String(),
+          end: DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+        );
   }
 
   /// Get SHORT EPG for MULTIPLE channels in ONE request
@@ -123,7 +143,8 @@ class XtreamServiceMobile {
   /// This is the optimized method that prevents N+1 queries.
   /// Instead of 50 requests for 50 channels, this loads all at once.
   /// Results are cached for 1 hour to avoid repeated requests.
-  Future<Map<String, model.ShortEPG>> getBatchEPG(List<String> streamIds) async {
+  Future<Map<String, model.ShortEPG>> getBatchEPG(
+      List<String> streamIds) async {
     if (streamIds.isEmpty) return {};
 
     // Create cache key from sorted IDs for consistency
@@ -133,7 +154,8 @@ class XtreamServiceMobile {
     // Check if we have valid cached data
     final cached = _epgBatchCache[cacheKeyStr];
     if (cached != null && !cached.isExpired) {
-      if (kDebugMode) print('✅ EPG batch cache hit: ${streamIds.length} channels');
+      if (kDebugMode)
+        print('✅ EPG batch cache hit: ${streamIds.length} channels');
       return cached.data;
     }
 
@@ -158,7 +180,9 @@ class XtreamServiceMobile {
 
   /// Internal: Load EPG batch from API
   Future<Map<String, model.ShortEPG>> _loadEpgBatch(
-      List<String> streamIds, String cacheKey) async {
+    List<String> streamIds,
+    String cacheKey,
+  ) async {
     try {
       final result = <String, model.ShortEPG>{};
 
@@ -186,18 +210,20 @@ class XtreamServiceMobile {
           if (item is Map && item.containsKey('stream_id')) {
             final streamId = item['stream_id'].toString();
             // Assuming the API returns a list of EPG entries for this stream
-            if (item['epg_listings'] is List && (item['epg_listings'] as List).isNotEmpty) {
-               final epgJson = (item['epg_listings'] as List).first;
-               result[streamId] = model.ShortEPG.fromJson({
-                 ...epgJson,
-                 'id': streamId,
-               });
+            if (item['epg_listings'] is List &&
+                (item['epg_listings'] as List).isNotEmpty) {
+              final epgJson = (item['epg_listings'] as List).first;
+              result[streamId] = model.ShortEPG.fromJson({
+                ...epgJson,
+                'id': streamId,
+              });
             }
           }
         }
 
         if (kDebugMode) {
-          print('✅ Loaded EPG for ${result.length}/${streamIds.length} channels');
+          print(
+              '✅ Loaded EPG for ${result.length}/${streamIds.length} channels');
         }
       }
 
@@ -228,25 +254,34 @@ class XtreamServiceMobile {
           )
           .timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200 && response.data is List) {
-        final categories = (response.data as List)
-            .map((e) => model.Category.fromJson(e))
-            .toList();
+      if (response.statusCode == 200) {
+        if (response.data is List) {
+          final categories = (response.data as List)
+              .map((e) => model.Category.fromJson(e))
+              .toList();
 
-        if (kDebugMode) {
-          print('✅ Loaded ${categories.length} live categories');
+          if (kDebugMode) {
+            print('✅ Loaded ${categories.length} live categories: ${categories.map((c) => c.categoryName).toList()}');
+          }
+
+          return categories;
+        } else if (response.data is Map) {
+          if (kDebugMode) print('⚠️ get_live_categories returned a Map (not a list): ${response.data}');
+          return [];
+        } else {
+          if (kDebugMode) print('⚠️ get_live_categories returned unexpected type: ${response.data.runtimeType}');
+          return [];
         }
-
-        return categories;
       }
 
       if (kDebugMode) {
-        print('⚠️ Failed to load categories (status: ${response.statusCode})');
+        print('⚠️ Failed to load categories (status: ${response.statusCode}, body: ${response.data})');
       }
       return [];
     } on TimeoutException {
       if (kDebugMode) {
-        print('⏱️ Timeout loading live categories - will fallback to loading all channels');
+        print(
+            '⏱️ Timeout loading live categories - will fallback to loading all channels');
       }
       return [];
     } catch (e) {
@@ -335,7 +370,9 @@ class XtreamServiceMobile {
   /// Search VOD movies
   Future<List<model.VodItem>> searchMovies(String query) async {
     final all = await getMovies();
-    return all.where((m) => m.name.toLowerCase().contains(query.toLowerCase())).toList();
+    return all
+        .where((m) => m.name.toLowerCase().contains(query.toLowerCase()))
+        .toList();
   }
 
   /// Get all series
@@ -363,7 +400,9 @@ class XtreamServiceMobile {
   /// Search series
   Future<List<model.Series>> searchSeries(String query) async {
     final all = await getSeries();
-    return all.where((s) => s.name.toLowerCase().contains(query.toLowerCase())).toList();
+    return all
+        .where((s) => s.name.toLowerCase().contains(query.toLowerCase()))
+        .toList();
   }
 
   /// Get series paginated
@@ -373,7 +412,7 @@ class XtreamServiceMobile {
 
   /// Get series info
   Future<model.SeriesInfo?> getSeriesInfo(String seriesId) async {
-     try {
+    try {
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
         queryParameters: {
@@ -387,7 +426,7 @@ class XtreamServiceMobile {
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map<String, dynamic>;
         final seriesModel = model.Series.fromJson(data['info'] ?? {});
-        
+
         final episodesMap = <String, List<model.Episode>>{};
         if (data['episodes'] is Map) {
           final seasons = data['episodes'] as Map<String, dynamic>;
@@ -399,7 +438,7 @@ class XtreamServiceMobile {
             }
           });
         }
-        
+
         return model.SeriesInfo(
           series: seriesModel,
           episodes: episodesMap,

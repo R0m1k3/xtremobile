@@ -35,7 +35,8 @@ class MemoryProfiler {
       count++;
     });
     if (kDebugMode) {
-      print('⏰ PERIODIC MEMORY MONITORING STARTED (${interval.inSeconds}s interval)');
+      print(
+          '⏰ PERIODIC MEMORY MONITORING STARTED (${interval.inSeconds}s interval)');
     }
   }
 
@@ -50,9 +51,10 @@ class MemoryProfiler {
 
   /// Analyze memory growth between snapshots
   static MemoryAnalysis analyzeGrowth(String startLabel, String endLabel) {
-    final start =
-        _snapshots.firstWhere((s) => s.label == startLabel, orElse: () => _snapshots.first);
-    final end = _snapshots.firstWhere((s) => s.label == endLabel, orElse: () => _snapshots.last);
+    final start = _snapshots.firstWhere((s) => s.label == startLabel,
+        orElse: () => _snapshots.first);
+    final end = _snapshots.firstWhere((s) => s.label == endLabel,
+        orElse: () => _snapshots.last);
 
     return MemoryAnalysis(
       startLabel: startLabel,
@@ -65,7 +67,7 @@ class MemoryProfiler {
   /// Generate report
   static void printReport() {
     if (kDebugMode) {
-      print('\n' + ('=' * 60));
+      print('\n${'=' * 60}');
       print('📊 MEMORY PROFILING REPORT');
       print('=' * 60);
       for (int i = 0; i < _snapshots.length; i++) {
@@ -75,19 +77,20 @@ class MemoryProfiler {
 
       // Show growth analysis
       if (_snapshots.length >= 2) {
-        print('\n' + ('-' * 60));
+        print('\n${'-' * 60}');
         print('📈 GROWTH ANALYSIS');
         print('-' * 60);
         for (int i = 0; i < _snapshots.length - 1; i++) {
           final snapshot = _snapshots[i];
           final nextSnapshot = _snapshots[i + 1];
-          final growth = nextSnapshot.description.compareTo(snapshot.description);
+          final growth =
+              nextSnapshot.description.compareTo(snapshot.description);
 
           print('  ${snapshot.label} → ${nextSnapshot.label}: $growth');
         }
       }
 
-      print('\n' + ('=' * 60) + '\n');
+      print('\n${'=' * 60}\n');
     }
   }
 

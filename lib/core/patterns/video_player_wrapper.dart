@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 /// Video player selection and wrapper pattern
 /// Abstracts between MediaKit and other video players
