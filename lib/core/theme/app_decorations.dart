@@ -86,10 +86,10 @@ class AppDecorations {
         border: Border.all(color: const Color(0x28FFFFFF), width: 1),
         boxShadow: const [
           BoxShadow(
-            color: Color(0xAA000000),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: Offset(0, 8),
+            color: Color(0xCC000000), // Increased opacity from 0xAA
+            blurRadius: 16,
+            spreadRadius: 2, // Added spread to make it visible all around
+            offset: Offset(0, 4),
           ),
         ],
       );
@@ -119,8 +119,8 @@ class AppDecorations {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x40FFFFFF), Color(0x00FFFFFF)],
-          stops: [0.0, 0.55],
+          colors: [Color(0x25FFFFFF), Color(0x00FFFFFF)], // Reduced from 0x40
+          stops: [0.0, 0.45], // Reduced stop
         ),
         borderRadius:
             BorderRadius.vertical(top: Radius.circular(radius)),
@@ -145,7 +145,7 @@ class AppDecorations {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF3A3A3C), Color(0xFF1C1C1E)],
+          colors: [Color(0xFF121214), Color(0xFF1C1C1E)], // Top darkened from 3A3A3C
         ),
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       );
