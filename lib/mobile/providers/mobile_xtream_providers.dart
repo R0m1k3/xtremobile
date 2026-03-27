@@ -17,14 +17,34 @@ final mobileXtreamServiceProvider =
 });
 
 /// Mobile-specific live channels provider
+/// Loads ALL channels from ALL categories
 final mobileLiveChannelsProvider =
     FutureProvider.family<List<model.Channel>, PlaylistConfig>(
         (ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
-  // Correction: getLiveChannels returns List<Channel>, and we now need a selected category
-  // If no category is selected, we might want to load all or first category.
-  // For now, let's assume it should return all channels or handle category selection elsewhere.
-  return service.getLiveChannels(""); 
+
+  // Strategy: Try to load categories first (with timeout)
+  // If categories load successfully, load channels for each category
+  // If categories fail/timeout, load all channels at once
+  List<model.Category> categories = [];
+  try {
+    categories = await service.getLiveCategories();
+  } catch (e) {
+    // Silently fall back to loading all channels
+  }
+
+  if (categories.isNotEmpty) {
+    // Load channels from each category and combine them
+    final allChannels = <model.Channel>[];
+    for (final category in categories) {
+      final channels = await service.getLiveChannels(category.categoryId);
+      allChannels.addAll(channels);
+    }
+    return allChannels;
+  }
+
+  // Fallback: Load all channels without category filter
+  return service.getLiveChannels("");
 });
 
 /// Mobile-specific movies provider

@@ -5,6 +5,7 @@
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import '../models/xtream_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/api/api_client.dart';
@@ -53,16 +54,27 @@ class XtreamServiceMobile {
   }
 
   /// Get live channels for a category (with batch EPG support)
+  /// If categoryId is empty, fetches ALL channels from all categories
   Future<List<model.Channel>> getLiveChannels(String categoryId) async {
     try {
+      final queryParams = {
+        'username': _username,
+        'password': _password,
+        'action': 'get_live_streams',
+      };
+
+      // Only add category_id if specified
+      if (categoryId.isNotEmpty) {
+        queryParams['category_id'] = categoryId;
+      }
+
+      if (kDebugMode) {
+        print('🔍 Loading live channels with params: $queryParams');
+      }
+
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
-        queryParameters: {
-          'username': _username,
-          'password': _password,
-          'action': 'get_live_streams',
-          'category_id': categoryId,
-        },
+        queryParameters: queryParams,
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
           sendTimeout: const Duration(seconds: 15),
@@ -70,9 +82,22 @@ class XtreamServiceMobile {
       );
 
       if (response.statusCode == 200 && response.data is List) {
-        return (response.data as List)
+        final channels = (response.data as List)
             .map((e) => model.Channel.fromJson(e))
             .toList();
+
+        if (kDebugMode) {
+          final categories = channels.map((c) => c.categoryName).toSet();
+          print(
+            '✅ Loaded ${channels.length} channels with ${categories.length} categories: $categories',
+          );
+        }
+
+        return channels;
+      }
+
+      if (kDebugMode) {
+        print('⚠️ Unexpected response status: ${response.statusCode}');
       }
       return [];
     } catch (e) {
@@ -183,6 +208,53 @@ class XtreamServiceMobile {
     }
   }
 
+  /// Get live TV categories
+  Future<List<model.Category>> getLiveCategories() async {
+    try {
+      if (kDebugMode) print('🔍 Loading live TV categories with 8s timeout...');
+
+      final response = await _dio
+          .get(
+            '$_baseUrl/player_api.php',
+            queryParameters: {
+              'username': _username,
+              'password': _password,
+              'action': 'get_live_categories',
+            },
+            options: Options(
+              receiveTimeout: const Duration(seconds: 8),
+              sendTimeout: const Duration(seconds: 8),
+            ),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200 && response.data is List) {
+        final categories = (response.data as List)
+            .map((e) => model.Category.fromJson(e))
+            .toList();
+
+        if (kDebugMode) {
+          print('✅ Loaded ${categories.length} live categories');
+        }
+
+        return categories;
+      }
+
+      if (kDebugMode) {
+        print('⚠️ Failed to load categories (status: ${response.statusCode})');
+      }
+      return [];
+    } on TimeoutException {
+      if (kDebugMode) {
+        print('⏱️ Timeout loading live categories - will fallback to loading all channels');
+      }
+      return [];
+    } catch (e) {
+      if (kDebugMode) print('❌ Error loading live categories: $e');
+      return [];
+    }
+  }
+
   /// Get VOD categories
   Future<List<model.Category>> getVodCategories() async {
     try {
@@ -209,16 +281,23 @@ class XtreamServiceMobile {
   }
 
   /// Get movies by category
+  /// If categoryId is empty, fetches ALL movies from all categories
   Future<List<model.VodItem>> getMoviesByCategory(String categoryId) async {
     try {
+      final queryParams = {
+        'username': _username,
+        'password': _password,
+        'action': 'get_vod_streams',
+      };
+
+      // Only add category_id if specified
+      if (categoryId.isNotEmpty) {
+        queryParams['category_id'] = categoryId;
+      }
+
       final response = await _dio.get(
         '$_baseUrl/player_api.php',
-        queryParameters: {
-          'username': _username,
-          'password': _password,
-          'action': 'get_vod_streams',
-          'category_id': categoryId,
-        },
+        queryParameters: queryParams,
       );
       if (response.statusCode == 200 && response.data is List) {
         return (response.data as List)
