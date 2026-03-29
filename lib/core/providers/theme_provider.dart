@@ -41,26 +41,8 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
     _loadTheme();
   }
 
-  /// Load saved theme preference from SharedPreferences
-  Future<void> _loadTheme() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedMode = prefs.getString(_ThemeKeys.themeMode);
-      
-      if (savedMode != null) {
-        final appMode = AppThemeMode.values.firstWhere(
-          (e) => e.name == savedMode,
-          orElse: () => AppThemeMode.dark,
-        );
-        state = state.copyWith(
-          appThemeMode: appMode,
-          themeMode: _mapToThemeMode(appMode),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error loading theme: $e');
-    }
-  }
+  /// Theme is always forced to dark — no loading from preferences
+  Future<void> _loadTheme() async {}
 
   /// Set theme mode and persist to SharedPreferences
   Future<void> setThemeMode(AppThemeMode mode) async {

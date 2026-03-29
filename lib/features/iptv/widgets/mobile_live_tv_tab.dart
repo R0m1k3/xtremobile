@@ -27,6 +27,7 @@ class MobileLiveTVTab extends ConsumerStatefulWidget {
 
 class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     with AutomaticKeepAliveClientMixin {
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -60,6 +61,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _searchTimer?.cancel();
@@ -80,13 +82,24 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     final uiState = ref.watch(mobileLiveTvUiStateProvider);
     final uiNotifier = ref.read(mobileLiveTvUiStateProvider.notifier);
 
+    // Scroll to top when entering a category so first row is fully visible
+    ref.listen(mobileLiveTvUiStateProvider, (previous, next) {
+      if (previous?.isCategoryView == true && !next.isCategoryView) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(0);
+          }
+        });
+      }
+    });
+
     // Determine if we should show the category grid
     final bool showGrid = uiState.isCategoryView &&
         _searchQuery.isEmpty &&
         !_showFavoritesOnly;
 
     return Container(
-      color: const Color(0xFF000000), // Pure black background
+      color: const Color(0xFF000000),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: PopScope(
@@ -94,6 +107,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
           canPop: false,
           onPopInvokedWithResult: (didPop, _) async {
             if (didPop) return;
+
+            // Only handle back if this tab is currently active (tab index 0)
+            if (ref.read(mobileDashboardIndexProvider) != 0) return;
 
             // If just returned from player, reset the flag and do nothing (stay on channel list)
             if (_justReturnedFromPlayer) {
@@ -194,6 +210,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
               return SafeArea(
                 bottom: false,
                 child: CustomScrollView(
+                  controller: _scrollController,
                   slivers: [
                     // Floating Header (Search + Navigation)
                     SliverAppBar(
@@ -447,14 +464,13 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => NativePlayerScreen(
+          builder: (context) => LitePlayerScreen(
             streamId: channel.streamId,
             title: channel.name,
             playlist: playlist,
             streamType: StreamType.live,
-            channels: channels, // Pass full channel list for zapping
+            channels: channels,
             initialIndex: index,
-            forceDeinterlace: true,
           ),
         ),
       );
@@ -462,13 +478,14 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => LitePlayerScreen(
+          builder: (context) => NativePlayerScreen(
             streamId: channel.streamId,
             title: channel.name,
             playlist: playlist,
             streamType: StreamType.live,
-            channels: channels, // Pass full channel list for zapping
+            channels: channels,
             initialIndex: index,
+            forceDeinterlace: false,
           ),
         ),
       );

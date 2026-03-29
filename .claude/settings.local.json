@@ -19,7 +19,30 @@
       "WebFetch(domain:www.color-hex.com)",
       "WebFetch(domain:iosexample.com)",
       "WebFetch(domain:blog.karenying.com)",
-      "WebFetch(domain:gist.github.com)"
+      "WebFetch(domain:gist.github.com)",
+      "Bash(~/.flutter/bin/flutter analyze:*)",
+      "Bash(where flutter:*)",
+      "Read(//c/Users/Michael/**)",
+      "Bash(/c/Users/Michael/Git/flutter/bin/flutter analyze:*)",
+      "Bash(/c/Users/Michael/Git/flutter/bin/flutter build:*)",
+      "Bash(echo \"ANDROID_HOME=$ANDROID_HOME\")",
+      "Bash(echo \"ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT\")",
+      "Bash(java -version)",
+      "Bash(where java:*)",
+      "Bash(echo \"JAVA_HOME=$JAVA_HOME\")",
+      "Bash(winget --version)",
+      "Bash(winget install:*)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Microsoft/jdk-21.0.10.7-hotspot\")",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Microsoft/jdk-21.0.10.7-hotspot\" export ANDROID_HOME=\"/c/Users/Michael/Android/Sdk\" export PATH=\"$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH\" __NEW_LINE_a84857a0b65daa44__ SDKMANAGER=\"/c/Users/Michael/Android/Sdk/cmdline-tools/latest/bin/sdkmanager.bat\" __NEW_LINE_a84857a0b65daa44__ yes)",
+      "Bash(\"$SDKMANAGER\" --licenses)",
+      "Bash(export ANDROID_HOME=\"/c/Users/Michael/Android/Sdk\")",
+      "Bash(SDKMANAGER=\"/c/Users/Michael/Android/Sdk/cmdline-tools/latest/bin/sdkmanager.bat\")",
+      "Bash(__NEW_LINE_633e55f3dba9c695__ \"$SDKMANAGER\" \"platform-tools\" \"platforms;android-35\" \"build-tools;35.0.0\")",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH\")",
+      "Bash(__NEW_LINE_fa059bc1c566f6ee__ cd:*)",
+      "Bash(__NEW_LINE_70fecd5c4080fe72__ cd:*)",
+      "Bash(__NEW_LINE_2a0d1cacdabfd662__ cd:*)"
     ]
   }
 }

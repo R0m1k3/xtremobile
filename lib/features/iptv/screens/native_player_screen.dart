@@ -11,6 +11,7 @@ import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -86,6 +87,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   Timer? _clockTimer;
   Timer? _controlsTimer; // Auto-hide timer
+  Timer? _epgTimer; // Periodic EPG refresh for live TV
   Timer? _liveWatchdog; // Watchdog for live stream reconnection
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
@@ -464,6 +466,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     _clockTimer?.cancel();
     _controlsTimer?.cancel();
+    _epgTimer?.cancel();
     _liveWatchdog?.cancel();
 
     // Stop playback first to prevent audio continuing in background
@@ -702,9 +705,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               ? widget.channels![_currentIndex].streamId
               : widget.streamId;
 
-      // Load EPG if Live TV
+      // Load EPG if Live TV (with periodic refresh every 5 min)
       if (widget.streamType == model.StreamType.live) {
         _loadEpg(currentStreamId);
+        _epgTimer?.cancel();
+        _epgTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+          _loadEpg(currentStreamId);
+        });
       }
 
       // ... (rest of _loadStream logic: get url, open player)
@@ -806,7 +813,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   Future<void> _loadEpg(String streamId) async {
     try {
-      final epg = await _xtreamService!.getShortEPG(streamId);
+      // Use shared provider service so EPG cached by channel cards is reused instantly
+      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      final epg = await service.getShortEPG(streamId);
       if (mounted) {
         setState(() => _epg = epg);
       }
@@ -1323,7 +1332,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   }
 
   Widget _buildEPGBox(String title) {
-    String nowPlaying = _epg?.nowPlaying ?? "Pas d'infos EPG";
+    final rawNow = _epg?.nowPlaying ?? '';
+    String nowPlaying = rawNow.isNotEmpty ? rawNow : "Pas d'infos EPG";
     String nextPlaying =
         _epg?.nextPlaying != null ? "Suivant: ${_epg!.nextPlaying}" : "";
 
@@ -1375,19 +1385,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
             ),
           ],
         ),
-        if (nextPlaying.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              nextPlaying,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
       ],
     );
   }

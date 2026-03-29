@@ -117,10 +117,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           // === APPARENCE ===
           _buildSectionHeader('Apparence'),
 
-          _buildThemeSwitcher(),
-
-          const SizedBox(height: 8),
-
           _buildSettingItem(
             icon: Icons.access_time,
             title: 'Afficher l\'heure',
@@ -360,8 +356,9 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                         final selected = themeState.appThemeMode == mode;
                         final accentColor = Theme.of(context).colorScheme.primary;
                         return Expanded(
-                          child: GestureDetector(
-                            onTap: () => notifier.setThemeMode(mode),
+                          child: TVFocusable(
+                            onPressed: () => notifier.setThemeMode(mode),
+                            borderRadius: BorderRadius.circular(8),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               margin: const EdgeInsets.symmetric(horizontal: 2),

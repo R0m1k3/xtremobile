@@ -264,6 +264,9 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
         onPopInvokedWithResult: (didPop, _) async {
           if (didPop) return;
 
+          // Only handle back if this tab is currently active (tab index 1)
+          if (ref.read(mobileDashboardIndexProvider) != 1) return;
+
           // Handle Search Exit
           if (_searchQuery.isNotEmpty || _isSearching) {
             _onSearchChanged(''); // clear search
@@ -327,94 +330,101 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                 // Pinned Header
                 SliverAppBar(
                   pinned: true,
-                  floating: true,
-                  backgroundColor: AppDecorations.background(context).gradient is LinearGradient 
-                      ? (AppDecorations.background(context).gradient as LinearGradient).colors.first
-                      : Theme.of(context).scaffoldBackgroundColor,
-                  elevation: 4,
+                  floating: false,
+                  snap: false,
+                  backgroundColor: const Color(0xFF000000),
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
                   automaticallyImplyLeading: false,
-                  expandedHeight: showingMovies ? 110 : 110,
-                  collapsedHeight: showingMovies ? 110 : 110,
+                  toolbarHeight: showingMovies ? 120.0 : 110.0,
                   flexibleSpace: FlexibleSpaceBar(
-                    background: Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
+                    background: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (showingMovies)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          // Search Bar
+                          TVFocusable(
+                            scale: 1.0,
+                            focusColor: Colors.white,
+                            onPressed: () {
+                              setState(() => _isSearchEditing = true);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _searchFocusNode.requestFocus();
+                                SystemChannels.textInput.invokeMethod('TextInput.show');
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              height: 48,
+                              decoration: AppDecorations.searchBar(context),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Row(
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                                    onPressed: _onBack,
-                                  ),
+                                  Icon(Icons.search, color: AppDecorations.textSecondary(context)),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(
-                                      _selectedCategoryName ?? 'Films',
-                                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                    child: ExcludeFocus(
+                                      excluding: !_isSearchEditing,
+                                      child: TextField(
+                                        cursorColor: Colors.white,
+                                        controller: _searchController,
+                                        focusNode: _searchFocusNode,
+                                        readOnly: !_isSearchEditing,
+                                        style: TextStyle(color: AppDecorations.textPrimary(context)),
+                                        decoration: InputDecoration(
+                                          hintText: _selectedCategoryId != null ? 'Rechercher...' : 'Rechercher un film...',
+                                          border: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          isDense: true,
+                                        ),
+                                        onChanged: _onSearchChanged,
+                                        onSubmitted: (_) => setState(() => _isSearchEditing = false),
+                                      ),
                                     ),
                                   ),
+                                  if (_isSearching) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  if (_searchQuery.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () { _searchController.clear(); _onSearchChanged(''); },
+                                      child: Icon(Icons.close, color: AppDecorations.textSecondary(context)),
+                                    ),
                                 ],
                               ),
-                            )
-                          else
-                            const SizedBox(height: 10),
+                            ),
+                          ),
 
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            child: TVFocusable(
-                              scale: 1.0,
-                              focusColor: Colors.white,
-                              onPressed: () {
-                                setState(() => _isSearchEditing = true);
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  _searchFocusNode.requestFocus();
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                height: 40,
-                                decoration: AppDecorations.searchBar(context),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.search, size: 20, color: AppDecorations.textSecondary(context)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ExcludeFocus(
-                                        excluding: !_isSearchEditing,
-                                        child: TextField(
-                                          cursorColor: AppDecorations.textPrimary(context),
-                                          controller: _searchController,
-                                          focusNode: _searchFocusNode,
-                                          readOnly: !_isSearchEditing,
-                                          style: TextStyle(fontSize: 14, color: AppDecorations.textPrimary(context)),
-                                          decoration: InputDecoration(
-                                            hintText: _selectedCategoryId != null ? 'Rechercher...' : 'Rechercher un film...',
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                            contentPadding: const EdgeInsets.only(bottom: 11),
-                                          ),
-                                          onChanged: _onSearchChanged,
-                                          onSubmitted: (_) => setState(() => _isSearchEditing = false),
-                                        ),
-                                      ),
-                                    ),
-                                    if (_isSearching) const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                                    if (_searchQuery.isNotEmpty)
-                                      GestureDetector(
-                                        onTap: () {
-                                          _searchController.clear();
-                                          _onSearchChanged('');
-                                        },
-                                        child: Icon(Icons.close, size: 16, color: AppDecorations.textSecondary(context)),
-                                      ),
-                                  ],
+                          const SizedBox(height: 12),
+
+                          // Navigation Row
+                          Row(
+                            children: [
+                              if (showingMovies) ...[
+                                IconButton(
+                                  icon: Icon(Icons.arrow_back, color: AppDecorations.textPrimary(context)),
+                                  onPressed: _onBack,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  showingMovies
+                                      ? (_selectedCategoryName ?? 'Films')
+                                      : showingSearch
+                                          ? 'Résultats de recherche'
+                                          : 'Catégories',
+                                  style: TextStyle(
+                                    color: AppDecorations.textPrimary(context),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -427,7 +437,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: showingCategories ? 3 : 4,
+                      crossAxisCount: showingCategories ? 6 : 8,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
                       childAspectRatio: showingCategories ? 2.0 : 0.67,
