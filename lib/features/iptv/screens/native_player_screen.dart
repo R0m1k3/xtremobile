@@ -183,7 +183,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Startup Speed: Disable initial cache pause to allow immediate playback
       (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
-      // (_player.platform as dynamic)?.setProperty('cache-pause-wait', '3');
+      // Never pause for buffering — stay at live edge like ExoPlayer/TiviMate
+      (_player.platform as dynamic)?.setProperty('cache-pause', 'no');
+      // Prevent any seek attempt on live streams
+      (_player.platform as dynamic)?.setProperty('force-seekable', 'no');
     } else {
       // [P2-2 FIX] VOD PROFILE: Adaptive buffer size based on device RAM
       // - Low-end (<2GB): 20MB (conservative, prevent OOM)
@@ -227,27 +230,22 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
-    // Live Stream optimizations
-    if (widget.streamType == model.StreamType.live) {
-      // For live: reconnect but do NOT use reconnect_streamed (causes rollbacks)
-      (_player.platform as dynamic)?.setProperty(
-        'stream-lavf-o',
-        'reconnect=1,reconnect_on_network_error=1,reconnect_delay_max=3',
-      );
-    } else {
-      // For VOD/series: full reconnect support
-      (_player.platform as dynamic)?.setProperty(
-        'stream-lavf-o',
-        'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
-      );
-    }
+    // Network-level reconnection (FFmpeg internal — no app reload)
+    (_player.platform as dynamic)?.setProperty(
+      'stream-lavf-o',
+      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
+    );
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=2000000,probesize=1000000',
+      'analyzeduration=2000000,probesize=1000000,fflags=+discardcorrupt',
     );
 
-    // Optimized for performance and stability on progressive & interlaced streams
-    (_player.platform as dynamic)?.setProperty('hr-seek', 'yes');
+    // Seeking: disabled for live (prevents rollback), enabled for VOD
+    if (widget.streamType == model.StreamType.live) {
+      (_player.platform as dynamic)?.setProperty('hr-seek', 'no');
+    } else {
+      (_player.platform as dynamic)?.setProperty('hr-seek', 'yes');
+    }
     (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
     (_player.platform as dynamic)?.setProperty('vd-lavc-fast', 'yes');
     (_player.platform as dynamic)
@@ -347,27 +345,28 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     _player.stream.error.listen((error) async {
       if (!mounted) return;
-
-      // Filter out non-errors or non-fatal messages if necessary
       if (error.isEmpty) return;
 
       debugPrint('MediaKitPlayer Error Stream: $error');
 
-      // Smart Retry for Codec/Decoder errors
-      // If we haven't tried SW decoding yet, retry with it enabled.
-      if (!_useSoftwareDecoder) {
-        debugPrint(
-          'MediaKitPlayer: Error encountered. Auto-retrying with Software Decoding...',
-        );
-        setState(() => _useSoftwareDecoder = true);
-
-        // Short delay to allow player cleanup
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) _loadStream(); // Retry connection
+      // For LIVE TV: never reload the stream on errors — mpv handles recovery internally.
+      // Only show fatal errors that truly stop playback (detected by watchdog after 2min).
+      if (widget.streamType == model.StreamType.live) {
+        debugPrint('MediaKitPlayer: Live — ignoring error (mpv handles internally): $error');
         return;
       }
 
-      // If SW decoding was already on or failed too, show error
+      // For VOD/Series: retry with software decoding on first error
+      if (!_useSoftwareDecoder) {
+        debugPrint(
+          'MediaKitPlayer: VOD error — retrying with Software Decoding...',
+        );
+        setState(() => _useSoftwareDecoder = true);
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) _loadStream();
+        return;
+      }
+
       setState(() {
         _errorMessage = error;
         _isLoading = false;
@@ -377,15 +376,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Listen for stream completion
     _player.stream.completed.listen((completed) {
       if (completed && mounted) {
-        // Logic for Live TV
+        // For Live TV: do NOT reconnect immediately — let mpv handle it internally.
+        // Only reconnect after a long pause (handled by watchdog).
         if (widget.streamType == model.StreamType.live) {
           debugPrint(
-            'MediaKitPlayer: Live stream completed unexpectedly, attempting reconnect...',
+            'MediaKitPlayer: Live stream completed signal — ignoring (mpv handles reconnect internally)',
           );
-          _attemptReconnect();
+          return;
         }
         // Logic for VOD/Series: Check if really finished or cut off
-        else if (_duration.inSeconds > 0) {
+        if (_duration.inSeconds > 0) {
           final progress = _position.inSeconds / _duration.inSeconds;
           if (progress < 0.95) {
             debugPrint(
@@ -652,21 +652,30 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
   }
 
+  int _watchdogStallCount = 0;
+
   /// Start watchdog timer for live streams
   void _startLiveWatchdog() {
     _liveWatchdog?.cancel();
+    _watchdogStallCount = 0;
     if (widget.streamType != model.StreamType.live) return;
 
-    // Check every 30 seconds if stream is still playing
-    _liveWatchdog = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Check every 60 seconds — only reconnect after 2 consecutive stalls (2 min total)
+    _liveWatchdog = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
 
-      // If we're supposedly playing but position hasn't changed, reconnect
       if (!_isPlaying && !_isLoading && _errorMessage == null) {
+        _watchdogStallCount++;
         debugPrint(
-          'MediaKitPlayer: Watchdog detected stalled stream, reconnecting...',
+          'MediaKitPlayer: Watchdog stall count: $_watchdogStallCount/2',
         );
-        _attemptReconnect();
+        if (_watchdogStallCount >= 2) {
+          debugPrint('MediaKitPlayer: Watchdog — stream stalled for 2min, reconnecting...');
+          _watchdogStallCount = 0;
+          _attemptReconnect();
+        }
+      } else {
+        _watchdogStallCount = 0; // Reset if playing normally
       }
     });
   }

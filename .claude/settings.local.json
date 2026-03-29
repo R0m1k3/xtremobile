@@ -51,7 +51,11 @@
       "Bash(powershell -Command \"Get-Command flutter -ErrorAction SilentlyContinue\")",
       "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\'' -Recurse -Filter ''flutter.bat'' -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName\")",
       "Bash(powershell -Command \"Set-Location ''c:\\\\Users\\\\Michael\\\\Git\\\\xtremobile''; & ''C:\\\\Users\\\\Michael\\\\Git\\\\flutter\\\\bin\\\\flutter.bat'' build apk --release 2>&1\")",
-      "Bash(powershell -Command \":*)"
+      "Bash(powershell -Command \":*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:tivimatepremiums.com)",
+      "WebFetch(domain:tivimates.com)",
+      "WebFetch(domain:tv.dezzflix.com)"
     ]
   }
 }
