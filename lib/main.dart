@@ -8,6 +8,7 @@ import 'features/iptv/screens/mobile_dashboard_screen.dart';
 import 'core/models/playlist_config.dart';
 import 'core/database/hive_service.dart';
 import 'core/utils/startup_profiler.dart';
+import 'core/utils/device_info.dart';
 
 /// Android-optimized entry point for XtremFlow IPTV
 /// No authentication - direct access to playlist selection
@@ -24,6 +25,14 @@ void main() async {
   // Initialize Hive (Centralized)
   await HiveService.init();
   StartupProfiler.mark('hive_init');
+
+  // Initialize DeviceInfo for player buffering optimizations
+  try {
+    await DeviceInfo().init();
+    StartupProfiler.mark('device_info_init');
+  } catch (e) {
+    debugPrint('XtremFlow: DeviceInfo init failed: $e');
+  }
 
   // [P0-2 FIX] Implement TTL-based cache instead of destructive clearing
   // Cache is now persistent with TTL:

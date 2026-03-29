@@ -162,22 +162,25 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
 
     if (widget.streamType == model.StreamType.live) {
-      // LIVE PROFILE: Increased stability, no longer low-latency (prevents cuts)
+      // LIVE PROFILE: TiviMate-Power Profile (Ultra Stability)
+      // Uses larger buffers and ignoring broken timestamps to prevent "rollbacks"
+      final deviceInfo = DeviceInfo();
+      final liveBufferSecs = deviceInfo.getRecommendedLiveBufferSeconds();
+      // Estimate bytes based on 2MB/s (16Mbps) which is high for most IPTV
+      final liveBufferBytes = liveBufferSecs * 2 * 1024 * 1024;
+
       debugPrint(
-        'MediaKitPlayer: Applying LIVE optimization profile (STABILITY)',
+        'MediaKitPlayer: Applying TIVIMATE-POWER profile - buffer=${liveBufferSecs}s cache=${liveBufferBytes ~/ (1024 * 1024)}MB',
       );
-      (_player.platform as dynamic)?.setProperty(
-        'cache-secs',
-        '10',
-      ); // Reduced to 10s for faster startup
-      (_player.platform as dynamic)?.setProperty(
-        'demuxer-max-bytes',
-        '32000000',
-      ); // 32MB (approx 20-30s @ 10Mbps) for stability
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-readahead-secs', '15');
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', '0');
+
+      (_player.platform as dynamic)?.setProperty('cache-secs', liveBufferSecs.toString());
+      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', liveBufferBytes.toString());
+      (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', liveBufferSecs.toString());
+      (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '0');
+      
+      // Fix rollbacks: Ignore broken/discontinuous timestamps in some TS streams
+      (_player.platform as dynamic)?.setProperty('correct-pts', 'no');
+      
       // Ensure temp files are cleaned up
       (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
 
@@ -215,11 +218,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Audio/Video Sync - critical for smooth playback
     // Changed to 'audio' (default) instead of 'display-resample' to prevent resource exhaustion/drift over time
     (_player.platform as dynamic)
-        ?.setProperty('video-sync', 'audio'); // More stable for long streams
+        ?.setProperty('video-sync', 'audio'); // Audio-master sync
     (_player.platform as dynamic)
         ?.setProperty('interpolation', 'no'); // Keep off for safety
     (_player.platform as dynamic)
-        ?.setProperty('audio-buffer', '1.0'); // Larger audio buffer (1 second)
+        ?.setProperty('audio-buffer', '3.0'); // [FIX] 3s buffer to prevent 30-min drift/crash
+    (_player.platform as dynamic)
+        ?.setProperty('audio-pitch-correction', 'yes'); // Smooth sync adjustments
     (_player.platform as dynamic)
         ?.setProperty('audio-samplerate', '48000'); // Standard high quality
 
@@ -660,17 +665,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _watchdogStallCount = 0;
     if (widget.streamType != model.StreamType.live) return;
 
-    // Check every 60 seconds — only reconnect after 2 consecutive stalls (2 min total)
-    _liveWatchdog = Timer.periodic(const Duration(seconds: 60), (_) {
+    // [FIX] TiviMate-like Watchdog: Check every 30 seconds for faster recovery
+    _liveWatchdog = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
 
-      if (!_isPlaying && !_isLoading && _errorMessage == null) {
+      // If intentionally paused by user, don't trigger watchdog
+      if (!_isPlaying && _player.state.playing == false && _errorMessage == null && !_isLoading) {
+        return;
+      }
+
+      // If buffering or not playing for 60s total, reconnect
+      if (!_isPlaying || _isLoading) {
         _watchdogStallCount++;
         debugPrint(
-          'MediaKitPlayer: Watchdog stall count: $_watchdogStallCount/2',
+          'MediaKitPlayer: Watchdog health check: $_watchdogStallCount/2',
         );
         if (_watchdogStallCount >= 2) {
-          debugPrint('MediaKitPlayer: Watchdog — stream stalled for 2min, reconnecting...');
+          debugPrint('MediaKitPlayer: Watchdog — Stream unstable or stalled, triggering auto-reconnect...');
           _watchdogStallCount = 0;
           _attemptReconnect();
         }
