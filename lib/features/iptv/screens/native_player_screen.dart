@@ -15,7 +15,7 @@ import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremobile/core/utils/device_info.dart';
+
 
 /// Stream type enum for player
 // (Moved to global or imported from iptv_models if available)
@@ -141,7 +141,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
     final decoderMode = ref.read(mobileSettingsProvider).decoderMode;
-    (_player.platform as dynamic)?.setProperty('hwdec', decoderMode);
+    // [V5.2 Fix] Force native Android Hardware decoding (Hardware-to-Surface)
+    (_player.platform as dynamic)?.setProperty('hwdec', 'mediacodec');
 
     // Performance & Scaling Fixes for Android
     // 'opengl-pbo' removed to save VRAM on low-end devices preventing long-run crashes
@@ -162,72 +163,46 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
 
     if (widget.streamType == model.StreamType.live) {
-      // LIVE PROFILE: TiviMate-Power Profile (Ultra Stability)
-      // Uses larger buffers and ignoring broken timestamps to prevent "rollbacks"
-      final deviceInfo = DeviceInfo();
-      final liveBufferSecs = deviceInfo.getRecommendedLiveBufferSeconds();
-      // Estimate bytes based on 2MB/s (16Mbps) which is high for most IPTV
-      final liveBufferBytes = liveBufferSecs * 2 * 1024 * 1024;
-
-      debugPrint(
-        'MediaKitPlayer: Applying TIVIMATE-POWER profile - buffer=${liveBufferSecs}s cache=${liveBufferBytes ~/ (1024 * 1024)}MB',
-      );
-
-      (_player.platform as dynamic)?.setProperty('cache-secs', liveBufferSecs.toString());
-      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', liveBufferBytes.toString());
-      (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', liveBufferSecs.toString());
-      (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '0');
+      // LIVE PROFILE: Free-Run Speed (TiviMate Style)
+      // 10s safety margin with minimal RAM footprint (16MB)
+      (_player.platform as dynamic)?.setProperty('cache-secs', '10');
+      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '16777216'); 
+      (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '10');
+      (_player.platform as dynamic)?.setProperty('demuxer-thread', 'yes');
+      (_player.platform as dynamic)?.setProperty('correct-pts', 'no');
       
-      // Fix rollbacks: Standardize timestamps to prevent "rattrapages" (catch-ups)
-      (_player.platform as dynamic)?.setProperty('correct-pts', 'yes');
+      // Hardware decoding for Live (Essential for 1080p efficiency)
+      (_player.platform as dynamic)?.setProperty('hwdec', 'mediacodec');
+      
+      // Stop "Slow Motion" on RMC Découverte (1080i): No sync wait!
+      (_player.platform as dynamic)?.setProperty('video-sync', 'display-desync');
+      (_player.platform as dynamic)?.setProperty('deinterlace', 'no');
       
       // Ensure temp files are cleaned up
       (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
-
-      // [V4.0 FIX] TiviMate-like "Buffer-First" behavior
-      // Instead of jumping or rolling back, we pause cleanly and show a spinner
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
-      (_player.platform as dynamic)?.setProperty('cache-pause', 'yes');
-      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5'); // Wait for 5s of data
-      // Prevent any seek attempt on live streams
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+      (_player.platform as dynamic)?.setProperty('cache-pause', 'no');
+      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '1');
       (_player.platform as dynamic)?.setProperty('force-seekable', 'no');
     } else {
-      // [P2-2 FIX] VOD PROFILE: Adaptive buffer size based on device RAM
-      // - Low-end (<2GB): 20MB (conservative, prevent OOM)
-      // - Mid-range (2-6GB): 50MB (balanced)
-      // - High-end (>6GB): 100MB (maximum quality)
-      final deviceInfo = DeviceInfo();
-      final bufferBytes = deviceInfo.getRecommendedVodBufferBytes();
-      final backBytes = (bufferBytes / 10).toInt(); // 10% for backward buffer
-
-      debugPrint(
-        'MediaKitPlayer: VOD profile - ${deviceInfo.getDeviceProfile()}, buffer=${bufferBytes ~/ (1024 * 1024)}MB',
-      );
-
-      (_player.platform as dynamic)?.setProperty('cache-secs', '100');
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-bytes', bufferBytes.toString());
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-readahead-secs', '60');
-      (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', backBytes.toString());
-
-      // Disable initial cache pause to allow immediate playback attempt
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
+      // VOD PROFILE: Radical Compatibility (Software Mode)
+      // Pure CPU decoding to guarantee image visibility (Fixes "White Page" surface errors)
+      (_player.platform as dynamic)?.setProperty('hwdec', 'no'); 
+      (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
     }
+    
+    // [V6.1 Fix] Universal Audio Compatibility (TiviMate-like driver)
+    // Forced Stereo handles 5.1 tracks on 2.0 hardware without initialization errors
+    (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
+    (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
+    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.5');
+    
+    // Global Seeking: 'no' is much safer for IPTV hardware startup
+    (_player.platform as dynamic)?.setProperty('hr-seek', 'no');
 
-    // Audio/Video Sync - critical for smooth playback
-    // Changed to 'audio' (default) instead of 'display-resample' to prevent resource exhaustion/drift over time
-    (_player.platform as dynamic)
-        ?.setProperty('video-sync', 'audio'); // Audio-master sync
-    (_player.platform as dynamic)
-        ?.setProperty('interpolation', 'no'); // Keep off for safety
-    (_player.platform as dynamic)
-        ?.setProperty('audio-buffer', '3.0'); // [FIX] 3s buffer to prevent 30-min drift/crash
-    (_player.platform as dynamic)
-        ?.setProperty('audio-pitch-correction', 'yes'); // Smooth sync adjustments
-    (_player.platform as dynamic)
-        ?.setProperty('audio-samplerate', '48000'); // Standard high quality
+    // Ensure temp files are cleaned up
+    (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
+    (_player.platform as dynamic)?.setProperty('interpolation', 'no'); // Keep off for safety
 
     // Network resilience - more aggressive settings
     (_player.platform as dynamic)?.setProperty('network-timeout', '120');
@@ -236,29 +211,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
+    // [V5.2 Fix] Pure Hardware Acceleration flags (to match TiviMate performance)
+    (_player.platform as dynamic)?.setProperty('vd-lavc-skiploopfilter', 'all');
+    (_player.platform as dynamic)?.setProperty('vd-lavc-skipidct', 'all');
+    (_player.platform as dynamic)?.setProperty('vd-lavc-fast', 'yes');
+    (_player.platform as dynamic)?.setProperty('vd-lavc-threads', '4');
+
     // Network-level reconnection (FFmpeg internal — no app reload)
     (_player.platform as dynamic)?.setProperty(
       'stream-lavf-o',
       'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_at_eof=1,reconnect_delay_max=5',
     );
-    // [V4.0 FIX] genpts + igndts fixes broken stream timestamps at the source
+    // [V5.1 Fix] discard genpts to fix CPU-starvation/slow-motion on low-end CPUs
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=2000000,probesize=1000000,fflags=+genpts+igndts+discardcorrupt',
+      'analyzeduration=2000000,probesize=1000000,fflags=+discardcorrupt',
     );
-
-    // Seeking: disabled for live (prevents rollback), enabled for VOD
-    if (widget.streamType == model.StreamType.live) {
-      (_player.platform as dynamic)?.setProperty('hr-seek', 'no');
-    } else {
-      (_player.platform as dynamic)?.setProperty('hr-seek', 'yes');
-    }
     (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
-    (_player.platform as dynamic)?.setProperty('vd-lavc-fast', 'yes');
-    (_player.platform as dynamic)
-        ?.setProperty('vd-lavc-threads', '0'); // Auto-detect
-    (_player.platform as dynamic)
-        ?.setProperty('vd-lavc-skiploopfilter', 'nonref'); // Balanced stability
     (_player.platform as dynamic)?.setProperty('framedrop', 'vo');
 
     // Low-latency intentionally removed for stability
@@ -268,32 +237,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
     */
 
-    // ============ AUDIO CODEC SUPPORT FOR VOD ============
-    // V3: Explicit LAVC Downmix & Audiotrack
-
-    // Ensure audio is NOT muted
-    (_player.platform as dynamic)?.setProperty('mute', 'no');
-
-    // Explicitly enable LAVC downmixing to stereo (Crucial for 5.1/7.1 on Stereo devices)
-    // (_player.platform as dynamic)?.setProperty('ad-lavc-downmix', 'yes');
-    // (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
-    // (_player.platform as dynamic)?.setProperty('audio-normalize-downmix', 'yes');
-
-    // Force software decoding for audio tracks (Maximum compatibility)
-    (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
-
-    // Use audiotrack (standard Android)
-    (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
-
-    // Track Selection - Auto
+    // Track Selection - Auto (Safe for all)
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
     (_player.platform as dynamic)?.setProperty('alang', 'fr,fra,fre,en,eng');
-
-    // Volume
     (_player.platform as dynamic)?.setProperty('volume', '100');
-    // NOTE: audio-buffer already set to 1.0s above — do NOT set again here
+    (_player.platform as dynamic)?.setProperty('mute', 'no'); 
 
-    debugPrint('MediaKitPlayer: Audio V3 configuration applied');
+    debugPrint('MediaKitPlayer: Combined Live/VOD configuration applied');
 
     _controller = VideoController(_player);
 
@@ -346,7 +296,21 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     _player.stream.duration.listen((duration) {
       if (mounted) {
-        setState(() => _duration = duration);
+        setState(() {
+          _duration = duration;
+          // [V5.1 UI Fix] Force loading off as soon as metadata/duration is known
+          // backup to the 'playing' event for VOD visibility
+          if (duration.inSeconds > 0 && _isLoading) {
+            _isLoading = false;
+          }
+        });
+      }
+    });
+
+    _player.stream.width.listen((width) {
+      if (mounted && (width ?? 0) > 0 && _isLoading) {
+        debugPrint('MediaKitPlayer: Video width detected ($width), clearing loading overlay');
+        setState(() => _isLoading = false);
       }
     });
 
@@ -727,6 +691,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _epg = null; // Reset EPG
       });
 
+      // [V5.2 Fix] Absolute fail-safe Loading Timeout (5 seconds)
+      // This ensures even if metadata/width is never reached, the UI opens
+      Future.delayed(const Duration(seconds: 5), () {
+        if (mounted && _isLoading) {
+          debugPrint('MediaKitPlayer: Loading Timeout reached, forcing Visibility');
+          setState(() => _isLoading = false);
+        }
+      });
+
       // Determine effective Stream ID
       final currentStreamId =
           widget.channels != null && widget.channels!.isNotEmpty
@@ -1071,9 +1044,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         ? widget.channels![_currentIndex].name
         : widget.title;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
+    return Theme(
+      data: ThemeData.dark(),
+      child: Scaffold(
+        backgroundColor: Colors.black, // [V5.2 Fix] Enforce black background globally
+        body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
         onPanDown: (_) => _onUserInteraction(),
@@ -1200,8 +1175,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   BoxFit _getBoxFit(String mode) {
     switch (mode) {
