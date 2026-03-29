@@ -107,16 +107,20 @@ class XtreamServiceMobile {
 
           return channels;
         } else if (response.data is Map) {
-          if (kDebugMode) print('⚠️ API returned a Map instead of List: ${response.data}');
+          if (kDebugMode)
+            print('⚠️ API returned a Map instead of List: ${response.data}');
           return [];
         } else {
-          if (kDebugMode) print('⚠️ API returned unexpected type: ${response.data.runtimeType}');
+          if (kDebugMode)
+            print(
+                '⚠️ API returned unexpected type: ${response.data.runtimeType}');
           return [];
         }
       }
 
       if (kDebugMode) {
-        print('⚠️ Unexpected response status: ${response.statusCode}, body: ${response.data}');
+        print(
+            '⚠️ Unexpected response status: ${response.statusCode}, body: ${response.data}');
       }
       return [];
     } catch (e) {
@@ -144,7 +148,8 @@ class XtreamServiceMobile {
   /// Instead of 50 requests for 50 channels, this loads all at once.
   /// Results are cached for 1 hour to avoid repeated requests.
   Future<Map<String, model.ShortEPG>> getBatchEPG(
-      List<String> streamIds) async {
+    List<String> streamIds,
+  ) async {
     if (streamIds.isEmpty) return {};
 
     // Create cache key from sorted IDs for consistency
@@ -154,8 +159,9 @@ class XtreamServiceMobile {
     // Check if we have valid cached data
     final cached = _epgBatchCache[cacheKeyStr];
     if (cached != null && !cached.isExpired) {
-      if (kDebugMode)
+      if (kDebugMode) {
         print('✅ EPG batch cache hit: ${streamIds.length} channels');
+      }
       return cached.data;
     }
 
@@ -190,19 +196,21 @@ class XtreamServiceMobile {
     // Load EPG for each stream_id individually (API doesn't support true batch)
     for (final streamId in streamIds) {
       try {
-        final response = await _dio.get(
-          '$_baseUrl/player_api.php',
-          queryParameters: {
-            'username': _username,
-            'password': _password,
-            'action': 'get_short_epg',
-            'stream_id': streamId,
-          },
-          options: Options(
-            receiveTimeout: const Duration(seconds: 10),
-            sendTimeout: const Duration(seconds: 10),
-          ),
-        ).timeout(const Duration(seconds: 10));
+        final response = await _dio
+            .get(
+              '$_baseUrl/player_api.php',
+              queryParameters: {
+                'username': _username,
+                'password': _password,
+                'action': 'get_short_epg',
+                'stream_id': streamId,
+              },
+              options: Options(
+                receiveTimeout: const Duration(seconds: 10),
+                sendTimeout: const Duration(seconds: 10),
+              ),
+            )
+            .timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200 && response.data is Map) {
           final data = response.data as Map;
@@ -272,27 +280,34 @@ class XtreamServiceMobile {
               .toList();
 
           if (kDebugMode) {
-            print('✅ Loaded ${categories.length} live categories: ${categories.map((c) => c.categoryName).toList()}');
+            print(
+                '✅ Loaded ${categories.length} live categories: ${categories.map((c) => c.categoryName).toList()}');
           }
 
           return categories;
         } else if (response.data is Map) {
-          if (kDebugMode) print('⚠️ get_live_categories returned a Map (not a list): ${response.data}');
+          if (kDebugMode)
+            print(
+                '⚠️ get_live_categories returned a Map (not a list): ${response.data}');
           return [];
         } else {
-          if (kDebugMode) print('⚠️ get_live_categories returned unexpected type: ${response.data.runtimeType}');
+          if (kDebugMode)
+            print(
+                '⚠️ get_live_categories returned unexpected type: ${response.data.runtimeType}');
           return [];
         }
       }
 
       if (kDebugMode) {
-        print('⚠️ Failed to load categories (status: ${response.statusCode}, body: ${response.data})');
+        print(
+            '⚠️ Failed to load categories (status: ${response.statusCode}, body: ${response.data})');
       }
       return [];
     } on TimeoutException {
       if (kDebugMode) {
         print(
-            '⏱️ Timeout loading live categories - will fallback to loading all channels');
+          '⏱️ Timeout loading live categories - will fallback to loading all channels',
+        );
       }
       return [];
     } catch (e) {
@@ -404,14 +419,14 @@ class XtreamServiceMobile {
             .toList();
       }
       if (kDebugMode) {
-        print('⚠️ get_series returned unexpected status or type: ${response.statusCode}');
+        print(
+            '⚠️ get_series returned unexpected status or type: ${response.statusCode}');
       }
       return [];
     } catch (e) {
       return [];
     }
   }
-
 
   /// Get series paginated / filtered by category
   Future<List<model.Series>> getSeriesPaginated({String? categoryId}) async {
@@ -535,9 +550,11 @@ class XtreamServiceMobile {
     try {
       final allSeries = await getSeries();
       if (query.isEmpty) return allSeries;
-      
+
       final normalizedQuery = query.toLowerCase();
-      return allSeries.where((s) => s.name.toLowerCase().contains(normalizedQuery)).toList();
+      return allSeries
+          .where((s) => s.name.toLowerCase().contains(normalizedQuery))
+          .toList();
     } catch (e) {
       if (kDebugMode) print('❌ Error searching series: $e');
       return [];

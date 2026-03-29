@@ -75,6 +75,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final FocusNode _audioFocusNode = FocusNode();
 
   bool _isLoading = true;
+  bool _isFirstLoad = true; // true = black overlay; false = silent spinner
+  bool _isReconnecting = false; // silent reconnect spinner (no black overlay)
   String? _errorMessage;
   late int _currentIndex;
   XtreamServiceMobile? _xtreamService;
@@ -85,6 +87,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final bool _isSeeking = false;
   bool _useSoftwareDecoder = false;
 
+  // [TiviMate] Zapping OSD — shown for 3s after each channel switch
+  bool _showZappingOSD = false;
+  Timer? _zappingOSDTimer;
+
+  // [TiviMate] Channel List Sidebar
+  bool _showChannelList = false;
+  Timer? _channelListTimer;
+  final ScrollController _channelListScrollController = ScrollController();
+
   Timer? _clockTimer;
   Timer? _controlsTimer; // Auto-hide timer
   Timer? _epgTimer; // Periodic EPG refresh for live TV
@@ -92,8 +103,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   String _currentTime = '';
-  bool _hasMarkedAsWatched = false; // Flag to mark watched only once at 80%
-  DateTime? _lastSaveTime; // For throttling position saves
+  bool _hasMarkedAsWatched = false;
+  DateTime? _lastSaveTime;
+
+  // [v23.0] Position-based stall tracking for robust watchdog
+  // Tracks the last time the player position actually advanced.
+  // A freeze is only "real" if position hasn't changed for > 60 seconds.
+  Duration _lastKnownPosition = Duration.zero;
+  DateTime? _lastPositionChangeTime;
 
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
@@ -163,72 +180,95 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('cache', 'yes');
 
     if (widget.streamType == model.StreamType.live) {
-      // LIVE PROFILE: Free-Run Speed (TiviMate Style)
-      // 10s safety margin with minimal RAM footprint (16MB)
-      (_player.platform as dynamic)?.setProperty('cache-secs', '10');
-      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '16777216'); 
+      // ===== LIVE PROFILE — Anti-Artefact v22.0 (TiviMate Flow) =====
+      // Principe TiviMate : jouer à partir de là où on est, JAMAIS chasser le live edge.
+      // ExoPlayer n'utilise pas les PTS du stream pour se recaler — on fait pareil.
+
+      // --- Buffering stable (TiviMate Medium ~ 8-10s) ---
+      (_player.platform as dynamic)?.setProperty('cache-secs', '8');
+      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB RAM max
       (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '10');
       (_player.platform as dynamic)?.setProperty('demuxer-thread', 'yes');
-      (_player.platform as dynamic)?.setProperty('correct-pts', 'no');
-      
-      // Hardware decoding for Live (Essential for 1080p efficiency)
-      (_player.platform as dynamic)?.setProperty('hwdec', 'mediacodec');
-      
-      // Stop "Slow Motion" on RMC Découverte (1080i): No sync wait!
-      (_player.platform as dynamic)?.setProperty('video-sync', 'display-desync');
-      (_player.platform as dynamic)?.setProperty('deinterlace', 'no');
-      
-      // Ensure temp files are cleaned up
-      (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
+      // Si le buffer se vide : courte pause (0.5s) puis reprise — freeze minimal, SANS rattrapage
+      // 0.5s vs 1.5s : moins de gel visible, moins de PTS gap à rattraper
+      (_player.platform as dynamic)?.setProperty('cache-pause', 'yes');
+      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '0.5');
       (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
-      (_player.platform as dynamic)?.setProperty('cache-pause', 'no');
-      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '1');
-      (_player.platform as dynamic)?.setProperty('force-seekable', 'no');
+      (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
+
+      // --- Décodage hardware — Direct Surface ---
+      (_player.platform as dynamic)?.setProperty('hwdec', 'mediacodec');
+
+      // --- Synchronisation A/V : mode desync (clé anti-rattrapage) ---
+      // video-sync: desync = audio et vidéo jouent indépendamment, AUCUN ajustement de vitesse.
+      // C'est le mode le plus stable pour les flux live IPTV :
+      //   - pas de fast-forward pour rattraper l'audio
+      //   - pas de slow-down pour attendre la vidéo
+      //   - identique au comportement natif ExoPlayer de TiviMate
+      // video-sync: audio (ancien) ajustait la vitesse lecture selon l'horloge audio
+      // ⇒ si audio dérive ou est en avance après un rebuffer : fast-forward visible = RATTRAPAGE
+      (_player.platform as dynamic)?.setProperty('correct-pts', 'no');
+      (_player.platform as dynamic)?.setProperty('video-sync', 'desync');
+      // autosync non applicable en mode desync, supprimé
+
+      // --- Qualité image : JAMAIS de skip de frames sur du live TV ---
+      (_player.platform as dynamic)?.setProperty('framedrop', 'no');
+
     } else {
       // VOD PROFILE: Radical Compatibility (Software Mode)
-      // Pure CPU decoding to guarantee image visibility (Fixes "White Page" surface errors)
-      (_player.platform as dynamic)?.setProperty('hwdec', 'no'); 
+      // Pour VOD, on garde correct-pts:yes (précision de position nécessaire pour le seek)
+      (_player.platform as dynamic)?.setProperty('hwdec', 'no');
+      (_player.platform as dynamic)?.setProperty('correct-pts', 'yes');
       (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
     }
     
-    // [V6.1 Fix] Universal Audio Compatibility (TiviMate-like driver)
-    // Forced Stereo handles 5.1 tracks on 2.0 hardware without initialization errors
+    // [V11.0 Perfect Restoration] Recovering settings from working commit a1628a6b
+    // Forced software re-sampling handles ANY stubborn 5.1/LATM/24-bit audio track.
+    (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
+    (_player.platform as dynamic)?.setProperty('af', 'lavrresample,format=channels=stereo:sample_fmts=s16');
+    (_player.platform as dynamic)?.setProperty('audio-format', 's16');
     (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
-    (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
-    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.5');
+    (_player.platform as dynamic)?.setProperty('audio-pitch-correction', 'no');
+    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.2'); // Live: buffer audio court (réduit le désync pendant les cache-pauses)
+    (_player.platform as dynamic)?.setProperty('audio-samplerate', '48000');
+    (_player.platform as dynamic)?.setProperty('aid', 'auto');
     
-    // Global Seeking: 'no' is much safer for IPTV hardware startup
-    (_player.platform as dynamic)?.setProperty('hr-seek', 'no');
-
-    // Ensure temp files are cleaned up
+    // --- Seeking & Sync globaux ---
+    (_player.platform as dynamic)?.setProperty('hr-seek', 'no');           // Seeking rapide (plus sûr pour IPTV)
+    (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
     (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
-    (_player.platform as dynamic)?.setProperty('interpolation', 'no'); // Keep off for safety
+    (_player.platform as dynamic)?.setProperty('interpolation', 'no');     // Pas d'interpolation (trop lourd sur Android)
 
-    // Network resilience - more aggressive settings
+    // --- Réseau & Timeouts ---
     (_player.platform as dynamic)?.setProperty('network-timeout', '120');
     (_player.platform as dynamic)?.setProperty('stream-timeout', '120');
     (_player.platform as dynamic)?.setProperty('tls-verify', 'no');
     (_player.platform as dynamic)
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
-    // [V5.2 Fix] Pure Hardware Acceleration flags (to match TiviMate performance)
-    (_player.platform as dynamic)?.setProperty('vd-lavc-skiploopfilter', 'all');
-    (_player.platform as dynamic)?.setProperty('vd-lavc-skipidct', 'all');
-    (_player.platform as dynamic)?.setProperty('vd-lavc-fast', 'yes');
-    (_player.platform as dynamic)?.setProperty('vd-lavc-threads', '4');
-
-    // Network-level reconnection (FFmpeg internal — no app reload)
+    // --- Reconnexion réseau FFmpeg (consolidée) ---
+    // IMPORTANT : reconnect_at_eof SUPPRIMÉ
+    // Les serveurs IPTV ferment souvent la connexion HTTP entre segments (comportement normal).
+    // reconnect_at_eof=1 causait une reconnexion au live edge (position en avance) après chaque EOF
+    // ⇒ freeze pendant la reconnexion + saut de position = RATTRAPAGE visible
+    // Le watchdog applicatif (toutes les 15s) gère les vrais arrêts de stream.
     (_player.platform as dynamic)?.setProperty(
       'stream-lavf-o',
-      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_at_eof=1,reconnect_delay_max=5',
+      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
     );
-    // [V5.1 Fix] discard genpts to fix CPU-starvation/slow-motion on low-end CPUs
+
+    // --- Probing du flux (une seule entrée, consolidée) ---
+    // Précédent : 2 setProperty('demuxer-lavf-o') en conflit
+    // fflags=+discardcorrupt supprimé : peut causer des skips sur certains streams IPTV
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=2000000,probesize=1000000,fflags=+discardcorrupt',
+      'analyzeduration=2000000,probesize=1000000',
     );
-    (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
-    (_player.platform as dynamic)?.setProperty('framedrop', 'vo');
+
+    // --- Décodeur lavc : threads libres, sans fast-mode (qualité prioritaire) ---
+    // vd-lavc-skiploopfilter SUPPRIMÉ (causait la pixelisation)
+    // vd-lavc-fast SUPPRIMÉ (décodage imprécis = artefacts)
+    (_player.platform as dynamic)?.setProperty('vd-lavc-threads', '0');    // Threads auto (0 = détection auto)
 
     // Low-latency intentionally removed for stability
     /*
@@ -255,9 +295,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           if (playing) _errorMessage = null; // Clear error on successful play
         });
         if (playing) {
-          // Smooth Loading: Hide loading screen 1s AFTER playback actually starts
-          // This masks initial glitches/re-buffering
-          Future.delayed(const Duration(seconds: 1), () {
+          // Smooth Loading: Hide loading screen AFTER playback actually starts
+          // Faster hide for Live TV
+          final hideDelay = widget.streamType == model.StreamType.live ? 300 : 1000;
+          Future.delayed(Duration(milliseconds: hideDelay), () {
             if (mounted && _isPlaying) {
               setState(() => _isLoading = false);
             }
@@ -270,6 +311,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _player.stream.position.listen((position) {
       if (mounted && !_isSeeking) {
         setState(() => _position = position);
+
+        // [v23.0] Track last position change time for time-based watchdog
+        if (position != _lastKnownPosition) {
+          _lastKnownPosition = position;
+          _lastPositionChangeTime = DateTime.now();
+        }
 
         // Check if 80% of content watched (for VOD/Series only)
         _checkAndMarkWatched(position);
@@ -445,6 +492,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _controlsTimer?.cancel();
     _epgTimer?.cancel();
     _liveWatchdog?.cancel();
+    _zappingOSDTimer?.cancel();
+    _channelListTimer?.cancel();
+    _channelListScrollController.dispose();
 
     // Stop playback first to prevent audio continuing in background
     _player.stop();
@@ -625,34 +675,50 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   int _watchdogStallCount = 0;
 
-  /// Start watchdog timer for live streams
+  /// [v23.0] Watchdog revampé — Détection temporelle basée sur la POSITION réelle.
+  ///
+  /// Problème de l'ancienne version :
+  /// Le watchdog vérifiait `!_isPlaying` toutes les 15s. Pendant un cache-pause de
+  /// 0.5s (normal sur IPTV), si le tick de 15s tombait pendant la pause, il incrémentait
+  /// le compteur. Après 2 tels événements (30s), il appelait `_loadStream()` → nouvelle
+  /// requête HTTP au LIVE EDGE → saut de position = RATTRAPAGE.
+  ///
+  /// Nouvelle logique (style TiviMate) :
+  /// - Suit la dernière fois que la POSITION a avancé (plus fiable que _isPlaying)
+  /// - Ne reconnecte que si la position est gelée depuis > 60 secondes CONTINUES
+  /// - Les cache-pauses courtes (< 60s) sont ignorées — mpv les gère via stream-lavf-o
   void _startLiveWatchdog() {
     _liveWatchdog?.cancel();
     _watchdogStallCount = 0;
     if (widget.streamType != model.StreamType.live) return;
 
-    // [FIX] TiviMate-like Watchdog: Check every 30 seconds for faster recovery
-    _liveWatchdog = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Initialiser le timestamp de position
+    _lastPositionChangeTime = DateTime.now();
+    _lastKnownPosition = Duration.zero;
+
+    // Vérifie toutes les 10s, mais seuil de reconnexion à 60s de position gelée
+    _liveWatchdog = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
 
-      // If intentionally paused by user, don't trigger watchdog
-      if (!_isPlaying && _player.state.playing == false && _errorMessage == null && !_isLoading) {
-        return;
+      // Si le player joue et la position avance : tout va bien, reset
+      if (_isPlaying && _lastPositionChangeTime != null) {
+        final stallSecs = DateTime.now().difference(_lastPositionChangeTime!).inSeconds;
+        if (stallSecs < 5) return; // Position avance normalement
       }
 
-      // If buffering or not playing for 60s total, reconnect
-      if (!_isPlaying || _isLoading) {
-        _watchdogStallCount++;
-        debugPrint(
-          'MediaKitPlayer: Watchdog health check: $_watchdogStallCount/2',
-        );
-        if (_watchdogStallCount >= 2) {
-          debugPrint('MediaKitPlayer: Watchdog — Stream unstable or stalled, triggering auto-reconnect...');
-          _watchdogStallCount = 0;
-          _attemptReconnect();
-        }
-      } else {
-        _watchdogStallCount = 0; // Reset if playing normally
+      // Calculer la durée réelle de gel (basée sur la position, pas sur _isPlaying)
+      final stallSecs = _lastPositionChangeTime != null
+          ? DateTime.now().difference(_lastPositionChangeTime!).inSeconds
+          : 9999;
+
+      debugPrint('MediaKitPlayer: Watchdog — position gelée depuis ${stallSecs}s');
+
+      // Ne reconnecte QUE si vraiment gelé depuis > 60s (les cache-pauses sont < 5s)
+      // Cela laisse mpv's reconnect interne (stream-lavf-o) gérer les coupures courtes
+      if (stallSecs > 60) {
+        debugPrint('MediaKitPlayer: Watchdog — gel de 60s confirmé, reconnexion forcée');
+        _lastPositionChangeTime = DateTime.now(); // Éviter re-déclenchement immédiat
+        _attemptReconnect();
       }
     });
   }
@@ -686,7 +752,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       if (_xtreamService == null) return;
 
       setState(() {
-        _isLoading = true;
+        if (_isFirstLoad) {
+          _isLoading = true; // Black overlay only on first load
+        } else {
+          _isReconnecting = true; // Silent spinner on subsequent loads
+        }
         _errorMessage = null;
         _epg = null; // Reset EPG
       });
@@ -735,15 +805,20 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       debugPrint('MediaKitPlayer: Loading stream: $streamUrl');
 
-      // Enable software decoding fallback if hardware fails (handled by mpv usually, but ensuring 'auto' helps)
-      // If we are in fallback mode, force software ('no')
-      String hwdecValue;
-      if (_useSoftwareDecoder) {
-        hwdecValue = 'no';
-      } else {
-        hwdecValue = ref.read(mobileSettingsProvider).decoderMode;
+      // [v23.0] Fix: Ne PAS overrider hwdec pour les streams live.
+      // initState a déjà configuré 'mediacodec' pour le live.
+      // Overrider ici avec mobileSettingsProvider.decoderMode annulerait ce réglage
+      // (si l'utilisateur a 'auto' dans les settings → retour à mediacodec-copy).
+      // Pour le VOD : on garde le fallback logiciel si nécessaire.
+      if (widget.streamType != model.StreamType.live) {
+        final hwdecValue = _useSoftwareDecoder
+            ? 'no'
+            : ref.read(mobileSettingsProvider).decoderMode;
+        (_player.platform as dynamic)?.setProperty('hwdec', hwdecValue);
+      } else if (_useSoftwareDecoder) {
+        // Live fallback software uniquement si hardware a échoué
+        (_player.platform as dynamic)?.setProperty('hwdec', 'no');
       }
-      (_player.platform as dynamic)?.setProperty('hwdec', hwdecValue);
 
       await _player.open(
         Media(streamUrl, httpHeaders: {'User-Agent': 'XtremFlow/1.0'}),
@@ -751,7 +826,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       );
 
       setState(() {
-        _isLoading = false;
+        // [TiviMate] For live: DON'T hide loading here — let the 'playing' / 'width'
+        // stream listeners handle it for a glitch-free first-frame reveal.
+        // For VOD: immediately hide since we need the controls visible for seek.
+        if (widget.streamType != model.StreamType.live) {
+          _isLoading = false;
+        }
+        _isReconnecting = false;
+        _isFirstLoad = false;
         _reconnectAttempts = 0; // Reset reconnect counter on success
       });
 
@@ -807,6 +889,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       setState(() {
         _isLoading = false;
+        _isReconnecting = false;
+        _isFirstLoad = false;
         _errorMessage = e.toString();
       });
     }
@@ -841,8 +925,46 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _switchChannel(int index) {
     setState(() {
       _currentIndex = index;
+      _showZappingOSD = true;
+      _showChannelList = false; // close sidebar on switch
+      _showControls = false;    // hide regular OSD — Zapping OSD takes over
+    });
+    // Show zapping OSD for 3 seconds
+    _zappingOSDTimer?.cancel();
+    _zappingOSDTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showZappingOSD = false);
     });
     _loadStream();
+  }
+
+  /// Open/close the channel list sidebar
+  void _toggleChannelList() {
+    setState(() => _showChannelList = !_showChannelList);
+    if (_showChannelList) {
+      _scrollToCurrentChannel();
+      _channelListTimer?.cancel();
+      _channelListTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted) setState(() => _showChannelList = false);
+      });
+    } else {
+      _channelListTimer?.cancel();
+    }
+  }
+
+  /// Scroll channel list to keep current channel visible
+  void _scrollToCurrentChannel() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_channelListScrollController.hasClients) return;
+      const itemHeight = 64.0;
+      final offset = (_currentIndex * itemHeight) -
+          (_channelListScrollController.position.viewportDimension / 2) +
+          (itemHeight / 2);
+      _channelListScrollController.animateTo(
+        offset.clamp(0, _channelListScrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   void _togglePlayPause() {
@@ -982,6 +1104,26 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         }
       }
 
+      // OK / Select when channel list is open → switch to focused channel
+      if (_showChannelList &&
+          (key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.numpadEnter)) {
+        // Channel list handles its own tap, this closes it
+        setState(() => _showChannelList = false);
+        return true;
+      }
+
+      // Menu key or 'M' → toggle channel list sidebar
+      if (key == LogicalKeyboardKey.contextMenu ||
+          key == LogicalKeyboardKey.keyM) {
+        if (widget.streamType == model.StreamType.live &&
+            widget.channels != null) {
+          _toggleChannelList();
+          return true;
+        }
+      }
+
       // Cycle Aspect Ratio - secret key 'A' or digit 1
       if (key == LogicalKeyboardKey.keyA || key == LogicalKeyboardKey.digit1) {
         _cycleAspectRatio();
@@ -1050,9 +1192,24 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         backgroundColor: Colors.black, // [V5.2 Fix] Enforce black background globally
         body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _toggleControls,
+        onTap: () {
+          if (_showChannelList) {
+            setState(() => _showChannelList = false);
+          } else {
+            _toggleControls();
+          }
+        },
         onPanDown: (_) => _onUserInteraction(),
         onPanUpdate: (_) => _onUserInteraction(),
+        // Swipe from right edge → open channel list
+        onHorizontalDragEnd: (details) {
+          if (widget.streamType == model.StreamType.live &&
+              widget.channels != null &&
+              details.primaryVelocity != null &&
+              details.primaryVelocity! < -300) {
+            _toggleChannelList();
+          }
+        },
         child: Stack(
           children: [
             // Video Player
@@ -1069,12 +1226,33 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 ),
               ),
 
-            // Loading Overlay (Stays on top until smooth playback starts)
-            // We moved _buildLoadingView out of the if/else chain above to overlay it
+            // Loading Overlay — black only on FIRST load
             if (_isLoading && _errorMessage == null)
               Container(
                 color: Colors.black,
                 child: _buildLoadingView(),
+              ),
+
+            // Silent reconnect spinner (does NOT black out the video)
+            if (_isReconnecting && !_isLoading)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
               ),
 
             // Custom controls overlay
@@ -1165,6 +1343,20 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   ),
                 ),
               ),
+
+            // [TiviMate] Zapping OSD — shown briefly on channel switch
+            if (_showZappingOSD &&
+                widget.streamType == model.StreamType.live &&
+                widget.channels != null &&
+                widget.channels!.isNotEmpty)
+              _buildZappingOSD(),
+
+            // [TiviMate] Channel list sidebar
+            if (_showChannelList &&
+                widget.streamType == model.StreamType.live &&
+                widget.channels != null &&
+                widget.channels!.isNotEmpty)
+              _buildChannelListSidebar(),
 
             // Stats Overlay (Top Left) - Isolated to prevent main rebuilds
             Positioned(
@@ -1338,6 +1530,21 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Widget _buildEPGBox(String title) {
     final rawNow = _epg?.nowPlaying ?? '';
     String nowPlaying = rawNow.isNotEmpty ? rawNow : "Pas d'infos EPG";
+    final epgProgress = _epg?.progress ?? 0.0;
+
+    // Format start / end time for display
+    String startTime = '';
+    String endTime = '';
+    if (_epg != null && _epg!.start.isNotEmpty && _epg!.end.isNotEmpty) {
+      try {
+        final s = DateTime.parse(_epg!.start).toLocal();
+        final e = DateTime.parse(_epg!.end).toLocal();
+        startTime =
+            '${s.hour.toString().padLeft(2, '0')}:${s.minute.toString().padLeft(2, '0')}';
+        endTime =
+            '${e.hour.toString().padLeft(2, '0')}:${e.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1382,6 +1589,39 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  // EPG Progress Bar
+                  if (startTime.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          startTime,
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 11),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: epgProgress.clamp(0.0, 1.0),
+                              minHeight: 4,
+                              backgroundColor: Colors.white24,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4FC3F7),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          endTime,
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1395,7 +1635,306 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     if (widget.streamType == model.StreamType.live) {
       return _buildUnifiedOSD(title);
     }
+    return _buildVodControlsOverlay();
+  }
 
+  /// [TiviMate] Zapping OSD — brief overlay on channel switch (like TiviMate)
+  Widget _buildZappingOSD() {
+    final ch = widget.channels![_currentIndex];
+    final chNum = _currentIndex + 1;
+    final nowPlaying = _epg?.nowPlaying ?? '';
+    final epgProgress = _epg?.progress ?? 0.0;
+
+    return Positioned(
+      bottom: 24,
+      left: 24,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 360),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.82),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Channel logo
+              if (ch.streamIcon.isNotEmpty)
+                Container(
+                  width: 52,
+                  height: 52,
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white10,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: ch.streamIcon,
+                      fit: BoxFit.contain,
+                      errorWidget: (_, __, ___) =>
+                          const Icon(Icons.tv, color: Colors.white38, size: 32),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 52,
+                  height: 52,
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white10,
+                  ),
+                  child: const Icon(Icons.tv, color: Colors.white38, size: 32),
+                ),
+
+              // Channel info
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1565C0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'CH $chNum',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            ch.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_isReconnecting || _isLoading)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: SizedBox(
+                          height: 3,
+                          child: LinearProgressIndicator(
+                            backgroundColor: Colors.white24,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4FC3F7)),
+                          ),
+                        ),
+                      )
+                    else if (nowPlaying.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        nowPlaying,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: epgProgress.clamp(0.0, 1.0),
+                          minHeight: 3,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF4FC3F7)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// [TiviMate] Channel list sidebar — slide-in panel on the right
+  Widget _buildChannelListSidebar() {
+    final channels = widget.channels!;
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      right: 0,
+      child: Container(
+        width: 280,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+            colors: [Color(0xE6000000), Color(0x99000000)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.white12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.list, color: Colors.white70, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Chaînes',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _showChannelList = false),
+                      child: const Icon(Icons.close,
+                          color: Colors.white54, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+              // Channel list
+              Expanded(
+                child: ListView.builder(
+                  controller: _channelListScrollController,
+                  itemCount: channels.length,
+                  itemExtent: 64.0,
+                  itemBuilder: (context, index) {
+                    final ch = channels[index];
+                    final isActive = index == _currentIndex;
+                    return GestureDetector(
+                      onTap: () {
+                        _channelListTimer?.cancel();
+                        _switchChannel(index);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? const Color(0xFF1565C0).withOpacity(0.6)
+                              : Colors.transparent,
+                          border: isActive
+                              ? const Border(
+                                  left: BorderSide(
+                                    color: Color(0xFF4FC3F7),
+                                    width: 3,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            // Logo
+                            Container(
+                              width: 40,
+                              height: 40,
+                              margin: const EdgeInsets.only(right: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: ch.streamIcon.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: CachedNetworkImage(
+                                        imageUrl: ch.streamIcon,
+                                        fit: BoxFit.contain,
+                                        errorWidget: (_, __, ___) =>
+                                            const Icon(Icons.tv,
+                                                color: Colors.white38,
+                                                size: 20),
+                                      ),
+                                    )
+                                  : const Icon(Icons.tv,
+                                      color: Colors.white38, size: 20),
+                            ),
+                            // Name + num
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    ch.name,
+                                    style: TextStyle(
+                                      color: isActive
+                                          ? Colors.white
+                                          : Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: isActive
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    'CH ${index + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Active indicator
+                            if (isActive)
+                              const Icon(
+                                Icons.play_arrow,
+                                color: Color(0xFF4FC3F7),
+                                size: 18,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVodControlsOverlay() {
     return Positioned.fill(
       child: Container(
         color: Colors.black.withOpacity(0.4),
@@ -1583,15 +2122,46 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   }
 
   Widget _buildLoadingView() {
-    return const Center(
+    // During first load of a live channel: show logo + name for better UX
+    final isLive = widget.streamType == model.StreamType.live;
+    final hasChannel = isLive &&
+        widget.channels != null &&
+        widget.channels!.isNotEmpty;
+    final ch = hasChannel ? widget.channels![_currentIndex] : null;
+
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: AppColors.primary),
-          SizedBox(height: 16),
+          // Channel logo during live TV first load
+          if (ch != null && ch.streamIcon.isNotEmpty)
+            Container(
+              width: 72,
+              height: 72,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: ch.streamIcon,
+                  fit: BoxFit.contain,
+                  errorWidget: (_, __, ___) =>
+                      const Icon(Icons.tv, color: Colors.white38, size: 40),
+                ),
+              ),
+            ),
+          const CircularProgressIndicator(color: AppColors.primary),
+          const SizedBox(height: 16),
           Text(
-            'Chargement...',
-            style: TextStyle(color: Colors.white70),
+            ch != null ? ch.name : 'Chargement...',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

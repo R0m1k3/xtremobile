@@ -36,7 +36,8 @@ class MemoryProfiler {
     });
     if (kDebugMode) {
       print(
-          '⏰ PERIODIC MEMORY MONITORING STARTED (${interval.inSeconds}s interval)');
+        '⏰ PERIODIC MEMORY MONITORING STARTED (${interval.inSeconds}s interval)',
+      );
     }
   }
 
@@ -51,10 +52,14 @@ class MemoryProfiler {
 
   /// Analyze memory growth between snapshots
   static MemoryAnalysis analyzeGrowth(String startLabel, String endLabel) {
-    final start = _snapshots.firstWhere((s) => s.label == startLabel,
-        orElse: () => _snapshots.first);
-    final end = _snapshots.firstWhere((s) => s.label == endLabel,
-        orElse: () => _snapshots.last);
+    final start = _snapshots.firstWhere(
+      (s) => s.label == startLabel,
+      orElse: () => _snapshots.first,
+    );
+    final end = _snapshots.firstWhere(
+      (s) => s.label == endLabel,
+      orElse: () => _snapshots.last,
+    );
 
     return MemoryAnalysis(
       startLabel: startLabel,

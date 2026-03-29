@@ -191,9 +191,11 @@ class HiveEncryptionBenchmark {
 
         print('\nStatus:');
         print(
-            '  $writeStatus Write overhead: ${writeOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
+          '  $writeStatus Write overhead: ${writeOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)',
+        );
         print(
-            '  $readStatus Read overhead: ${readOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)');
+          '  $readStatus Read overhead: ${readOverhead.toStringAsFixed(1)}% (target: <$acceptableThreshold%)',
+        );
         print('=' * 60 + '\n');
       }
     }
@@ -242,7 +244,8 @@ class EncryptionBenchmarkResult {
   void print() {
     print('  Name: $name');
     print(
-        '  Write: ${writeTimeMs}ms (${writePerOpUs.toStringAsFixed(2)}µs/op)');
+      '  Write: ${writeTimeMs}ms (${writePerOpUs.toStringAsFixed(2)}µs/op)',
+    );
     print('  Read: ${readTimeMs}ms (${readPerOpUs.toStringAsFixed(2)}µs/op)');
     print('  Delete: ${deleteTimeMs}ms');
   }

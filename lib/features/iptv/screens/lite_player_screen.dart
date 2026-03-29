@@ -147,8 +147,9 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   }
 
   Future<void> _updateEPG() async {
-    if (widget.streamType != model.StreamType.live || _xtreamService == null)
+    if (widget.streamType != model.StreamType.live || _xtreamService == null) {
       return;
+    }
     try {
       final currentChannelId =
           widget.channels?[_currentIndex].streamId ?? widget.streamId;

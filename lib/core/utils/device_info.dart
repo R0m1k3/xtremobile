@@ -4,7 +4,6 @@
 /// to prevent OOM crashes on low-end devices
 library;
 
-import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
