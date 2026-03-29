@@ -42,7 +42,16 @@
       "Bash(export PATH=\"$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH\")",
       "Bash(__NEW_LINE_fa059bc1c566f6ee__ cd:*)",
       "Bash(__NEW_LINE_70fecd5c4080fe72__ cd:*)",
-      "Bash(__NEW_LINE_2a0d1cacdabfd662__ cd:*)"
+      "Bash(__NEW_LINE_2a0d1cacdabfd662__ cd:*)",
+      "Bash(__NEW_LINE_0bb7b05d7f08e67e__ cd:*)",
+      "Bash(__NEW_LINE_92dba04a4f1169ce__ cd:*)",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\Michael\\\\Git\\\\xtremobile && flutter build apk --release\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\Michael\\\\Git\\\\xtremobile && flutter build apk --release 2>&1\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\Users\\\\Michael\\\\Git\\\\xtremobile''; & flutter build apk --release 2>&1\")",
+      "Bash(powershell -Command \"Get-Command flutter -ErrorAction SilentlyContinue\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\'' -Recurse -Filter ''flutter.bat'' -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\Users\\\\Michael\\\\Git\\\\xtremobile''; & ''C:\\\\Users\\\\Michael\\\\Git\\\\flutter\\\\bin\\\\flutter.bat'' build apk --release 2>&1\")",
+      "Bash(powershell -Command \":*)"
     ]
   }
 }

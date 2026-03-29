@@ -173,11 +173,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty(
         'demuxer-max-bytes',
         '32000000',
-      ); // Reduced to 32MB (approx 20-30s @ 10Mbps) for stability
+      ); // 32MB (approx 20-30s @ 10Mbps) for stability
       (_player.platform as dynamic)
           ?.setProperty('demuxer-readahead-secs', '15');
       (_player.platform as dynamic)
-          ?.setProperty('demuxer-max-back-bytes', '10000000');
+          ?.setProperty('demuxer-max-back-bytes', '0');
       // Ensure temp files are cleaned up
       (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
 
@@ -227,12 +227,20 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)
         ?.setProperty('http-header-fields', 'User-Agent: XtremFlow/1.0');
 
-    // Live Stream optimizations - reconnection only
-    (_player.platform as dynamic)?.setProperty(
-      'stream-lavf-o',
-      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
-    );
-    // Removed: force-seekable and live_start_index=-1 which caused rollbacks
+    // Live Stream optimizations
+    if (widget.streamType == model.StreamType.live) {
+      // For live: reconnect but do NOT use reconnect_streamed (causes rollbacks)
+      (_player.platform as dynamic)?.setProperty(
+        'stream-lavf-o',
+        'reconnect=1,reconnect_on_network_error=1,reconnect_delay_max=3',
+      );
+    } else {
+      // For VOD/series: full reconnect support
+      (_player.platform as dynamic)?.setProperty(
+        'stream-lavf-o',
+        'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
+      );
+    }
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
       'analyzeduration=2000000,probesize=1000000',
@@ -276,13 +284,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
     (_player.platform as dynamic)?.setProperty('alang', 'fr,fra,fre,en,eng');
 
-    // Volume & Sync
+    // Volume
     (_player.platform as dynamic)?.setProperty('volume', '100');
-    // Slightly larger buffer for software decoding
-    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.25');
-    (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
+    // NOTE: audio-buffer already set to 1.0s above — do NOT set again here
 
-    debugPrint('MediaKitPlayer: Audio V3 (Downmix) configuration applied');
+    debugPrint('MediaKitPlayer: Audio V3 configuration applied');
 
     _controller = VideoController(_player);
 
@@ -1019,8 +1025,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
 
     final current = _player.state.track.audio;
-    int currentIndex = tracks.indexOf(current);
-    int nextIndex = (currentIndex + 1) % tracks.length;
+    final currentIndex = tracks.indexOf(current);
+    final nextIndex = (currentIndex + 1) % tracks.length;
     final nextTrack = tracks[nextIndex];
 
     await _player.setAudioTrack(nextTrack);
@@ -1334,8 +1340,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Widget _buildEPGBox(String title) {
     final rawNow = _epg?.nowPlaying ?? '';
     String nowPlaying = rawNow.isNotEmpty ? rawNow : "Pas d'infos EPG";
-    String nextPlaying =
-        _epg?.nextPlaying != null ? "Suivant: ${_epg!.nextPlaying}" : "";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
