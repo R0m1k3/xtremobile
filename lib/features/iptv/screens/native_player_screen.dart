@@ -178,16 +178,17 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', liveBufferSecs.toString());
       (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '0');
       
-      // Fix rollbacks: Ignore broken/discontinuous timestamps in some TS streams
-      (_player.platform as dynamic)?.setProperty('correct-pts', 'no');
+      // Fix rollbacks: Standardize timestamps to prevent "rattrapages" (catch-ups)
+      (_player.platform as dynamic)?.setProperty('correct-pts', 'yes');
       
       // Ensure temp files are cleaned up
       (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
 
-      // Startup Speed: Disable initial cache pause to allow immediate playback
-      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'no');
-      // Never pause for buffering — stay at live edge like ExoPlayer/TiviMate
-      (_player.platform as dynamic)?.setProperty('cache-pause', 'no');
+      // [V4.0 FIX] TiviMate-like "Buffer-First" behavior
+      // Instead of jumping or rolling back, we pause cleanly and show a spinner
+      (_player.platform as dynamic)?.setProperty('cache-pause-initial', 'yes');
+      (_player.platform as dynamic)?.setProperty('cache-pause', 'yes');
+      (_player.platform as dynamic)?.setProperty('cache-pause-wait', '5'); // Wait for 5s of data
       // Prevent any seek attempt on live streams
       (_player.platform as dynamic)?.setProperty('force-seekable', 'no');
     } else {
@@ -238,11 +239,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Network-level reconnection (FFmpeg internal — no app reload)
     (_player.platform as dynamic)?.setProperty(
       'stream-lavf-o',
-      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5',
+      'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_at_eof=1,reconnect_delay_max=5',
     );
+    // [V4.0 FIX] genpts + igndts fixes broken stream timestamps at the source
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=2000000,probesize=1000000,fflags=+discardcorrupt',
+      'analyzeduration=2000000,probesize=1000000,fflags=+genpts+igndts+discardcorrupt',
     );
 
     // Seeking: disabled for live (prevents rollback), enabled for VOD
