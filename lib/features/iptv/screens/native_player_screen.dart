@@ -87,10 +87,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final bool _isSeeking = false;
   bool _useSoftwareDecoder = false;
 
-  // [TiviMate] Zapping OSD — shown for 3s after each channel switch
-  bool _showZappingOSD = false;
-  Timer? _zappingOSDTimer;
-
   // [TiviMate] Channel List Sidebar
   bool _showChannelList = false;
   Timer? _channelListTimer;
@@ -492,7 +488,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _controlsTimer?.cancel();
     _epgTimer?.cancel();
     _liveWatchdog?.cancel();
-    _zappingOSDTimer?.cancel();
     _channelListTimer?.cancel();
     _channelListScrollController.dispose();
 
@@ -925,15 +920,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _switchChannel(int index) {
     setState(() {
       _currentIndex = index;
-      _showZappingOSD = true;
       _showChannelList = false; // close sidebar on switch
-      _showControls = false;    // hide regular OSD — Zapping OSD takes over
+      _showControls = true;     // show regular OSD
     });
-    // Show zapping OSD for 3 seconds
-    _zappingOSDTimer?.cancel();
-    _zappingOSDTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _showZappingOSD = false);
-    });
+    _resetControlsTimer();
     _loadStream();
   }
 
@@ -1344,13 +1334,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 ),
               ),
 
-            // [TiviMate] Zapping OSD — shown briefly on channel switch
-            if (_showZappingOSD &&
-                widget.streamType == model.StreamType.live &&
-                widget.channels != null &&
-                widget.channels!.isNotEmpty)
-              _buildZappingOSD(),
-
             // [TiviMate] Channel list sidebar
             if (_showChannelList &&
                 widget.streamType == model.StreamType.live &&
@@ -1638,6 +1621,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     return _buildVodControlsOverlay();
   }
 
+  /*
   /// [TiviMate] Zapping OSD — brief overlay on channel switch (like TiviMate)
   Widget _buildZappingOSD() {
     final ch = widget.channels![_currentIndex];
@@ -1777,6 +1761,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       ),
     );
   }
+  */
 
   /// [TiviMate] Channel list sidebar — slide-in panel on the right
   Widget _buildChannelListSidebar() {
