@@ -18,6 +18,12 @@ class MobileSettings {
   final List<String>
       deinterlacedChannels; // IDs of channels with forced deinterlacing
 
+  /// Custom XMLTV guide URL, tried after the provider's own `xmltv.php`.
+  final String xmltvUrl;
+
+  /// Allow the built-in community XMLTV guides as the last EPG resort.
+  final bool useCommunityEpg;
+
   const MobileSettings({
     this.liveTvKeywords = const [],
     this.moviesKeywords = const [],
@@ -30,6 +36,8 @@ class MobileSettings {
     this.deinterlace = false,
     this.bufferDuration = 0,
     this.deinterlacedChannels = const [],
+    this.xmltvUrl = '',
+    this.useCommunityEpg = true,
   });
 
   MobileSettings copyWith({
@@ -44,6 +52,8 @@ class MobileSettings {
     bool? deinterlace,
     int? bufferDuration,
     List<String>? deinterlacedChannels,
+    String? xmltvUrl,
+    bool? useCommunityEpg,
   }) {
     return MobileSettings(
       liveTvKeywords: liveTvKeywords ?? this.liveTvKeywords,
@@ -57,6 +67,8 @@ class MobileSettings {
       deinterlace: deinterlace ?? this.deinterlace,
       bufferDuration: bufferDuration ?? this.bufferDuration,
       deinterlacedChannels: deinterlacedChannels ?? this.deinterlacedChannels,
+      xmltvUrl: xmltvUrl ?? this.xmltvUrl,
+      useCommunityEpg: useCommunityEpg ?? this.useCommunityEpg,
     );
   }
 
@@ -121,6 +133,9 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
     final buffer = _box?.get('bufferDuration', defaultValue: 0) as int?;
     final deinterlacedChannels =
         _box?.get('deinterlacedChannels', defaultValue: <String>[]) as List?;
+    final xmltvUrl = _box?.get('xmltvUrl', defaultValue: '') as String?;
+    final useCommunityEpg =
+        _box?.get('useCommunityEpg', defaultValue: true) as bool?;
 
     state = MobileSettings(
       liveTvKeywords: liveTv?.cast<String>() ?? [],
@@ -134,6 +149,8 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
       deinterlace: deinterlace ?? false,
       bufferDuration: buffer ?? 0,
       deinterlacedChannels: deinterlacedChannels?.cast<String>() ?? [],
+      xmltvUrl: xmltvUrl ?? '',
+      useCommunityEpg: useCommunityEpg ?? true,
     );
   }
 
@@ -185,6 +202,17 @@ class MobileSettingsNotifier extends StateNotifier<MobileSettings> {
   void setBufferDuration(int seconds) {
     state = state.copyWith(bufferDuration: seconds);
     _box?.put('bufferDuration', seconds);
+  }
+
+  void setXmltvUrl(String url) {
+    final trimmed = url.trim();
+    state = state.copyWith(xmltvUrl: trimmed);
+    _box?.put('xmltvUrl', trimmed);
+  }
+
+  void toggleCommunityEpg(bool value) {
+    state = state.copyWith(useCommunityEpg: value);
+    _box?.put('useCommunityEpg', value);
   }
 
   void toggleChannelDeinterlace(String streamId) {

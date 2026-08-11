@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Theme-aware decoration helpers.
-/// Returns dark (Apple TV glossy) or light (iOS clean white) styles
-/// based on current [BuildContext] brightness.
+import 'app_colors.dart';
+
+/// Theme-aware decoration helpers — "Warm Cinema" charter.
+///
+/// Depth comes from warm shadows and contrast, never from `BackdropFilter`:
+/// a blur layer repaints every frame and is the first thing to drop frames on
+/// low-end Android.
 class AppDecorations {
   AppDecorations._();
 
-  // Force Dark/Glossy mode for IPTV experience regardless of system theme
+  // Force Dark mode for the IPTV experience regardless of system theme.
   static bool _isDark(BuildContext context) => true;
 
   // ─── Backgrounds ────────────────────────────────────────────────────────────
@@ -14,20 +18,13 @@ class AppDecorations {
   /// Full-screen gradient background for tab content areas.
   static BoxDecoration background(BuildContext context) {
     if (_isDark(context)) {
-      return const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF1C1C1E), Color(0xFF000000)],
-          stops: [0.0, 1.0],
-        ),
-      );
+      return const BoxDecoration(gradient: AppColors.backgroundGradient);
     }
     return const BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFFEAEAF0), Color(0xFFD8D8E0)],
+        colors: [Color(0xFFFBF3EC), Color(0xFFEFE2D6)],
         stops: [0.0, 1.0],
       ),
     );
@@ -39,28 +36,20 @@ class AppDecorations {
   static BoxDecoration navPill(BuildContext context) {
     if (_isDark(context)) {
       return BoxDecoration(
-        color: const Color(0xFF1C1C1E),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: const Color(0x20FFFFFF), width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: Offset(0, 6),
-          ),
-        ],
+        border: Border.all(color: AppColors.glassLevel2Border, width: 1),
+        boxShadow: AppColors.lift(),
       );
     }
     return BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(40),
-      border: Border.all(color: const Color(0x1A000000), width: 1),
+      border: Border.all(color: const Color(0x1A201A16), width: 1),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x1A000000),
+          color: Color(0x1A201A16),
           blurRadius: 16,
-          spreadRadius: 0,
           offset: Offset(0, 4),
         ),
       ],
@@ -69,59 +58,41 @@ class AppDecorations {
 
   // ─── Cards ───────────────────────────────────────────────────────────────────
 
-  /// Glossy category / channel card — primary card style.
+  /// Category / channel card — primary card style.
   static BoxDecoration glossyCard(
     BuildContext context, {
     double radius = 16,
   }) {
     if (_isDark(context)) {
       return BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4A4A4E), Color(0xFF1C1C1E)],
-          stops: [0.0, 1.0],
-        ),
+        gradient: AppColors.cardGradient,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: const Color(0x28FFFFFF), width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0xCC000000),
-            blurRadius: 16,
-            spreadRadius: 2,
-            offset: Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: AppColors.glassLevel2Border, width: 1),
+        boxShadow: AppColors.lift(intensity: 0.8),
       );
     }
     return BoxDecoration(
-      color: const Color(0xFFF2F2F7),
+      color: const Color(0xFFFBF3EC),
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: const Color(0x1A000000), width: 1),
+      border: Border.all(color: const Color(0x1A201A16), width: 1),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x14000000),
+          color: Color(0x14201A16),
           blurRadius: 8,
-          spreadRadius: 0,
           offset: Offset(0, 2),
         ),
       ],
     );
   }
 
-  /// Gloss shimmer overlay — placed on top-left of a card Stack.
+  /// Warm highlight overlay — placed on top of a card Stack.
   static BoxDecoration glossShimmer(
     BuildContext context, {
     double radius = 16,
   }) {
     if (_isDark(context)) {
       return BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0x45FFFFFF), Color(0x00FFFFFF)],
-          stops: [0.0, 0.5],
-        ),
+        gradient: AppColors.cardHighlight,
         borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
       );
     }
@@ -129,7 +100,7 @@ class AppDecorations {
       gradient: const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x0A000000), Color(0x00000000)],
+        colors: [Color(0x0A201A16), Color(0x00201A16)],
         stops: [0.0, 0.55],
       ),
       borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
@@ -139,20 +110,23 @@ class AppDecorations {
   /// Smaller channel card base (top area behind the logo).
   static BoxDecoration channelCardBase(BuildContext context) {
     if (_isDark(context)) {
-      return BoxDecoration(
-        gradient: const LinearGradient(
+      return const BoxDecoration(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF2C2C2E), Color(0xFF1C1C1E)],
+          colors: [
+            AppColors.surfaceContainerHigh,
+            AppColors.surfaceContainerLow,
+          ],
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.12), width: 0.5),
+          top: BorderSide(color: AppColors.glassLevel2Border, width: 0.5),
         ),
       );
     }
     return const BoxDecoration(
-      color: Color(0xFFE4E4EC),
+      color: Color(0xFFEFE2D6),
       borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
     );
   }
@@ -163,33 +137,29 @@ class AppDecorations {
   static BoxDecoration searchBar(BuildContext context) {
     if (_isDark(context)) {
       return BoxDecoration(
-        color: const Color(0xFF2C2C2E),
+        color: AppColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x18FFFFFF), width: 1),
+        border: Border.all(color: AppColors.glassLevel2Border, width: 1),
       );
     }
     return BoxDecoration(
-      color: const Color(0xFFEEEEF4),
+      color: const Color(0xFFF3E7DB),
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0x18000000), width: 1),
+      border: Border.all(color: const Color(0x18201A16), width: 1),
     );
   }
 
   // ─── Colours ─────────────────────────────────────────────────────────────────
 
   static Color textPrimary(BuildContext context) =>
-      _isDark(context) ? Colors.white : const Color(0xFF000000);
+      _isDark(context) ? AppColors.textPrimary : const Color(0xFF201A16);
 
   static Color textSecondary(BuildContext context) =>
-      _isDark(context)
-          ? const Color(0x99EBEBF5)
-          : const Color(0x993C3C43);
+      _isDark(context) ? AppColors.textSecondary : const Color(0xFF52443B);
 
   static Color iconMuted(BuildContext context) =>
-      _isDark(context) ? Colors.white38 : Colors.black26;
+      _isDark(context) ? AppColors.onSurface38 : Colors.black26;
 
   static Color divider(BuildContext context) =>
-      _isDark(context)
-          ? const Color(0x1FFFFFFF)
-          : const Color(0x1A000000);
+      _isDark(context) ? AppColors.onSurface12 : const Color(0x1A201A16);
 }

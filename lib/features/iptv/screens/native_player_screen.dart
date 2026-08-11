@@ -96,6 +96,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Timer? _controlsTimer; // Auto-hide timer
   Timer? _epgTimer; // Periodic EPG refresh for live TV
   Timer? _liveWatchdog; // Watchdog for live stream reconnection
+
+  /// Every player stream subscription, so none survives this screen.
+  /// Left dangling they keep firing setState against a dead element — the
+  /// classic slow leak behind "crashes after a few hours".
+  final List<StreamSubscription<dynamic>> _playerSubscriptions = [];
+
+  /// Set once the app is backgrounded, to stop any in-flight reload from
+  /// resurrecting playback behind the user's back.
+  bool _isReleased = false;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   String _currentTime = '';
@@ -185,6 +194,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB RAM max
       (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '10');
       (_player.platform as dynamic)?.setProperty('demuxer-thread', 'yes');
+      // --- Plafond du buffer ARRIÈRE (stabilité longue durée) ---
+      // mpv garde par défaut 50 Mio de flux déjà lu pour permettre un retour
+      // arrière. Sur du live ce buffer ne sert à rien : cumulé aux 150 Mo de
+      // readahead il pousse le tas natif vers ~200 Mo et finit par déclencher
+      // un kill mémoire Android après plusieurs heures. 8 Mo suffisent aux
+      // resynchronisations internes du démuxeur.
+      (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '8000000');
       // Si le buffer se vide : courte pause (0.5s) puis reprise — freeze minimal, SANS rattrapage
       // 0.5s vs 1.5s : moins de gel visible, moins de PTS gap à rattraper
       (_player.platform as dynamic)?.setProperty('cache-pause', 'yes');
@@ -284,7 +300,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _controller = VideoController(_player);
 
     // Listen to player state
-    _player.stream.playing.listen((playing) {
+    _playerSubscriptions.add(_player.stream.playing.listen((playing) {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
@@ -302,16 +318,23 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           _resetControlsTimer(); // Start auto-hide timer
         }
       }
-    });
+    }));
 
-    _player.stream.position.listen((position) {
+    _playerSubscriptions.add(_player.stream.position.listen((position) {
       if (mounted && !_isSeeking) {
-        setState(() => _position = position);
-
         // [v23.0] Track last position change time for time-based watchdog
         if (position != _lastKnownPosition) {
           _lastKnownPosition = position;
           _lastPositionChangeTime = DateTime.now();
+        }
+
+        // Only rebuild when the position is actually on screen. mpv emits this
+        // several times per second; rebuilding the whole player tree for a
+        // hidden readout burns CPU and GC for hours on a live channel.
+        if (_showControls) {
+          setState(() => _position = position);
+        } else {
+          _position = position;
         }
 
         // Check if 80% of content watched (for VOD/Series only)
@@ -335,9 +358,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           }
         }
       }
-    });
+    }));
 
-    _player.stream.duration.listen((duration) {
+    _playerSubscriptions.add(_player.stream.duration.listen((duration) {
       if (mounted) {
         setState(() {
           _duration = duration;
@@ -348,16 +371,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           }
         });
       }
-    });
+    }));
 
-    _player.stream.width.listen((width) {
+    _playerSubscriptions.add(_player.stream.width.listen((width) {
       if (mounted && (width ?? 0) > 0 && _isLoading) {
         debugPrint('MediaKitPlayer: Video width detected ($width), clearing loading overlay');
         setState(() => _isLoading = false);
       }
-    });
+    }));
 
-    _player.stream.error.listen((error) async {
+    _playerSubscriptions.add(_player.stream.error.listen((error) async {
       if (!mounted) return;
       if (error.isEmpty) return;
 
@@ -385,10 +408,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _errorMessage = error;
         _isLoading = false;
       });
-    });
+    }));
 
     // Listen for stream completion
-    _player.stream.completed.listen((completed) {
+    _playerSubscriptions.add(_player.stream.completed.listen((completed) {
       if (completed && mounted) {
         // For Live TV: do NOT reconnect immediately — let mpv handle it internally.
         // Only reconnect after a long pause (handled by watchdog).
@@ -409,7 +432,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           }
         }
       }
-    });
+    }));
 
     // Lock to landscape for video playback
     SystemChrome.setPreferredOrientations([
@@ -435,13 +458,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   }
 
   void _updateTime() {
-    if (mounted) {
-      final now = DateTime.now();
-      setState(() {
-        _currentTime =
-            "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-      });
-    }
+    if (!mounted) return;
+    final now = DateTime.now();
+    final formatted =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    // The clock ticks every second but only changes once a minute — rebuild
+    // only when the displayed value actually differs.
+    if (formatted == _currentTime) return;
+    setState(() => _currentTime = formatted);
   }
 
   @override
@@ -453,21 +477,50 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      if (widget.streamType == model.StreamType.live) {
-        // Force stop for Live TV
-        _player.stop();
-      } else {
-        _player.pause();
-      }
+    // `inactive` is deliberately NOT handled: on Android it fires for transient
+    // interruptions (notification shade, incoming-call banner, permission
+    // dialog, split-screen resize). Treating it as "backgrounded" killed
+    // playback every time the user swiped the shade down.
+    final isBackgrounded = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached;
+    if (!isBackgrounded) return;
 
-      // Exit player screen so user returns to dashboard on resume
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+    _releasePlayback();
+
+    // Exit the player screen so the user comes back to the dashboard rather
+    // than to a frozen frame.
+    if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
     }
+  }
+
+  /// Fully stop playback and release the decoder.
+  ///
+  /// Android reclaims MediaCodec instances from backgrounded apps: holding one
+  /// while hidden is what leaves the app with a dead surface (black screen, no
+  /// audio) on return. Stopping releases it deterministically, and also drops
+  /// the network reader so no bandwidth is consumed in the background.
+  void _releasePlayback() {
+    if (_isReleased) return;
+    _isReleased = true;
+
+    // Kill the timers first: a watchdog firing mid-release would call
+    // _loadStream() and restart the stream we are tearing down.
+    _liveWatchdog?.cancel();
+    _liveWatchdog = null;
+    _epgTimer?.cancel();
+    _epgTimer = null;
+    _controlsTimer?.cancel();
+    _controlsTimer = null;
+    _stopClock();
+
+    if (widget.streamType != model.StreamType.live) {
+      _saveResumePositionOnExit();
+    }
+
+    _player.stop();
+    WakelockPlus.disable();
   }
 
   @override
@@ -481,8 +534,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Disable wakelock when leaving player
     WakelockPlus.disable();
 
-    // Save resume position before cleanup (only for VOD/Series)
-    _saveResumePositionOnExit();
+    // Save resume position before cleanup (only for VOD/Series).
+    // Skipped when _releasePlayback already did it on backgrounding.
+    if (!_isReleased) {
+      _saveResumePositionOnExit();
+    }
 
     _clockTimer?.cancel();
     _controlsTimer?.cancel();
@@ -490,6 +546,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _liveWatchdog?.cancel();
     _channelListTimer?.cancel();
     _channelListScrollController.dispose();
+
+    // Detach from the player streams BEFORE disposing it, so no late event can
+    // land on a deactivated element.
+    for (final subscription in _playerSubscriptions) {
+      subscription.cancel();
+    }
+    _playerSubscriptions.clear();
 
     // Stop playback first to prevent audio continuing in background
     _player.stop();
@@ -605,7 +668,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   /// Attempt to reconnect a live stream that stopped
   void _attemptReconnect() {
-    if (!mounted) return;
+    if (!mounted || _isReleased) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       setState(() {
         _errorMessage = 'Flux interrompu après plusieurs tentatives';
@@ -693,7 +756,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     // Vérifie toutes les 10s, mais seuil de reconnexion à 60s de position gelée
     _liveWatchdog = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) return;
+      if (!mounted || _isReleased) return;
 
       // Si le player joue et la position avance : tout va bien, reset
       if (_isPlaying && _lastPositionChangeTime != null) {
@@ -727,6 +790,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       _xtreamService = XtreamServiceMobile(dir.path);
       await _xtreamService!.setPlaylistAsync(widget.playlist);
 
+      // Resolve DNS and open (then drop) a bare socket to the panel host so
+      // mpv's first request skips resolution and the TCP/TLS handshake.
+      // Capped hard: playback must never wait more than a moment on this.
+      await _xtreamService!.prewarmHost().timeout(
+            const Duration(milliseconds: 1500),
+            onTimeout: () {},
+          );
+
       await _loadStream();
     } catch (e) {
       if (mounted) {
@@ -745,6 +816,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Future<void> _loadStream({Duration? startAt}) async {
     try {
       if (_xtreamService == null) return;
+      // The app went to background while a (re)load was queued — do not bring
+      // the stream back up behind the user.
+      if (_isReleased || !mounted) return;
 
       setState(() {
         if (_isFirstLoad) {

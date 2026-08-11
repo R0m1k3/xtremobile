@@ -1,170 +1,292 @@
 import 'package:flutter/material.dart';
 
-/// XtremFlow Apple TV Grey Glossy Palette
+/// XtremFlow — "Warm Cinema" Design System (ported from the web app)
 ///
-/// Premium Apple TV design language:
-/// - Background: Deep dark grey (#1C1C1E) to black (#000000) gradient
-/// - Surface cards: Glossy dark grey (#2C2C2E to #3A3A3C) with glass reflections
-/// - Primary accent: Bright white (#FFFFFF) and light grey (#EBEBF5)
-/// - Secondary accent: Apple Blue (#0A84FF)
-/// - Borders: Subtle white 8% opacity for glass effect
-/// - Glossy highlight: White 10-15% at top fading to transparent
+/// Palette: charbon chaud + crème + orange brûlé (ember).
+/// Inspiration: salle de projection, pellicule, affiches 70s.
+///
+/// Règle de perf : AUCUNE couleur de surface n'est translucide. La profondeur
+/// vient des ombres et du contraste, pas du flou — pas de `BackdropFilter`,
+/// coûteux à chaque frame sur les Android d'entrée de gamme.
+///
+/// Les noms hérités de l'ancienne charte Apple TV (`appleBlue`,
+/// `glossyCardGradient`, `appleTvGradient`, …) sont conservés en alias pour ne
+/// pas casser les sites d'appel existants ; ils pointent désormais vers les
+/// teintes chaudes.
 class AppColors {
   AppColors._();
 
+  // ============ BASE LEVEL 0 ============
+  /// Noir chaud — le "noir de salle", jamais un noir pur bleuté.
+  static const Color baseLevel0 = Color(0xFF0B0908);
+
   // ============ BACKGROUNDS ============
-  /// Pure black — infinite depth, OLED-friendly
-  static const Color background = Color(0xFF000000);
+  static const Color background = Color(0xFF100C0A);
+  static const Color onBackground = Color(0xFFF3E9DF);
 
-  /// Apple deep dark grey — primary app background (alias)
-  static const Color backgroundSecondary = Color(0xFF1C1C1E);
+  static const Color surface = Color(0xFF100C0A);
+  static const Color surfaceDim = Color(0xFF0B0908);
+  static const Color surfaceBright = Color(0xFF3C322C);
 
-  /// Apple deep dark grey — primary surface
-  static const Color surface = Color(0xFF1C1C1E);
+  // Surface Containers (hiérarchie Material 3, toutes opaques)
+  static const Color surfaceContainerLowest = Color(0xFF070505);
+  static const Color surfaceContainerLow = Color(0xFF181310);
+  static const Color surfaceContainer = Color(0xFF1F1815);
+  static const Color surfaceContainerHigh = Color(0xFF2A211C);
+  static const Color surfaceContainerHighest = Color(0xFF352A24);
+  static const Color surfaceVariant = Color(0xFF1F1815);
 
-  /// Mid grey — elevated cards, sheets
-  static const Color surfaceVariant = Color(0xFF2C2C2E);
+  // ============ SURFACE / ON SURFACE ============
+  static const Color onSurface = Color(0xFFF3E9DF); // crème
+  static const Color onSurfaceVariant = Color(0xFFC5B3A5); // crème atténué
 
-  /// Light grey surface — tertiary elevation
-  static const Color surfaceElevated = Color(0xFF3A3A3C);
+  // ============ PRIMARY (Ember / orange brûlé) ============
+  static const Color primary = Color(0xFFFFB68C); // texte & icônes sur sombre
+  static const Color onPrimary = Color(0xFF521B00);
+  static const Color primaryContainer = Color(0xFFD9541F); // remplissage ember
+  static const Color onPrimaryContainer = Color(0xFF2B0A00);
+  static const Color inversePrimary = Color(0xFFA63B10);
 
-  /// Focus/selected element background
-  static const Color focusColor = Color(0xFFFFFFFF);
+  /// Braise profonde — réservée aux **remplissages portant du texte**.
+  /// `primaryContainer` (#D9541F) est trop lumineux : du blanc dessus plafonne
+  /// vers 3,9:1, sous le seuil AA de 4,5:1. Cette variante passe le seuil tout
+  /// en restant la même couleur perçue.
+  static const Color primaryFill = Color(0xFFA8360C);
 
-  // ============ ACCENTS ============
-  /// Primary: Pure white — focus rings, active labels
-  static const Color primary = Color(0xFFFFFFFF);
+  // ============ SECONDARY (Terre cuite / argile) ============
+  static const Color secondary = Color(0xFFE7C3AC);
+  static const Color onSecondary = Color(0xFF442A1B);
+  static const Color secondaryContainer = Color(0xFF5D4030);
+  static const Color onSecondaryContainer = Color(0xFFFFDCC8);
 
-  /// Light grey — secondary text / inactive elements
-  static const Color accent = Color(0xFFEBEBF5);
+  // ============ TERTIARY (Laiton / doré patiné) ============
+  static const Color tertiary = Color(0xFFD9C88C);
+  static const Color onTertiary = Color(0xFF3A3016);
+  static const Color tertiaryContainer = Color(0xFF52472A);
+  static const Color onTertiaryContainer = Color(0xFFF6E4A6);
 
-  /// Apple Blue — CTAs, links, active indicators
-  static const Color appleBlue = Color(0xFF0A84FF);
+  // ============ ERROR ============
+  static const Color error = Color(0xFFFFB4A6);
+  static const Color onError = Color(0xFF5F1409);
+  static const Color errorContainer = Color(0xFF8C2416);
+  static const Color onErrorContainer = Color(0xFFFFDAD4);
+
+  // ============ OUTLINE ============
+  static const Color outline = Color(0xFF9C8878);
+  static const Color outlineVariant = Color(0xFF4A3C33);
+
+  // ============ INVERSE SURFACE ============
+  static const Color inverseSurface = Color(0xFFF3E9DF);
+  static const Color inverseOnSurface = Color(0xFF2A211C);
+  static const Color surfaceTint = Color(0xFFFFB68C);
+
+  // ============ TEXT / CONTENT ============
+  static const Color textPrimary = Color(0xFFF3E9DF);
+  static const Color textSecondary = Color(0xFFC5B3A5);
+  static const Color textTertiary = Color(0xFF9C8878);
+
+  // ============ CRÈME À OPACITÉ ============
+  // Un blanc pur sur fond chaud tire vers le bleu : on décline la crème.
+  static const Color onSurface06 = Color(0x0FF3E9DF);
+  static const Color onSurface12 = Color(0x1FF3E9DF);
+  static const Color onSurface24 = Color(0x3DF3E9DF);
+  static const Color onSurface38 = Color(0x61F3E9DF);
+  static const Color onSurface54 = Color(0x8AF3E9DF);
+
+  // ============ STATUS ============
+  static const Color success = Color(0xFF9BC46A); // olive lumineux
+  static const Color warning = Color(0xFFE9B23C); // ambre
+  static const Color info = Color(0xFFA3B8C4); // bleu-gris fumé
+
+  // ============ CATÉGORIES ============
+  static const Color live = Color(0xFFE5484D); // rouge enseigne
+  static const Color movies = Color(0xFFD9541F); // ember
+  static const Color series = Color(0xFFD9C88C); // laiton
+
+  // ============ RATING / PREMIUM ============
+  static const Color ratingGold = Color(0xFFE9B23C);
+  static const Color premiumGold = Color(0xFFC9922A);
+
+  // ============ SHIMMER (placeholders de chargement) ============
+  static const Color shimmer = Color(0xFF2A211C);
+  static const Color shimmerHighlight = Color(0xFF3C302A);
+
+  // ============ BORDERS / FOCUS ============
+  static const Color border = outlineVariant;
+  static const Color focusColor = primaryContainer;
+  static const Color focusBorder = primaryContainer;
+  static const Color borderFocused = primaryContainer;
+
+  /// Liseré crème 8 % — définit l'arête d'une surface sans la faire flotter.
+  static const Color glassBorderColor = Color(0x14F3E9DF);
+
+  // ============ SURFACES "GLASS" — OPAQUES ============
+  static const Color glassLevel1Bg = Color(0xFF181310);
+  static const Color glassLevel1Border = Color(0x14F3E9DF); // crème 8 %
+  static const Color glassLevel2Bg = Color(0xFF1F1815);
+  static const Color glassLevel2Border = Color(0x1FF3E9DF); // crème 12 %
+  static const Color glassLevel2InnerGlow = Color(0x3DD9541F); // ember 24 %
+
+  static const Color glassBackground = glassLevel2Bg;
+  static const Color glassBorder = glassLevel2Border;
 
   // ============ GRADIENTS ============
-
-  /// Apple TV background: deep dark top → pure black bottom
-  static const LinearGradient backgroundGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF1C1C1E), // Deep dark grey
-      Color(0xFF000000), // Pure black
-    ],
-    stops: [0.0, 1.0],
+  /// Braise : orange brûlé vers rouge profond.
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFFE9701F), Color(0xFFC13A1C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
-  /// Legacy alias for backward compatibility
-  static const RadialGradient appleTvGradient = RadialGradient(
+  /// Fond de salle : projecteur chaud en haut, obscurité en bas.
+  static const LinearGradient backgroundGradient = LinearGradient(
+    colors: [Color(0xFF1A1310), Color(0xFF0B0908)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  /// Halo de projection depuis le centre de l'écran.
+  static const RadialGradient projectorGradient = RadialGradient(
     center: Alignment.center,
     radius: 1.5,
-    colors: [
-      Color(0xFF1A1A1C), // Slightly lighter than pure black
-      Color(0xFF000000), // Pure black edge
-    ],
+    colors: [Color(0xFF1A1310), Color(0xFF0B0908)],
     stops: [0.0, 1.0],
   );
 
-  /// Glossy card gradient: bright highlight at top fading to dark base
-  static const LinearGradient glossyCardGradient = LinearGradient(
+  /// Carte : arête éclairée en haut, matière sombre en bas.
+  static const LinearGradient cardGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF352A24), Color(0xFF181310)],
+    stops: [0.0, 1.0],
+  );
+
+  /// Reflet chaud posé sur le haut d'une carte.
+  static const LinearGradient cardHighlight = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF484848), // Lighter top for gloss highlight
-      Color(0xFF2C2C2E), // Dark mid
-      Color(0xFF1C1C1E), // Deeper bottom
-    ],
+    colors: [Color(0x1FF3E9DF), Color(0x00F3E9DF)],
+    stops: [0.0, 0.5],
+  );
+
+  /// Voile d'affiche : lecture du texte par-dessus une jaquette.
+  static const LinearGradient posterScrim = LinearGradient(
+    colors: [Color(0x000B0908), Color(0xCC0B0908), Color(0xFF0B0908)],
+    stops: [0.0, 0.55, 1.0],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  /// Voile latéral pour les héros pleine largeur.
+  static const LinearGradient heroScrim = LinearGradient(
+    colors: [Color(0xF20B0908), Color(0x990B0908), Color(0x000B0908)],
     stops: [0.0, 0.45, 1.0],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
   );
 
-  /// Glossy inner highlight (white shimmer layer, overlaid on top of card)
-  static const LinearGradient glossyHighlight = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0x26FFFFFF), // White ~15% at top
-      Color(0x00FFFFFF), // Transparent at bottom
-    ],
-    stops: [0.0, 0.5],
-  );
+  // ============ GLOW / OMBRES ============
+  static Color glowPrimary(double opacity) =>
+      const Color(0xFFD9541F).withValues(alpha: opacity);
+  static Color glowPrimaryDim(double opacity) =>
+      const Color(0xFFFFB68C).withValues(alpha: opacity);
 
-  /// Card glossy gradient (Apple TV spec alias — dark base)
-  static const LinearGradient cardGlossyGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF48484A), Color(0xFF2C2C2E)],
-  );
+  /// Ombre portée « projecteur » : profonde, chaude, jamais grise.
+  static List<BoxShadow> lift({double intensity = 1.0}) => [
+        BoxShadow(
+          color: const Color(0xFF000000).withValues(alpha: 0.55 * intensity),
+          blurRadius: 28 * intensity,
+          spreadRadius: -8,
+          offset: Offset(0, 12 * intensity),
+        ),
+      ];
 
-  /// Card glossy highlight (Apple TV spec alias — top-left shimmer)
-  static const LinearGradient cardGlossyHighlight = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0x26FFFFFF), Color(0x00FFFFFF)],
-    stops: [0.0, 0.5],
-  );
+  /// Halo ember pour l'élément focalisé (navigation TV / télécommande).
+  static List<BoxShadow> emberFocus({double intensity = 1.0}) => [
+        BoxShadow(
+          color: const Color(0xFFD9541F).withValues(alpha: 0.45 * intensity),
+          blurRadius: 32 * intensity,
+          spreadRadius: -4,
+        ),
+        BoxShadow(
+          color: const Color(0xFF000000).withValues(alpha: 0.6),
+          blurRadius: 24,
+          spreadRadius: -10,
+          offset: const Offset(0, 14),
+        ),
+      ];
 
-  /// Primary silver gradient (used for buttons/badges)
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFFFFFFFF), Color(0xFFCCCCCC)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  // ============ ALIAS DE COMPATIBILITÉ (ancienne charte Apple TV) ============
+  // Conservés pour ne pas casser les sites d'appel ; remappés sur les teintes
+  // chaudes. À retirer au fil des réécritures d'écrans.
+  static const Color backgroundSecondary = surfaceContainerLow;
+  static const Color surfaceElevated = surfaceContainerHigh;
+  static const Color accent = secondary;
 
-  // ============ TEXT ============
-  /// Pure white — headings, active labels
-  static const Color textPrimary = Color(0xFFFFFFFF);
+  /// Ancien accent bleu Apple → braise portant du texte blanc (contraste AA).
+  static const Color appleBlue = primaryFill;
 
-  /// Light grey 60% — secondary info, captions
-  static const Color textSecondary = Color(0x99EBEBF5); // #EBEBF5 @ 60%
+  static const RadialGradient appleTvGradient = projectorGradient;
+  static const LinearGradient glossyCardGradient = cardGradient;
+  static const LinearGradient glossyHighlight = cardHighlight;
+  static const LinearGradient cardGlossyGradient = cardGradient;
+  static const LinearGradient cardGlossyHighlight = cardHighlight;
 
-  /// Darker grey — hints, placeholders
-  static const Color textTertiary = Color(0xFF636366);
-
-  // ============ FUNCTIONAL COLORS ============
-  static const Color success = Color(0xFF30D158); // Apple Green
-  static const Color warning = Color(0xFFFF9F0A); // Apple Orange
-  static const Color error = Color(0xFFFF453A);   // Apple Red
-  static const Color live = Color(0xFFFF453A);    // Apple Red (live badge)
-
-  // ============ BORDERS ============
-  /// Invisible border — unfocused state
-  static const Color border = Color(0xFF2C2C2E);
-
-  /// Glass border: white at 8% opacity for subtle edge definition
-  static const Color glassBorderColor = Color(0x14FFFFFF); // 8% white
-
-  /// Focus border: pure white ring
-  static const Color focusBorder = Color(0xFFFFFFFF);
-
-  /// Alias: focused border — pure white (Apple TV spec)
-  static const Color borderFocused = Color(0xFFFFFFFF);
-
-  // ============ GLASSMORPHISM ============
-  static final Color glassBackground = const Color(0xFF1E1E1E).withValues(alpha: 0.75);
-  static final Color glassBorder = const Color(0xFFFFFFFF).withValues(alpha: 0.08);
-
-  // ============ THEME SCHEMES ============
+  // ============ COLOR SCHEMES ============
   static ColorScheme get darkColorScheme => const ColorScheme.dark(
-        primary: appleBlue,
-        secondary: accent,
-        surface: surface,
+        primary: primary,
+        onPrimary: onPrimary,
+        primaryContainer: primaryContainer,
+        onPrimaryContainer: onPrimaryContainer,
+        secondary: secondary,
+        onSecondary: onSecondary,
+        secondaryContainer: secondaryContainer,
+        onSecondaryContainer: onSecondaryContainer,
+        tertiary: tertiary,
+        onTertiary: onTertiary,
+        tertiaryContainer: tertiaryContainer,
+        onTertiaryContainer: onTertiaryContainer,
         error: error,
-        onPrimary: Colors.white,
-        onSecondary: Colors.black,
-        onSurface: textPrimary,
-        onError: Colors.white,
+        onError: onError,
+        errorContainer: errorContainer,
+        onErrorContainer: onErrorContainer,
+        surface: surface,
+        onSurface: onSurface,
+        onSurfaceVariant: onSurfaceVariant,
+        surfaceContainerLowest: surfaceContainerLowest,
+        surfaceContainerLow: surfaceContainerLow,
+        surfaceContainer: surfaceContainer,
+        surfaceContainerHigh: surfaceContainerHigh,
+        surfaceContainerHighest: surfaceContainerHighest,
+        surfaceTint: surfaceTint,
+        outline: outline,
+        outlineVariant: outlineVariant,
+        inverseSurface: inverseSurface,
+        inversePrimary: inversePrimary,
         brightness: Brightness.dark,
       );
 
+  /// Thème clair : « papier kraft » — même famille chaude, inversée.
   static ColorScheme get lightColorScheme => const ColorScheme.light(
-        primary: Colors.black,
-        secondary: Colors.grey,
-        surface: Color(0xFFF2F2F7),
-        error: error,
+        primary: Color(0xFFA63B10),
         onPrimary: Colors.white,
+        primaryContainer: Color(0xFFFFDBC8),
+        onPrimaryContainer: Color(0xFF360F00),
+        secondary: Color(0xFF765847),
         onSecondary: Colors.white,
-        onSurface: Colors.black,
+        secondaryContainer: Color(0xFFFFDCC8),
+        onSecondaryContainer: Color(0xFF2B160A),
+        tertiary: Color(0xFF6A5F3F),
+        onTertiary: Colors.white,
+        error: Color(0xFFB3261E),
         onError: Colors.white,
+        errorContainer: Color(0xFFFFDAD4),
+        onErrorContainer: Color(0xFF410E05),
+        surface: Color(0xFFFBF3EC),
+        onSurface: Color(0xFF201A16),
+        onSurfaceVariant: Color(0xFF52443B),
+        outline: Color(0xFF847369),
+        outlineVariant: Color(0xFFD6C3B7),
         brightness: Brightness.light,
       );
 }

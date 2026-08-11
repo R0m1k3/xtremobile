@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
+import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/providers/theme_provider.dart';
 import 'package:xtremobile/features/iptv/screens/mobile_playlist_selection_screen.dart';
 
@@ -20,6 +21,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
   late TextEditingController _liveTvController;
   late TextEditingController _moviesController;
   late TextEditingController _seriesController;
+  late TextEditingController _xmltvController;
   bool _initialized = false;
   bool _isRefreshingCache = false;
 
@@ -29,6 +31,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     _liveTvController = TextEditingController();
     _moviesController = TextEditingController();
     _seriesController = TextEditingController();
+    _xmltvController = TextEditingController();
   }
 
   @override
@@ -36,6 +39,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     _liveTvController.dispose();
     _moviesController.dispose();
     _seriesController.dispose();
+    _xmltvController.dispose();
     super.dispose();
   }
 
@@ -44,6 +48,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
       _liveTvController.text = settings.liveTvKeywords.join(', ');
       _moviesController.text = settings.moviesKeywords.join(', ');
       _seriesController.text = settings.seriesKeywords.join(', ');
+      _xmltvController.text = settings.xmltvUrl;
       _initialized = true;
     }
   }
@@ -163,6 +168,38 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   .read(mobileSettingsProvider.notifier)
                   .setBufferDuration(buffers[nextIndex]);
             },
+          ),
+
+          const SizedBox(height: 24),
+
+          // === GUIDE TV (EPG) ===
+          _buildSectionHeader('Guide TV (EPG)'),
+
+          _buildSettingItem(
+            icon: Icons.public,
+            title: 'EPG communautaire',
+            subtitle:
+                'Repli quand le fournisseur ne renvoie aucun programme',
+            value: settings.useCommunityEpg ? 'Activé' : 'Désactivé',
+            onTap: () => ref
+                .read(mobileSettingsProvider.notifier)
+                .toggleCommunityEpg(!settings.useCommunityEpg),
+          ),
+
+          _buildSettingItem(
+            icon: Icons.link,
+            title: 'URL XMLTV personnalisée',
+            subtitle: settings.xmltvUrl.isEmpty
+                ? 'Aucune — xmltv.php du fournisseur, puis source communautaire'
+                : settings.xmltvUrl,
+            value: settings.xmltvUrl.isEmpty ? 'Ajouter' : 'Modifier',
+            onTap: () => _showKeyboardDialog(
+              'URL XMLTV',
+              _xmltvController,
+              (val) => ref
+                  .read(mobileSettingsProvider.notifier)
+                  .setXmltvUrl(val),
+            ),
           ),
 
           const SizedBox(height: 24),
@@ -417,11 +454,9 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
       child: Text(
         title.toUpperCase(),
-        style: GoogleFonts.inter(
+        style: AppTheme.eyebrow(
           fontSize: 12,
-          fontWeight: FontWeight.w600,
           color: Theme.of(context).colorScheme.primary,
-          letterSpacing: 1.2,
         ),
       ),
     );

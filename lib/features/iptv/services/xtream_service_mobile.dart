@@ -7,8 +7,38 @@ library;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'dart:io';
 import '../models/xtream_models.dart' as model;
+import 'package:xtremobile/core/api/dns_resolver.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
+import 'xmltv_service.dart';
+
+/// Counting semaphore used to cap concurrent EPG requests.
+class _Semaphore {
+  _Semaphore(this.maxConcurrent);
+
+  final int maxConcurrent;
+  int _current = 0;
+  final _waiting = <Completer<void>>[];
+
+  Future<void> acquire() {
+    if (_current < maxConcurrent) {
+      _current++;
+      return Future.value();
+    }
+    final completer = Completer<void>();
+    _waiting.add(completer);
+    return completer.future;
+  }
+
+  void release() {
+    if (_waiting.isNotEmpty) {
+      _waiting.removeAt(0).complete();
+      return;
+    }
+    if (_current > 0) _current--;
+  }
+}
 
 /// EPG cache entry with TTL
 class _EpgCacheEntry {
@@ -22,19 +52,32 @@ class _EpgCacheEntry {
       DateTime.now().difference(timestamp).inSeconds > ttlSeconds;
 }
 
+/// Default community XMLTV guides, used only when the provider has no EPG of
+/// its own. Ordered by preference; the first one that yields programmes wins.
+const List<XmltvSource> kDefaultPublicXmltvSources = [
+  XmltvSource(
+    label: 'EPGShare FR1',
+    url: 'https://epgshare01.online/epgshare01/epg_ripper_FR1.xml.gz',
+  ),
+];
+
 /// Xtream API Service for Mobile
 ///
 /// Optimized for Android with:
 /// - Batch EPG loading (N+1 prevention)
 /// - Provider-level caching with TTL
+/// - XMLTV fallback when the provider serves no EPG
 /// - Configurable timeouts and retries
 /// - Memory-efficient streaming
 class XtreamServiceMobile {
   final String cacheDir;
-  late Dio _dio;
-  late String _baseUrl;
-  late String _username;
-  late String _password;
+
+  /// Replaced with the configured instance in [setPlaylistAsync]; initialised
+  /// eagerly so [dispose] is safe even if the service was never configured.
+  Dio _dio = Dio();
+  String _baseUrl = '';
+  String _username = '';
+  String _password = '';
 
   // Batch EPG cache to prevent N+1 queries
   final Map<String, _EpgCacheEntry> _epgBatchCache = {};
@@ -42,7 +85,53 @@ class XtreamServiceMobile {
   // In-flight batch requests to deduplicate concurrent calls
   final Map<String, Future<Map<String, model.ShortEPG>>> _inFlightBatches = {};
 
+  /// A channel grid asks for EPG one tile at a time, so a screenful fires ~30
+  /// simultaneous `player_api.php` calls. Many Xtream panels rate-limit past a
+  /// handful of parallel connections and answer with errors, which empties the
+  /// EPG of the whole grid. Requests are therefore funnelled in small packets.
+  static final _Semaphore _epgGate = _Semaphore(3);
+
+  /// streamId → channel, populated by [getLiveChannels].
+  ///
+  /// The XMLTV fallback matches on `epg_channel_id` / channel name, neither of
+  /// which the per-stream EPG calls carry — this index supplies them without
+  /// changing any call site.
+  final Map<String, model.Channel> _channelIndex = {};
+
+  late final XmltvService _xmltv = XmltvService(cacheDir);
+
+  /// User-provided XMLTV URL (empty = not configured).
+  String _customXmltvUrl = '';
+
+  /// Whether the community guides may be used as the last resort.
+  bool _allowPublicXmltv = true;
+
+  /// Set once every XMLTV source has failed, so a channel grid does not retry
+  /// a multi-megabyte download for each of its tiles.
+  bool _xmltvExhausted = false;
+
   XtreamServiceMobile(this.cacheDir);
+
+  /// Label of the XMLTV source currently backing the fallback, if any.
+  String? get xmltvSourceLabel => _xmltv.loadedSourceLabel;
+
+  /// Configure the XMLTV fallback. Safe to call at any time.
+  void setXmltvConfig({String? customUrl, bool? allowPublicFallback}) {
+    final normalizedUrl = customUrl?.trim() ?? _customXmltvUrl;
+    final changed = normalizedUrl != _customXmltvUrl ||
+        (allowPublicFallback ?? _allowPublicXmltv) != _allowPublicXmltv;
+
+    _customXmltvUrl = normalizedUrl;
+    _allowPublicXmltv = allowPublicFallback ?? _allowPublicXmltv;
+
+    if (changed) {
+      // Sources changed — drop the "nothing works" latch and any indexed guide
+      // so the new configuration is actually tried.
+      _xmltvExhausted = false;
+      _xmltv.clear();
+      _epgBatchCache.clear();
+    }
+  }
 
   /// Initialize with playlist configuration
   Future<void> setPlaylistAsync(PlaylistConfig config) async {
@@ -59,8 +148,53 @@ class XtreamServiceMobile {
       ),
     );
 
+    // Warm the DNS entry for the panel host now, so the first zap does not pay
+    // for resolution. Fire-and-forget: playback must never wait on this.
+    unawaited(prewarmHost());
+
     if (kDebugMode) {
       print('✅ [XtreamServiceMobile] Initialized with URL: $_baseUrl');
+    }
+  }
+
+  /// Resolve and pre-connect to the panel host.
+  ///
+  /// Opens a bare TCP/TLS socket and closes it immediately: no HTTP request is
+  /// issued, so this never consumes one of the provider's connection slots,
+  /// while still leaving the DNS entry cached and the route warm.
+  Future<void> prewarmHost() async {
+    final uri = Uri.tryParse(_baseUrl);
+    if (uri == null || uri.host.isEmpty) return;
+
+    try {
+      await DnsResolver.resolve(uri.host).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+    } catch (_) {
+      // DNS pre-resolution is best effort.
+    }
+
+    final isSecure = uri.scheme == 'https';
+    final port = uri.hasPort ? uri.port : (isSecure ? 443 : 80);
+
+    try {
+      final socket = isSecure
+          ? await SecureSocket.connect(
+              uri.host,
+              port,
+              timeout: const Duration(milliseconds: 1200),
+              onBadCertificate: (_) => true,
+            )
+          : await Socket.connect(
+              uri.host,
+              port,
+              timeout: const Duration(milliseconds: 1200),
+            );
+      socket.destroy();
+      if (kDebugMode) print('🔥 [Prewarm] ${uri.host}:$port ready');
+    } catch (e) {
+      if (kDebugMode) print('⚠️ [Prewarm] ${uri.host}:$port failed: $e');
     }
   }
 
@@ -97,6 +231,11 @@ class XtreamServiceMobile {
           final channels = (response.data as List)
               .map((e) => model.Channel.fromJson(e))
               .toList();
+
+          // Keep the EPG-matching keys reachable from a bare streamId.
+          for (final channel in channels) {
+            _channelIndex[channel.streamId] = channel;
+          }
 
           if (kDebugMode) {
             final categories = channels.map((c) => c.categoryName).toSet();
@@ -195,6 +334,7 @@ class XtreamServiceMobile {
 
     // Load EPG for each stream_id individually (API doesn't support true batch)
     for (final streamId in streamIds) {
+      await _epgGate.acquire();
       try {
         final response = await _dio
             .get(
@@ -244,6 +384,22 @@ class XtreamServiceMobile {
         }
       } catch (e) {
         if (kDebugMode) print('⚠️ EPG failed for $streamId: $e');
+      } finally {
+        _epgGate.release();
+      }
+    }
+
+    // ── Fallback: whatever the provider could not answer for ──────────────
+    final missing =
+        streamIds.where((id) => !result.containsKey(id)).toList(growable: false);
+    if (missing.isNotEmpty) {
+      final recovered = await _resolveFromXmltv(missing);
+      result.addAll(recovered);
+      if (kDebugMode && recovered.isNotEmpty) {
+        print(
+          '📺 XMLTV fallback recovered ${recovered.length}/${missing.length} '
+          'channels via "${_xmltv.loadedSourceLabel}"',
+        );
       }
     }
 
@@ -251,6 +407,59 @@ class XtreamServiceMobile {
       print('✅ EPG loaded: ${result.length}/${streamIds.length} channels');
     }
     return result;
+  }
+
+  /// XMLTV sources to try, in the order requested: the provider's own dump
+  /// first (it is often populated even when `get_short_epg` is not), then the
+  /// user's URL, then the community guides.
+  List<XmltvSource> _xmltvSources() {
+    return [
+      XmltvSource(
+        label: 'Fournisseur (xmltv.php)',
+        url: '$_baseUrl/xmltv.php?username=$_username&password=$_password',
+      ),
+      if (_customXmltvUrl.isNotEmpty)
+        XmltvSource(label: 'URL personnalisée', url: _customXmltvUrl),
+      if (_allowPublicXmltv) ...kDefaultPublicXmltvSources,
+    ];
+  }
+
+  /// Resolve missing EPG entries from the XMLTV index, loading it on demand.
+  Future<Map<String, model.ShortEPG>> _resolveFromXmltv(
+    List<String> streamIds,
+  ) async {
+    if (_xmltvExhausted) return {};
+
+    // Nothing to match on: the channel list has not been loaded in this
+    // session, so neither epg_channel_id nor the name is known.
+    final known = streamIds
+        .map((id) => _channelIndex[id])
+        .whereType<model.Channel>()
+        .toList();
+    if (known.isEmpty) return {};
+
+    try {
+      final loaded = await _xmltv.ensureLoaded(_xmltvSources());
+      if (!loaded) {
+        _xmltvExhausted = true;
+        return {};
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ XMLTV load failed: $e');
+      _xmltvExhausted = true;
+      return {};
+    }
+
+    final resolved = <String, model.ShortEPG>{};
+    for (final channel in known) {
+      final epg = _xmltv.shortEpgFor(
+        streamId: channel.streamId,
+        epgChannelId: channel.epgChannelId,
+        channelName: channel.name,
+      );
+      if (epg != null) resolved[channel.streamId] = epg;
+    }
+    return resolved;
   }
 
   /// Get live TV categories
@@ -530,6 +739,13 @@ class XtreamServiceMobile {
     _inFlightBatches.clear();
   }
 
+  /// Drop the XMLTV index (keeps its disk cache) and allow a fresh attempt.
+  void resetXmltv() {
+    _xmltv.clear();
+    _xmltvExhausted = false;
+    _epgBatchCache.clear();
+  }
+
   /// Get Live Stream URL
   String getLiveStreamUrl(String streamId) {
     return '$_baseUrl/live/$_username/$_password/$streamId.ts';
@@ -564,5 +780,8 @@ class XtreamServiceMobile {
   /// Dispose service resources
   void dispose() {
     clearCache();
+    _channelIndex.clear();
+    _xmltv.clear();
+    _dio.close(force: true);
   }
 }

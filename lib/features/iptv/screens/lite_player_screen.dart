@@ -72,6 +72,10 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   Timer? _controlsTimer;
   int _loadId = 0;
 
+  /// Set once the app is backgrounded, so a queued reload cannot restart the
+  /// stream behind the user.
+  bool _isReleased = false;
+
   // Focus
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _prevFocusNode = FocusNode();
@@ -98,15 +102,43 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null) return;
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      _controller?.pause();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+    // `inactive` is deliberately NOT handled: on Android it fires for transient
+    // interruptions (notification shade, call banner, permission dialog).
+    final isBackgrounded = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached;
+    if (!isBackgrounded) return;
+
+    _releasePlayback();
+
+    if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
     }
+  }
+
+  /// Stop playback and release the decoder when the app leaves the foreground.
+  ///
+  /// `pause()` alone is not enough: ExoPlayer keeps filling its buffer, so the
+  /// stream would still be pulled (and metered) in the background.
+  void _releasePlayback() {
+    if (_isReleased) return;
+    _isReleased = true;
+
+    _clockTimer?.cancel();
+    _clockTimer = null;
+    _epgTimer?.cancel();
+    _epgTimer = null;
+    _controlsTimer?.cancel();
+    _controlsTimer = null;
+    _stabilizationTimer?.cancel();
+    _stabilizationTimer = null;
+
+    final controller = _controller;
+    _controller = null;
+    controller?.pause();
+    controller?.dispose();
+
+    WakelockPlus.disable();
   }
 
   void _startClock() {
@@ -132,6 +164,13 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       final dir = await getApplicationDocumentsDirectory();
       _xtreamService = XtreamServiceMobile(dir.path);
       await _xtreamService!.setPlaylistAsync(widget.playlist);
+
+      // Warm DNS + TCP/TLS to the panel host before the first request.
+      await _xtreamService!.prewarmHost().timeout(
+            const Duration(milliseconds: 1500),
+            onTimeout: () {},
+          );
+
       _loadStream();
 
       if (widget.streamType == model.StreamType.live) {
@@ -160,6 +199,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
   Future<void> _loadStream() async {
     if (_xtreamService == null) return;
+    // Backgrounded while a (re)load was queued — do not resurrect the stream.
+    if (_isReleased || !mounted) return;
 
     await _controller?.dispose();
     _controller = null;
@@ -359,6 +400,11 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     _controller?.pause(); // Force stop audio immediately
     _controller?.dispose();
     _xtreamService?.dispose();
+
+    _playPauseFocusNode.dispose();
+    _prevFocusNode.dispose();
+    _nextFocusNode.dispose();
+
     super.dispose();
   }
 

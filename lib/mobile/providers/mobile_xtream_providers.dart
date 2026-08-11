@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/playlist_config.dart';
 import '../../core/models/iptv_models.dart' as model;
 import '../../features/iptv/services/xtream_service_mobile.dart';
+import 'mobile_settings_providers.dart';
 
 /// Mobile-specific Xtream service provider
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +14,23 @@ final mobileXtreamServiceProvider =
   final service = XtreamServiceMobile(dir.path);
   await service
       .setPlaylistAsync(playlist); // Async to resolve DNS before API calls
+
+  // EPG fallback configuration follows the settings live, without tearing the
+  // service (and its caches) down on every unrelated settings change.
+  void applyEpgSettings(MobileSettings settings) => service.setXmltvConfig(
+        customUrl: settings.xmltvUrl,
+        allowPublicFallback: settings.useCommunityEpg,
+      );
+
+  applyEpgSettings(ref.read(mobileSettingsProvider));
+  ref.listen<MobileSettings>(mobileSettingsProvider, (previous, next) {
+    if (previous?.xmltvUrl != next.xmltvUrl ||
+        previous?.useCommunityEpg != next.useCommunityEpg) {
+      applyEpgSettings(next);
+    }
+  });
+
+  ref.onDispose(service.dispose);
   return service;
 });
 
