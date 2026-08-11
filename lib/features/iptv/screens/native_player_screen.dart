@@ -654,7 +654,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               'Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
             ),
             duration: const Duration(seconds: 2),
-            backgroundColor: Colors.green.shade700,
+            backgroundColor: AppColors.success,
           ),
         );
       } else {
@@ -1293,6 +1293,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
             // Loading Overlay — black only on FIRST load
             if (_isLoading && _errorMessage == null)
               Container(
+                // True black, not the warm ink: this sits over the video surface.
                 color: Colors.black,
                 child: _buildLoadingView(),
               ),
@@ -1313,7 +1314,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white70,
+                      color: AppColors.onSurface70,
                     ),
                   ),
                 ),
@@ -1349,7 +1350,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           child: IconButton(
                             icon: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: AppColors.onSurface,
                             ),
                             onPressed: () => Navigator.pop(context),
                           ),
@@ -1380,7 +1381,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                               Text(
                                 title,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.onSurface,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1392,7 +1393,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                 Text(
                                   _currentTime,
                                   style: const TextStyle(
-                                    color: Colors.white70,
+                                    color: AppColors.onSurface70,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -1485,7 +1486,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.7),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: AppColors.onSurface12),
         ),
         child: IntrinsicHeight(
           child: Row(
@@ -1506,7 +1507,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     onFocus: _resetControlsTimer,
                     child: const Icon(
                       Icons.skip_previous,
-                      color: Colors.white,
+                      color: AppColors.onSurface,
                       size: 36,
                     ),
                   ),
@@ -1521,7 +1522,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       _isPlaying
                           ? Icons.pause_circle_filled
                           : Icons.play_circle_filled,
-                      color: Colors.white,
+                      color: AppColors.onSurface,
                       size: 56,
                     ),
                   ),
@@ -1534,7 +1535,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     onFocus: _resetControlsTimer,
                     child: const Icon(
                       Icons.skip_next,
-                      color: Colors.white,
+                      color: AppColors.onSurface,
                       size: 36,
                     ),
                   ),
@@ -1570,7 +1571,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       onFocus: _resetControlsTimer,
                       child: const Icon(
                         Icons.grid_off,
-                        color: Colors.white,
+                        color: AppColors.onSurface,
                         size: 32,
                       ),
                     ),
@@ -1618,7 +1619,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   imageUrl: widget.channels![_currentIndex].streamIcon,
                   fit: BoxFit.contain,
                   errorWidget: (_, __, ___) =>
-                      const Icon(Icons.tv, color: Colors.white38),
+                      const Icon(Icons.tv, color: AppColors.onSurface38),
                 ),
               ),
             Expanded(
@@ -1628,7 +1629,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: AppColors.onSurface70,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1639,7 +1640,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   Text(
                     nowPlaying,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1654,7 +1655,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         Text(
                           startTime,
                           style: const TextStyle(
-                              color: Colors.white54, fontSize: 11),
+                              color: AppColors.onSurface54, fontSize: 11),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1663,9 +1664,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             child: LinearProgressIndicator(
                               value: epgProgress.clamp(0.0, 1.0),
                               minHeight: 4,
-                              backgroundColor: Colors.white24,
+                              backgroundColor: AppColors.onSurface24,
                               valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF4FC3F7),
+                                AppColors.primary,
                               ),
                             ),
                           ),
@@ -1674,7 +1675,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         Text(
                           endTime,
                           style: const TextStyle(
-                              color: Colors.white54, fontSize: 11),
+                              color: AppColors.onSurface54, fontSize: 11),
                         ),
                       ],
                     ),
@@ -1714,7 +1715,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.82),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: AppColors.onSurface12),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1728,7 +1729,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Colors.white10,
+                    color: AppColors.onSurface12,
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -1736,7 +1737,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       imageUrl: ch.streamIcon,
                       fit: BoxFit.contain,
                       errorWidget: (_, __, ___) =>
-                          const Icon(Icons.tv, color: Colors.white38, size: 32),
+                          const Icon(Icons.tv, color: AppColors.onSurface38, size: 32),
                     ),
                   ),
                 )
@@ -1747,9 +1748,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Colors.white10,
+                    color: AppColors.onSurface12,
                   ),
-                  child: const Icon(Icons.tv, color: Colors.white38, size: 32),
+                  child: const Icon(Icons.tv, color: AppColors.onSurface38, size: 32),
                 ),
 
               // Channel info
@@ -1765,13 +1766,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                               horizontal: 6, vertical: 2),
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1565C0),
+                            color: const AppColors.primaryFill,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'CH $chNum',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppColors.onSurface,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1781,7 +1782,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           child: Text(
                             ch.name,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppColors.onSurface,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1797,9 +1798,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         child: SizedBox(
                           height: 3,
                           child: LinearProgressIndicator(
-                            backgroundColor: Colors.white24,
+                            backgroundColor: AppColors.onSurface24,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF4FC3F7)),
+                                AppColors.primary),
                           ),
                         ),
                       )
@@ -1808,7 +1809,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       Text(
                         nowPlaying,
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: AppColors.onSurface70,
                           fontSize: 13,
                         ),
                         maxLines: 1,
@@ -1820,9 +1821,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         child: LinearProgressIndicator(
                           value: epgProgress.clamp(0.0, 1.0),
                           minHeight: 3,
-                          backgroundColor: Colors.white24,
+                          backgroundColor: AppColors.onSurface24,
                           valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF4FC3F7)),
+                              AppColors.primary),
                         ),
                       ),
                     ],
@@ -1861,18 +1862,18 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 decoration: const BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: Colors.white12),
+                    bottom: BorderSide(color: AppColors.onSurface12),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.list, color: Colors.white70, size: 18),
+                    const Icon(Icons.list, color: AppColors.onSurface70, size: 18),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Chaînes',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1881,7 +1882,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     GestureDetector(
                       onTap: () => setState(() => _showChannelList = false),
                       child: const Icon(Icons.close,
-                          color: Colors.white54, size: 18),
+                          color: AppColors.onSurface54, size: 18),
                     ),
                   ],
                 ),
@@ -1903,12 +1904,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       child: Container(
                         decoration: BoxDecoration(
                           color: isActive
-                              ? const Color(0xFF1565C0).withOpacity(0.6)
+                              ? AppColors.primaryFill.withValues(alpha: 0.6)
                               : Colors.transparent,
                           border: isActive
                               ? const Border(
                                   left: BorderSide(
-                                    color: Color(0xFF4FC3F7),
+                                    color: AppColors.primary,
                                     width: 3,
                                   ),
                                 )
@@ -1924,7 +1925,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                               height: 40,
                               margin: const EdgeInsets.only(right: 10),
                               decoration: BoxDecoration(
-                                color: Colors.white10,
+                                color: AppColors.onSurface12,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: ch.streamIcon.isNotEmpty
@@ -1935,12 +1936,12 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                         fit: BoxFit.contain,
                                         errorWidget: (_, __, ___) =>
                                             const Icon(Icons.tv,
-                                                color: Colors.white38,
+                                                color: AppColors.onSurface38,
                                                 size: 20),
                                       ),
                                     )
                                   : const Icon(Icons.tv,
-                                      color: Colors.white38, size: 20),
+                                      color: AppColors.onSurface38, size: 20),
                             ),
                             // Name + num
                             Expanded(
@@ -1952,8 +1953,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                     ch.name,
                                     style: TextStyle(
                                       color: isActive
-                                          ? Colors.white
-                                          : Colors.white70,
+                                          ? AppColors.onSurface
+                                          : AppColors.onSurface70,
                                       fontSize: 13,
                                       fontWeight: isActive
                                           ? FontWeight.bold
@@ -1965,7 +1966,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                   Text(
                                     'CH ${index + 1}',
                                     style: const TextStyle(
-                                      color: Colors.white38,
+                                      color: AppColors.onSurface38,
                                       fontSize: 11,
                                     ),
                                   ),
@@ -1976,7 +1977,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                             if (isActive)
                               const Icon(
                                 Icons.play_arrow,
-                                color: Color(0xFF4FC3F7),
+                                color: AppColors.primary,
                                 size: 18,
                               ),
                           ],
@@ -2021,7 +2022,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       child: IconButton(
                         icon: const Icon(
                           Icons.replay_10,
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                           size: 48,
                         ),
                         onPressed: () async {
@@ -2046,7 +2047,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                           _isPlaying
                               ? Icons.pause_circle_filled
                               : Icons.play_circle_filled,
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                         ),
                         onPressed: _togglePlayPause,
                       ),
@@ -2067,7 +2068,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       child: IconButton(
                         icon: const Icon(
                           Icons.forward_10,
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                           size: 48,
                         ),
                         onPressed: () async {
@@ -2103,7 +2104,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         Text(
                           _formatDuration(_position),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.onSurface,
                             fontSize: 14,
                           ),
                         ),
@@ -2157,14 +2158,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                                 _resetControlsTimer();
                               },
                               activeColor: AppColors.primary,
-                              inactiveColor: Colors.white24,
+                              inactiveColor: AppColors.onSurface24,
                             ),
                           ),
                         ),
                         Text(
                           _formatDuration(_duration),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.onSurface,
                             fontSize: 14,
                           ),
                         ),
@@ -2199,7 +2200,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               height: 72,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.white10,
+                color: AppColors.onSurface12,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ClipRRect(
@@ -2208,7 +2209,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   imageUrl: ch.streamIcon,
                   fit: BoxFit.contain,
                   errorWidget: (_, __, ___) =>
-                      const Icon(Icons.tv, color: Colors.white38, size: 40),
+                      const Icon(Icons.tv, color: AppColors.onSurface38, size: 40),
                 ),
               ),
             ),
@@ -2217,7 +2218,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           Text(
             ch != null ? ch.name : 'Chargement...',
             style: const TextStyle(
-              color: Colors.white70,
+              color: AppColors.onSurface70,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -2232,18 +2233,18 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const Icon(Icons.error_outline, size: 64, color: AppColors.error),
           const SizedBox(height: 16),
           const Text(
             'Erreur de lecture',
-            style: TextStyle(color: Colors.white, fontSize: 18),
+            style: TextStyle(color: AppColors.onSurface, fontSize: 18),
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
               _errorMessage ?? 'Une erreur inconnue est survenue',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: AppColors.onSurface70),
               textAlign: TextAlign.center,
             ),
           ),
@@ -2256,8 +2257,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Retour'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppColors.onSurface,
+                  foregroundColor: AppColors.onPrimaryFixed,
                 ),
               ),
               const SizedBox(width: 16),
@@ -2267,7 +2268,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                 label: const Text('Réessayer'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: AppColors.onPrimaryFixed,
                 ),
               ),
             ],
@@ -2328,7 +2329,7 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.7),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.5)),
+        border: Border.all(color: AppColors.success.withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2337,7 +2338,7 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
           const Text(
             'STATS FOR NERDS 🤓',
             style: TextStyle(
-              color: Colors.green,
+              color: AppColors.success,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
@@ -2345,11 +2346,11 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
           const SizedBox(height: 4),
           Text(
             'Buffer: ${_buffer.inSeconds}s',
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+            style: const TextStyle(color: AppColors.onSurface, fontSize: 12),
           ),
           Text(
             'Decoder: $_decoder',
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+            style: const TextStyle(color: AppColors.onSurface, fontSize: 12),
           ),
         ],
       ),

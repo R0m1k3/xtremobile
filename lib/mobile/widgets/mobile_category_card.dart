@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobileCategoryCard extends StatelessWidget {
   final String title;
@@ -13,7 +14,7 @@ class MobileCategoryCard extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.icon = Icons.folder_rounded,
-    this.iconColor = const Color(0xFF0A84FF),
+    this.iconColor = AppColors.primary,
   });
 
   @override

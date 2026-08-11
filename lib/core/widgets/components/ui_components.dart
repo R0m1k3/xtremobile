@@ -134,7 +134,7 @@ class _GradientButtonState extends State<GradientButton>
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: AppColors.onPrimaryFixed,
                       ),
                     )
                   : Row(
@@ -143,13 +143,13 @@ class _GradientButtonState extends State<GradientButton>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (widget.icon != null) ...[
-                          Icon(widget.icon, color: Colors.black, size: 20),
+                          Icon(widget.icon, color: AppColors.onPrimaryFixed, size: 20),
                           const SizedBox(width: 8),
                         ],
                         Text(
                           widget.label,
                           style: const TextStyle(
-                            color: Colors.black,
+                            color: AppColors.onPrimaryFixed,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
@@ -247,12 +247,12 @@ class LiveBadge extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.circle, size: 6, color: Colors.white),
+          Icon(Icons.circle, size: 6, color: AppColors.onSurface),
           SizedBox(width: 4),
           Text(
             'LIVE',
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.onSurface,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -427,11 +427,11 @@ class _MediaCardState extends State<MediaCard>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.star, size: 10, color: Color(0xFFFFD700)),
+                                  const Icon(Icons.star, size: 10, color: AppColors.ratingGold),
                                   const SizedBox(width: 4),
                                   Text(
                                     widget.rating!,
-                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: AppColors.onSurface, fontSize: 10, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -449,7 +449,7 @@ class _MediaCardState extends State<MediaCard>
                                 color: AppColors.success,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                              child: const Icon(Icons.check, size: 12, color: AppColors.onSurface),
                             ),
                           ),
                       ],

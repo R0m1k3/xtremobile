@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_decorations.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobileScaffold extends ConsumerStatefulWidget {
   final Widget child;
@@ -71,7 +72,7 @@ class _MobileScaffoldState extends ConsumerState<MobileScaffold> {
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.play_circle_filled,
-                                color: Colors.white,
+                                color: AppColors.onSurface,
                                 size: 40,
                               ),
                             ),
@@ -201,12 +202,12 @@ class _AppleTVNavItemState extends State<_AppleTVNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    const Color selectedColor = Color(0xFF0A84FF);
+    const Color selectedColor = AppColors.primaryFill;
     final Color unselectedColor = AppDecorations.textSecondary(context);
     final Color textColor =
-        widget.isSelected ? Colors.white : unselectedColor;
+        widget.isSelected ? AppColors.onSurface : unselectedColor;
     final Color iconColor =
-        widget.isSelected ? Colors.white : unselectedColor;
+        widget.isSelected ? AppColors.onSurface : unselectedColor;
     final FontWeight fontWeight =
         widget.isSelected ? FontWeight.w700 : FontWeight.w500;
 

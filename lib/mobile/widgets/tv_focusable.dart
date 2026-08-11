@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class TVFocusable extends StatefulWidget {
   final Widget child;
@@ -25,7 +26,7 @@ class TVFocusable extends StatefulWidget {
     this.autofocus = false,
     this.scale = 1.05, // Apple TV subtle lift
     this.borderWidth = 2.0,
-    this.focusColor = Colors.white,
+    this.focusColor = AppColors.onSurface,
     this.borderRadius,
     this.longPressDuration = const Duration(seconds: 3),
   });
@@ -162,7 +163,7 @@ class _TVFocusableState extends State<TVFocusable> {
                             offset: const Offset(0, 6),
                           ),
                           const BoxShadow(
-                            color: Color(0x40FFFFFF), // White glow
+                            color: Color(0x59D9541F), // Ember glow
                             blurRadius: 12,
                             spreadRadius: 0,
                           ),

@@ -10,6 +10,7 @@ library;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 /// Standard cache manager with 200MB size limit
 class AppCacheManager {
@@ -103,7 +104,7 @@ class ImageCacheConfig {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2E),
+          color: AppColors.surfaceContainer,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -111,10 +112,10 @@ class ImageCacheConfig {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: const Color(0xFF3A3A3C),
+          color: AppColors.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(Icons.image_not_supported, color: Color(0xFF8E8E93)),
+        child: const Icon(Icons.image_not_supported, color: AppColors.textTertiary),
       ),
     );
   }

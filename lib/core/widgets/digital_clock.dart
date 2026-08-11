@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class DigitalClock extends StatefulWidget {
   const DigitalClock({super.key});
@@ -31,16 +32,16 @@ class _DigitalClockState extends State<DigitalClock> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: AppColors.onSurface.withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: AppColors.onSurface.withOpacity(0.05)),
           ),
           child: Text(
             timeString,
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w600,
               fontSize: 16,
-              color: Colors.white,
+              color: AppColors.onSurface,
             ),
           ),
         );

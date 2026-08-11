@@ -236,7 +236,7 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
                                     ? 'Playlist modifiée'
                                     : 'Playlist ajoutée',
                               ),
-                              backgroundColor: Colors.green,
+                              backgroundColor: AppColors.success,
                             ),
                           );
                         }

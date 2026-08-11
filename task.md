@@ -25,6 +25,21 @@
 - [x] `mobile_theme.dart` : dérive désormais de `AppTheme` (échelle typo mobile)
       au lieu de dupliquer 390 lignes
 - [x] `app_decorations.dart` : hexs Apple codés en dur remplacés par la palette
+- [x] **Passe 2 (v1.6.1)** — le thème ne suffisait pas : du bleu restait codé en
+      dur dans 19 fichiers d'écran/widget, hors palette. Balayage complet :
+      - `0xFF0A84FF` (bleu Apple) dans la **pilule de navigation sélectionnée**
+        (`mobile_scaffold`), les icônes de catégorie et le bouton « ajouter »
+      - `0xFF4FC3F7` / `0xFF1565C0` (bleus) dans les overlays du lecteur
+      - `Colors.blueAccent` / `Colors.blue` dans les boîtes de dialogue
+      - gris Apple `1C1C1E` / `2C2C2E` / `3A3A3C` / `8E8E93` → charbons chauds
+      - `Colors.white*` (128 occurrences) → paliers crème `onSurfaceNN`
+      - `Colors.red/green/amber/yellow/grey*` → `error` / `success` /
+        `ratingGold` / `outlineVariant`
+      - noir pur sur remplissage clair → encre chaude `onPrimaryFixed`
+      - halo de focus blanc → halo ember
+      - Conservés en noir vrai : fonds de surface vidéo et voiles (`scrims`)
+      - Vérification : plus **aucune** couleur Material/Apple codée en dur hors
+        de `lib/core/theme/`
 
 ## 3. Lecture — arrêt en arrière-plan et tenue dans la durée
 

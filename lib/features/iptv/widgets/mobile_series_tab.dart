@@ -11,6 +11,7 @@ import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/features/iptv/screens/mobile_series_detail_screen.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobileSeriesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -269,18 +270,18 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              backgroundColor: Colors.grey[900],
-              title: const Text("Quitter l'application", style: TextStyle(color: Colors.white)),
-              content: const Text("Voulez-vous vraiment quitter l'application ?", style: TextStyle(color: Colors.white70)),
+              backgroundColor: AppColors.surfaceContainerLowest,
+              title: const Text("Quitter l'application", style: TextStyle(color: AppColors.onSurface)),
+              content: const Text("Voulez-vous vraiment quitter l'application ?", style: TextStyle(color: AppColors.onSurface70)),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
                   autofocus: true,
-                  child: const Text('Annuler', style: TextStyle(color: Colors.blueAccent)),
+                  child: const Text('Annuler', style: TextStyle(color: AppColors.primary)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Quitter', style: TextStyle(color: Colors.redAccent)),
+                  child: const Text('Quitter', style: TextStyle(color: AppColors.error)),
                 ),
               ],
             ),
@@ -316,7 +317,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                           // Search Bar
                           TVFocusable(
                             scale: 1.0,
-                            focusColor: Colors.white,
+                            focusColor: AppColors.onSurface,
                             onPressed: () {
                               setState(() => _isSearchEditing = true);
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -337,7 +338,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
                                     child: ExcludeFocus(
                                       excluding: !_isSearchEditing,
                                       child: TextField(
-                                        cursorColor: Colors.white,
+                                        cursorColor: AppColors.onSurface,
                                         controller: _searchController,
                                         focusNode: _searchFocusNode,
                                         readOnly: !_isSearchEditing,

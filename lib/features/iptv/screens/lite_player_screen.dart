@@ -416,6 +416,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
         : widget.title;
 
     return Scaffold(
+      // True black behind the video surface, never the warm ink.
       backgroundColor: Colors.black,
       body: GestureDetector(
         onTap: _onUserInteraction,
@@ -453,7 +454,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                             ),
                             child: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: AppColors.onSurface,
                               size: 28,
                             ),
                           ),
@@ -472,7 +473,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                             child: Text(
                               _currentTime,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.onSurface,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -495,7 +496,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                    style: const TextStyle(color: AppColors.error),
                   ),
                 ),
               ),
@@ -554,7 +555,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.7),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: AppColors.onSurface12),
             ),
             child: IntrinsicHeight(
               child: Row(
@@ -579,7 +580,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                           ),
                           child: const Icon(
                             Icons.skip_previous,
-                            color: Colors.white,
+                            color: AppColors.onSurface,
                             size: 36,
                           ),
                         ),
@@ -591,7 +592,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                           _isPlaying
                               ? Icons.pause_circle_filled
                               : Icons.play_circle_filled,
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                           size: 56,
                         ),
                       ),
@@ -605,7 +606,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                           ),
                           child: const Icon(
                             Icons.skip_next,
-                            color: Colors.white,
+                            color: AppColors.onSurface,
                             size: 36,
                           ),
                         ),
@@ -642,7 +643,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                         child: const Icon(
                           Icons
                               .grid_on, // Icon representing interlaced grid/mesh
-                          color: Colors.white,
+                          color: AppColors.onSurface,
                           size: 32,
                         ),
                       ),
@@ -684,7 +685,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
               child: Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -710,7 +711,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white10,
+              backgroundColor: AppColors.onSurface12,
               color: AppColors.primary,
               minHeight: 4,
             ),
@@ -718,7 +719,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
           const SizedBox(height: 6),
           Text(
             next,
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
+            style: const TextStyle(color: AppColors.onSurface54, fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -758,7 +759,7 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
             min: 0,
             max: _duration.inSeconds.toDouble(),
             activeColor: AppColors.primary,
-            inactiveColor: Colors.white24,
+            inactiveColor: AppColors.onSurface24,
             onChanged: (v) => setState(() {
               _position = Duration(seconds: v.toInt());
               _isSeeking = true;

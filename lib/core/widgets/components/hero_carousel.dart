@@ -150,7 +150,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                                 style: GoogleFonts.outfit(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppColors.onSurface,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -161,7 +161,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                                   item.subtitle!,
                                   style: GoogleFonts.inter(
                                     fontSize: 16,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: AppColors.onSurface.withOpacity(0.8),
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -227,8 +227,8 @@ class _HeroButtonState extends State<_HeroButton> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             color: widget.isPrimary
-                ? (_isHovered ? Colors.white : Colors.white.withOpacity(0.9))
-                : (_isHovered ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.1)),
+                ? (_isHovered ? AppColors.onSurface : AppColors.onSurface.withOpacity(0.9))
+                : (_isHovered ? AppColors.onSurface.withOpacity(0.2) : AppColors.onSurface.withOpacity(0.1)),
             borderRadius: BorderRadius.circular(AppTheme.radiusFull),
           ),
           child: Row(
@@ -236,14 +236,14 @@ class _HeroButtonState extends State<_HeroButton> {
             children: [
               Icon(
                 widget.icon,
-                color: widget.isPrimary ? Colors.black : Colors.white,
+                color: widget.isPrimary ? AppColors.onPrimaryFixed : AppColors.onSurface,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 widget.label,
                 style: GoogleFonts.inter(
-                  color: widget.isPrimary ? Colors.black : Colors.white,
+                  color: widget.isPrimary ? AppColors.onPrimaryFixed : AppColors.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),

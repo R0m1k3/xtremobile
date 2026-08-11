@@ -8,6 +8,7 @@ import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/providers/theme_provider.dart';
 import 'package:xtremobile/features/iptv/screens/mobile_playlist_selection_screen.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 /// Simplified mobile settings tab - optimized for TV remote control
 class MobileSettingsTab extends ConsumerStatefulWidget {
@@ -105,7 +106,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.5.1',
+                      'Version 1.6.1',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppDecorations.textSecondary(context),
@@ -327,7 +328,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Cache actualisé ! Relancez l\'app pour recharger.'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             duration: Duration(seconds: 3),
           ),
         );
@@ -335,7 +336,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -415,7 +416,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                                     icon,
                                     size: 16,
                                     color: selected
-                                        ? Colors.white
+                                        ? AppColors.onSurface
                                         : AppDecorations.textSecondary(context),
                                   ),
                                   const SizedBox(height: 3),
@@ -427,7 +428,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: selected
-                                          ? Colors.white
+                                          ? AppColors.onSurface
                                           : AppDecorations.textSecondary(context),
                                     ),
                                   ),

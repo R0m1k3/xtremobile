@@ -125,7 +125,7 @@ class _MobilePlaylistSelectionScreenState
                   const SizedBox(height: 16),
                   Text(
                     'Erreur de chargement',
-                    style: GoogleFonts.inter(color: Colors.white),
+                    style: GoogleFonts.inter(color: AppColors.onSurface),
                   ),
                   TextButton(
                     onPressed: () => ref.invalidate(playlistsProvider),
@@ -143,14 +143,14 @@ class _MobilePlaylistSelectionScreenState
                       const Icon(
                         Icons.playlist_add,
                         size: 64,
-                        color: Colors.white54,
+                        color: AppColors.onSurface54,
                       ),
                       const SizedBox(height: 24),
                       Text(
                         'Aucune playlist configurée',
                         style: GoogleFonts.inter(
                           fontSize: 18,
-                          color: Colors.white70,
+                          color: AppColors.onSurface70,
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -163,18 +163,18 @@ class _MobilePlaylistSelectionScreenState
                             vertical: 14,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A84FF),
+                            color: AppColors.primaryFill,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add, color: Colors.white, size: 20),
+                              Icon(Icons.add, color: AppColors.onSurface, size: 20),
                               SizedBox(width: 10),
                               Text(
                                 'Ajouter une Playlist',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.onSurface,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                 ),
@@ -268,21 +268,21 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text(label, style: const TextStyle(color: Colors.white)),
+        title: Text(label, style: const TextStyle(color: AppColors.onSurface)),
         content: TextField(
           controller: controller,
           autofocus: true,
           obscureText: obscure,
           keyboardType: keyboardType,
           textInputAction: TextInputAction.done,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.onSurface),
           decoration: const InputDecoration(
-            labelStyle: TextStyle(color: Colors.white70),
+            labelStyle: TextStyle(color: AppColors.onSurface70),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white24),
+              borderSide: BorderSide(color: AppColors.onSurface24),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white),
+              borderSide: BorderSide(color: AppColors.onSurface),
             ),
           ),
           onSubmitted: (val) => Navigator.pop(ctx, val),
@@ -327,7 +327,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.07),
+            color: AppColors.onSurface.withOpacity(0.07),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -341,7 +341,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                     Text(
                       label,
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.onSurface70,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
@@ -350,7 +350,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                     Text(
                       displayValue,
                       style: TextStyle(
-                        color: value.isEmpty ? Colors.white38 : Colors.white,
+                        color: value.isEmpty ? AppColors.onSurface38 : AppColors.onSurface,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -360,7 +360,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                   ],
                 ),
               ),
-              const Icon(Icons.edit, color: Colors.white38, size: 18),
+              const Icon(Icons.edit, color: AppColors.onSurface38, size: 18),
             ],
           ),
         ),
@@ -374,7 +374,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
       backgroundColor: AppColors.surface,
       title: Text(
         widget.isEditing ? 'Modifier la Playlist' : 'Ajouter une Playlist',
-        style: GoogleFonts.inter(color: Colors.white),
+        style: GoogleFonts.inter(color: AppColors.onSurface),
       ),
       content: SizedBox(
         width: 480,
@@ -435,8 +435,8 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   backgroundColor: AppColors.surface,
-                  title: const Text('Confirmer', style: TextStyle(color: Colors.white)),
-                  content: const Text('Supprimer cette playlist ?', style: TextStyle(color: Colors.white70)),
+                  title: const Text('Confirmer', style: TextStyle(color: AppColors.onSurface)),
+                  content: const Text('Supprimer cette playlist ?', style: TextStyle(color: AppColors.onSurface70)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -444,7 +444,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
                       child: const Text('Supprimer'),
                     ),
                   ],
@@ -458,7 +458,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
             borderRadius: BorderRadius.circular(8),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text('Supprimer', style: TextStyle(color: Colors.red)),
+              child: Text('Supprimer', style: TextStyle(color: AppColors.error)),
             ),
           ),
         TVFocusable(
@@ -466,7 +466,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
           borderRadius: BorderRadius.circular(8),
           child: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text('Annuler', style: TextStyle(color: Colors.white70)),
+            child: Text('Annuler', style: TextStyle(color: AppColors.onSurface70)),
           ),
         ),
         TVFocusable(
@@ -482,14 +482,14 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: _name.isEmpty || _dns.isEmpty
-                  ? Colors.white12
+                  ? AppColors.onSurface12
                   : AppColors.primary,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               _isSaving ? '...' : 'Enregistrer',
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.onSurface,
                 fontWeight: FontWeight.bold,
               ),
             ),

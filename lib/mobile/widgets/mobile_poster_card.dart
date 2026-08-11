@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/core/utils/image_cache_config.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobilePosterCard extends StatelessWidget {
   final String title;
@@ -134,12 +135,12 @@ class MobilePosterCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.star, color: Colors.amber, size: 10),
+            const Icon(Icons.star, color: AppColors.ratingGold, size: 10),
             const SizedBox(width: 2),
             Text(
               rating!,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.onSurface,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
@@ -157,13 +158,13 @@ class MobilePosterCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: const BoxDecoration(
-          color: Color(0xFF30D158),
+          color: AppColors.success,
           shape: BoxShape.circle,
         ),
         child: const Icon(
           Icons.check,
           size: 10,
-          color: Colors.white,
+          color: AppColors.onSurface,
         ),
       ),
     );

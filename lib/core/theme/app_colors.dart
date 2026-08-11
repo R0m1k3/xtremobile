@@ -53,6 +53,14 @@ class AppColors {
   /// en restant la même couleur perçue.
   static const Color primaryFill = Color(0xFFA8360C);
 
+  /// Encre chaude — remplace le noir pur pour du texte/des icônes posés sur un
+  /// remplissage clair (crème, ember clair). Un noir pur sur une teinte chaude
+  /// paraît sale ; ce brun très sombre garde le contraste sans le décalage.
+  static const Color onPrimaryFixed = Color(0xFF360F00);
+  static const Color primaryFixed = Color(0xFFFFDBC8);
+  static const Color primaryFixedDim = Color(0xFFFFB68C);
+  static const Color onPrimaryFixedVariant = Color(0xFF7A2C08);
+
   // ============ SECONDARY (Terre cuite / argile) ============
   static const Color secondary = Color(0xFFE7C3AC);
   static const Color onSecondary = Color(0xFF442A1B);
@@ -92,6 +100,7 @@ class AppColors {
   static const Color onSurface24 = Color(0x3DF3E9DF);
   static const Color onSurface38 = Color(0x61F3E9DF);
   static const Color onSurface54 = Color(0x8AF3E9DF);
+  static const Color onSurface70 = Color(0xB3F3E9DF);
 
   // ============ STATUS ============
   static const Color success = Color(0xFF9BC46A); // olive lumineux

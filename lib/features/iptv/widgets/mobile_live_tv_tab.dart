@@ -16,6 +16,7 @@ import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -130,14 +131,14 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
               final shouldExit = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  backgroundColor: Colors.grey[900],
+                  backgroundColor: AppColors.surfaceContainerLowest,
                   title: const Text(
                     "Quitter l'application",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: AppColors.onSurface),
                   ),
                   content: const Text(
                     "Voulez-vous vraiment quitter l'application ?",
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppColors.onSurface70),
                   ),
                   actions: [
                     TextButton(
@@ -145,14 +146,14 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                       autofocus: true,
                       child: const Text(
                         'Annuler',
-                        style: TextStyle(color: Colors.blueAccent),
+                        style: TextStyle(color: AppColors.primary),
                       ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(true),
                       child: const Text(
                         'Quitter',
-                        style: TextStyle(color: Colors.redAccent),
+                        style: TextStyle(color: AppColors.error),
                       ),
                     ),
                   ],
@@ -171,7 +172,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   'Erreur: $e',
-                  style: const TextStyle(color: Colors.red),
+                  style: const TextStyle(color: AppColors.error),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -235,7 +236,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                               // Search Bar
                               TVFocusable(
                                 scale: 1.0,
-                                focusColor: Colors.white,
+                                focusColor: AppColors.onSurface,
                                 onPressed: () {
                                   setState(() => _isSearchEditing = true);
                                   WidgetsBinding.instance
@@ -263,7 +264,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                         child: ExcludeFocus(
                                           excluding: !_isSearchEditing,
                                           child: TextField(
-                                            cursorColor: Colors.white,
+                                            cursorColor: AppColors.onSurface,
                                             controller: _searchController,
                                             focusNode: _searchFocusNode,
                                             readOnly: !_isSearchEditing,
@@ -357,7 +358,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                           ? Icons.favorite
                                           : Icons.favorite_border,
                                       color: _showFavoritesOnly
-                                          ? const Color(0xFFFF453A)
+                                          ? AppColors.live
                                           : AppDecorations.textSecondary(
                                               context),
                                     ),
@@ -535,7 +536,7 @@ class _ChannelListView extends ConsumerWidget {
         child: Center(
           child: Text(
             'Aucune catégorie sélectionnée',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: AppColors.onSurface70),
           ),
         ),
       );
@@ -557,7 +558,7 @@ class _ChannelListView extends ConsumerWidget {
               showFavoritesOnly
                   ? 'Sélectionnez une catégorie pour voir vos favoris'
                   : 'Sélectionnez une catégorie pour rechercher',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: AppColors.onSurface70),
               textAlign: TextAlign.center,
             ),
           ),
@@ -575,7 +576,7 @@ class _ChannelListView extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Text(
               'Erreur: $e',
-              style: const TextStyle(color: Colors.red),
+              style: const TextStyle(color: AppColors.error),
               textAlign: TextAlign.center,
             ),
           ),
@@ -600,7 +601,7 @@ class _ChannelListView extends ConsumerWidget {
             child: Center(
               child: Text(
                 'Aucune chaîne trouvée',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppColors.onSurface70),
               ),
             ),
           );
@@ -754,12 +755,12 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: Colors.red,
+                                  color: AppColors.error,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
                                   Icons.favorite,
-                                  color: Colors.white,
+                                  color: AppColors.onSurface,
                                   size: 10,
                                 ),
                               ),
@@ -779,7 +780,7 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                           Text(
                             widget.channel.name,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppColors.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 10,
                             ),
@@ -792,7 +793,7 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                             Text(
                               _epgTitle!,
                               style: const TextStyle(
-                                color: Colors.yellow,
+                                color: AppColors.ratingGold,
                                 fontSize: 8,
                               ),
                               textAlign: TextAlign.center,

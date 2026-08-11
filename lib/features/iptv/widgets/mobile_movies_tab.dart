@@ -11,6 +11,7 @@ import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
 
 class MobileMoviesTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -285,14 +286,14 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              backgroundColor: Colors.grey[900],
+              backgroundColor: AppColors.surfaceContainerLowest,
               title: const Text(
                 "Quitter l'application",
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.onSurface),
               ),
               content: const Text(
                 "Voulez-vous vraiment quitter l'application ?",
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppColors.onSurface70),
               ),
               actions: [
                 TextButton(
@@ -300,14 +301,14 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                   autofocus: true,
                   child: const Text(
                     'Annuler',
-                    style: TextStyle(color: Colors.blueAccent),
+                    style: TextStyle(color: AppColors.primary),
                   ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   child: const Text(
                     'Quitter',
-                    style: TextStyle(color: Colors.redAccent),
+                    style: TextStyle(color: AppColors.error),
                   ),
                 ),
               ],
@@ -346,7 +347,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                           // Search Bar
                           TVFocusable(
                             scale: 1.0,
-                            focusColor: Colors.white,
+                            focusColor: AppColors.onSurface,
                             onPressed: () {
                               setState(() => _isSearchEditing = true);
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -367,7 +368,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                     child: ExcludeFocus(
                                       excluding: !_isSearchEditing,
                                       child: TextField(
-                                        cursorColor: Colors.white,
+                                        cursorColor: AppColors.onSurface,
                                         controller: _searchController,
                                         focusNode: _searchFocusNode,
                                         readOnly: !_isSearchEditing,

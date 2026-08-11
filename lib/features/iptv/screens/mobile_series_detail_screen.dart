@@ -129,7 +129,7 @@ class _MobileSeriesDetailScreenState
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
               onPressed: () => Navigator.pop(context),
               tooltip: 'Back',
             ),
@@ -149,7 +149,7 @@ class _MobileSeriesDetailScreenState
                     maxHeightDiskCache: 720,
                     cacheManager: AppCacheManager.instance,
                     errorWidget: (_, __, ___) =>
-                        Container(color: Colors.grey.shade900),
+                        Container(color: AppColors.surfaceContainerLowest),
                   ),
                 // Gradient Overlay
                 Container(
@@ -190,7 +190,7 @@ class _MobileSeriesDetailScreenState
                             const Icon(
                               Icons.star,
                               size: 16,
-                              color: Colors.amber,
+                              color: AppColors.ratingGold,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -261,15 +261,15 @@ class _MobileSeriesDetailScreenState
                         }
                       },
                       backgroundColor: isDark
-                          ? const Color(0xFF1C1C1E)
-                          : Colors.grey.shade300,
-                      selectedColor: isDark ? Colors.white : Colors.blue,
+                          ? AppColors.surfaceContainer
+                          : AppColors.surfaceContainerHigh,
+                      selectedColor: isDark ? AppColors.onSurface : AppColors.primaryFill,
                       labelStyle: TextStyle(
                         color: isSelected
-                            ? (isDark ? Colors.black : Colors.white)
+                            ? (isDark ? AppColors.onPrimaryFixed : AppColors.onSurface)
                             : (isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade700),
+                                ? AppColors.textSecondary
+                                : AppColors.outlineVariant),
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
                       ),
@@ -323,10 +323,10 @@ class _MobileSeriesDetailScreenState
     }
 
     // Force dark mode colors since background is hardcoded dark
-    const textColor = Colors.white;
-    final secondaryTextColor = Colors.grey.shade400;
-    const surfaceColor = Color(0xFF1C1C1E);
-    const primaryColor = Colors.white; // Or accent color if preferred
+    const textColor = AppColors.onSurface;
+    final secondaryTextColor = AppColors.textSecondary;
+    const surfaceColor = AppColors.surfaceContainer;
+    const primaryColor = AppColors.onSurface; // Or accent color if preferred
 
     return InkWell(
       onTap: () {
@@ -356,7 +356,7 @@ class _MobileSeriesDetailScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.white10)),
+              border: Border(bottom: BorderSide(color: AppColors.onSurface12)),
             ),
             child: Row(
               children: [
@@ -374,7 +374,7 @@ class _MobileSeriesDetailScreenState
                   child: Icon(
                     isWatched ? Icons.check : Icons.play_arrow,
                     color: isWatched
-                        ? Colors.black // Checkmark on white bg
+                        ? AppColors.onPrimaryFixed // Checkmark on white bg
                         : primaryColor, // Play icon
                     size: 20,
                   ),
@@ -413,7 +413,7 @@ class _MobileSeriesDetailScreenState
             LinearProgressIndicator(
               value: progress,
               backgroundColor: Colors.transparent,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.error),
               minHeight: 2,
             ),
         ],
