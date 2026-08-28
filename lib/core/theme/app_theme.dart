@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// XtremFlow — "Warm Cinema" theme (ported from the web app).
+/// XtremFlow — "Apple Glass Gray" theme.
 ///
 /// Typography: **Fraunces** (serif éditorial) for display/headline, **Karla**
 /// (humaniste chaud) for UI and body — very legible at TV distance and on a
@@ -217,10 +217,9 @@ class AppTheme {
         secondary: AppColors.textSecondary,
       ),
 
-      // Curseur crème — un curseur blanc pur jure sur fond chaud.
       textSelectionTheme: const TextSelectionThemeData(
         cursorColor: AppColors.primary,
-        selectionColor: Color(0x59D9541F),
+        selectionColor: Color(0x590A84FF),
         selectionHandleColor: AppColors.primaryContainer,
       ),
 
@@ -334,7 +333,7 @@ class AppTheme {
         activeTrackColor: AppColors.primaryContainer,
         inactiveTrackColor: AppColors.onSurface24,
         thumbColor: AppColors.primary,
-        overlayColor: Color(0x29D9541F),
+        overlayColor: Color(0x290A84FF),
       ),
 
       progressIndicatorTheme: const ProgressIndicatorThemeData(
@@ -362,17 +361,17 @@ class AppTheme {
     );
   }
 
-  // ============ LIGHT THEME (« papier kraft ») ============
+  // ============ LIGHT THEME (gris système clair) ============
   static ThemeData get lightTheme {
     final baseTheme = ThemeData.light(useMaterial3: true);
 
-    const bgColor = Color(0xFFFBF3EC);
+    const bgColor = Color(0xFFF2F2F7);
     const surfaceColor = Color(0xFFFFFFFF);
-    const primaryColor = Color(0xFFA63B10);
-    const textPrimaryColor = Color(0xFF201A16);
-    const textSecondaryColor = Color(0xFF52443B);
-    const textTertiaryColor = Color(0xFF847369);
-    const borderColor = Color(0xFFD6C3B7);
+    const primaryColor = Color(0xFF0066CC);
+    const textPrimaryColor = Color(0xFF1C1C1E);
+    const textSecondaryColor = Color(0xFF48484E);
+    const textTertiaryColor = Color(0xFF8E8E93);
+    const borderColor = Color(0xFFD8D8DE);
 
     return baseTheme.copyWith(
       colorScheme: AppColors.lightColorScheme,
@@ -386,7 +385,7 @@ class AppTheme {
 
       textSelectionTheme: const TextSelectionThemeData(
         cursorColor: primaryColor,
-        selectionColor: Color(0x4DA63B10),
+        selectionColor: Color(0x4D0066CC),
         selectionHandleColor: primaryColor,
       ),
 

@@ -135,6 +135,35 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _resetControlsTimer();
   }
 
+  /// Dernier contrôle de l'OSD qui avait le focus télécommande.
+  ///
+  /// Quand l'OSD se masque (auto-hide 5s), ses FocusNodes sont démontés et le
+  /// focus part « on ne sait où » : à la réouverture l'utilisateur devait
+  /// re-naviguer depuis un point aléatoire jusqu'au bouton de zapping. On
+  /// mémorise donc le dernier bouton utilisé pour le re-focaliser d'office.
+  FocusNode? _lastFocusedControl;
+
+  void _noteFocus(FocusNode node) {
+    _lastFocusedControl = node;
+    _resetControlsTimer();
+  }
+
+  /// Réaffiche l'OSD en redonnant le focus au dernier contrôle utilisé
+  /// (Play/Pause par défaut) — un seul appui suffit alors pour re-zapper.
+  void _showControlsRestoringFocus() {
+    setState(() => _showControls = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_showControls) return;
+      final target = _lastFocusedControl ?? _playPauseFocusNode;
+      if (target.canRequestFocus) {
+        target.requestFocus();
+      } else {
+        _playPauseFocusNode.requestFocus();
+      }
+    });
+    _resetControlsTimer();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -189,10 +218,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Principe TiviMate : jouer à partir de là où on est, JAMAIS chasser le live edge.
       // ExoPlayer n'utilise pas les PTS du stream pour se recaler — on fait pareil.
 
-      // --- Buffering stable (TiviMate Medium ~ 8-10s) ---
-      (_player.platform as dynamic)?.setProperty('cache-secs', '8');
-      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '150000000'); // 150MB RAM max
-      (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '10');
+      // --- Buffering basse latence (TiviMate Low ~ 3-5s) ---
+      // 8s/10s de readahead ajoutaient autant de retard sur le direct : 3s de
+      // cache + 5s de readahead suffisent à absorber la gigue réseau tout en
+      // restant nettement plus près du live edge.
+      (_player.platform as dynamic)?.setProperty('cache-secs', '3');
+      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '60000000'); // 60MB RAM max
+      (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '5');
       (_player.platform as dynamic)?.setProperty('demuxer-thread', 'yes');
       // --- Plafond du buffer ARRIÈRE (stabilité longue durée) ---
       // mpv garde par défaut 50 Mio de flux déjà lu pour permettre un retour
@@ -234,15 +266,19 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
     }
     
-    // [V11.0 Perfect Restoration] Recovering settings from working commit a1628a6b
-    // Forced software re-sampling handles ANY stubborn 5.1/LATM/24-bit audio track.
+    // [Audio Fix] L'ancienne chaîne `af=lavrresample,format=channels=stereo:
+    // sample_fmts=s16` mélangeait la syntaxe FFmpeg et mpv : `lavrresample`
+    // n'existe plus dans les builds récents et `sample_fmts` n'est pas une
+    // option du filtre `format` de mpv. Quand la chaîne échoue à s'initialiser
+    // pour un codec donné (AC3/EAC3/LATM selon la chaîne TV), mpv coupe la
+    // sortie audio ⇒ « certaines chaînes n'ont pas de son ».
+    // Le downmix natif `audio-channels=stereo` fait la même chose (5.1 → 2.0)
+    // sans chaîne de filtres fragile, et l'AO négocie lui-même le format.
     (_player.platform as dynamic)?.setProperty('ad', 'lavc:*');
-    (_player.platform as dynamic)?.setProperty('af', 'lavrresample,format=channels=stereo:sample_fmts=s16');
-    (_player.platform as dynamic)?.setProperty('audio-format', 's16');
+    (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
     (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
     (_player.platform as dynamic)?.setProperty('audio-pitch-correction', 'no');
     (_player.platform as dynamic)?.setProperty('audio-buffer', '0.2'); // Live: buffer audio court (réduit le désync pendant les cache-pauses)
-    (_player.platform as dynamic)?.setProperty('audio-samplerate', '48000');
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
     
     // --- Seeking & Sync globaux ---
@@ -270,11 +306,14 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     );
 
     // --- Probing du flux (une seule entrée, consolidée) ---
-    // Précédent : 2 setProperty('demuxer-lavf-o') en conflit
     // fflags=+discardcorrupt supprimé : peut causer des skips sur certains streams IPTV
+    // Ces valeurs sont des PLAFONDS : FFmpeg s'arrête dès que toutes les pistes
+    // sont identifiées, donc les relever ne ralentit pas les flux sains.
+    // 1MB/2s ratait la piste audio (AAC-LATM déclaré tard) sur certaines
+    // chaînes ⇒ pas de son. 2MB/3s les récupère sans pénaliser le zapping.
     (_player.platform as dynamic)?.setProperty(
       'demuxer-lavf-o',
-      'analyzeduration=2000000,probesize=1000000',
+      'analyzeduration=3000000,probesize=2000000',
     );
 
     // --- Décodeur lavc : threads libres, sans fast-mode (qualité prioritaire) ---
@@ -997,6 +1036,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       _showChannelList = false; // close sidebar on switch
       _showControls = true;     // show regular OSD
     });
+    // Garde le focus sur le bouton de zap qui vient d'être pressé : l'appui
+    // suivant sur OK rezappe immédiatement, sans re-navigation dans l'OSD.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_showControls) return;
+      final target = _lastFocusedControl;
+      if (target != null && target.canRequestFocus && !target.hasFocus) {
+        target.requestFocus();
+      }
+    });
     _resetControlsTimer();
     _loadStream();
   }
@@ -1049,12 +1097,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _toggleControls() {
     // Always show controls on tap, then start auto-hide timer
     if (!_showControls) {
-      setState(() => _showControls = true);
-      // Request focus on Play/Pause button when opening
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // If controls opened, default to Play/Pause
-        _playPauseFocusNode.requestFocus();
-      });
+      // Reopen on the last focused control (falls back to Play/Pause)
+      _showControlsRestoringFocus();
+      return;
     }
     _resetControlsTimer();
   }
@@ -1087,8 +1132,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           key == LogicalKeyboardKey.numpadEnter ||
           key == LogicalKeyboardKey.gameButtonA ||
           key == LogicalKeyboardKey.mediaPlayPause) {
-        // If controls are hidden, toggle them + play/pause
         if (!_showControls) {
+          // Live : OK réaffiche seulement l'OSD (focus restauré sur le dernier
+          // bouton utilisé) — surtout ne PAS mettre le direct en pause.
+          if (widget.streamType == model.StreamType.live &&
+              key != LogicalKeyboardKey.mediaPlayPause) {
+            _showControlsRestoringFocus();
+            return true;
+          }
+          // VOD : comportement historique — toggle play/pause + OSD
           _togglePlayPause();
           _toggleControls();
           return true;
@@ -1116,8 +1168,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           if (widget.streamType != model.StreamType.live) {
             final newPos = _position - const Duration(seconds: 10);
             _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+            _onUserInteraction();
+          } else {
+            _showControlsRestoringFocus();
           }
-          _onUserInteraction();
           return true;
         }
         return false; // Let Focus handle navigation
@@ -1131,8 +1185,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
             if (newPos < _duration) {
               _player.seek(newPos);
             }
+            _onUserInteraction();
+          } else {
+            _showControlsRestoringFocus();
           }
-          _onUserInteraction();
           return true;
         }
         return false; // Let Focus handle navigation
@@ -1142,7 +1198,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       if (key == LogicalKeyboardKey.arrowUp ||
           key == LogicalKeyboardKey.arrowDown) {
         if (!_showControls) {
-          _onUserInteraction();
+          _showControlsRestoringFocus();
           return true;
         }
         return false; // Let Focus handle navigation
@@ -1504,7 +1560,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   TVFocusable(
                     focusNode: _prevFocusNode,
                     onPressed: _playPrevious,
-                    onFocus: _resetControlsTimer,
+                    onFocus: () => _noteFocus(_prevFocusNode),
                     child: const Icon(
                       Icons.skip_previous,
                       color: AppColors.onSurface,
@@ -1517,7 +1573,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   TVFocusable(
                     focusNode: _playPauseFocusNode,
                     onPressed: _togglePlayPause,
-                    onFocus: _resetControlsTimer,
+                    onFocus: () => _noteFocus(_playPauseFocusNode),
                     child: Icon(
                       _isPlaying
                           ? Icons.pause_circle_filled
@@ -1532,7 +1588,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   TVFocusable(
                     focusNode: _nextFocusNode,
                     onPressed: _playNext,
-                    onFocus: _resetControlsTimer,
+                    onFocus: () => _noteFocus(_nextFocusNode),
                     child: const Icon(
                       Icons.skip_next,
                       color: AppColors.onSurface,
@@ -2017,7 +2073,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         _player.seek(pos - const Duration(seconds: 10));
                         _resetControlsTimer();
                       },
-                      onFocus: _resetControlsTimer,
+                      onFocus: () => _noteFocus(_prevFocusNode),
                       borderRadius: BorderRadius.circular(50),
                       child: IconButton(
                         icon: const Icon(
@@ -2038,7 +2094,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                     TVFocusable(
                       focusNode: _playPauseFocusNode,
                       onPressed: _togglePlayPause,
-                      onFocus: _resetControlsTimer,
+                      onFocus: () => _noteFocus(_playPauseFocusNode),
                       scale: 1.1,
                       borderRadius: BorderRadius.circular(50),
                       child: IconButton(
@@ -2063,7 +2119,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                         _player.seek(pos + const Duration(seconds: 10));
                         _resetControlsTimer();
                       },
-                      onFocus: _resetControlsTimer,
+                      onFocus: () => _noteFocus(_nextFocusNode),
                       borderRadius: BorderRadius.circular(50),
                       child: IconButton(
                         icon: const Icon(
