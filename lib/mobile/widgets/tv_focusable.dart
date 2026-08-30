@@ -163,7 +163,7 @@ class _TVFocusableState extends State<TVFocusable> {
                             offset: const Offset(0, 6),
                           ),
                           const BoxShadow(
-                            color: Color(0x59D9541F), // Ember glow
+                            color: Color(0x590A84FF), // Apple blue glow
                             blurRadius: 12,
                             spreadRadius: 0,
                           ),
