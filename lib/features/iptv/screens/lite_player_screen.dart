@@ -80,6 +80,16 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _prevFocusNode = FocusNode();
   final FocusNode _nextFocusNode = FocusNode();
+  final FocusNode _channelListButtonFocusNode = FocusNode();
+
+  /// Focus D-pad de la chaîne active dans la sidebar : permet d'atterrir
+  /// directement dessus à l'ouverture de la liste.
+  final FocusNode _channelListItemFocusNode = FocusNode();
+
+  // [TiviMate] Channel List Sidebar
+  bool _showChannelList = false;
+  Timer? _channelListTimer;
+  final ScrollController _channelListScrollController = ScrollController();
 
   @override
   void initState() {
@@ -132,6 +142,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     _controlsTimer = null;
     _stabilizationTimer?.cancel();
     _stabilizationTimer = null;
+    _channelListTimer?.cancel();
+    _channelListTimer = null;
 
     final controller = _controller;
     _controller = null;
@@ -339,14 +351,94 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
   void _switchChannel(int index) {
     if (widget.channels == null) return;
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _showChannelList = false; // close sidebar on switch
+    });
+    _channelListTimer?.cancel();
     _onUserInteraction(); // Ensure OSD shows up and timer resets on channel change
     _loadStream();
+  }
+
+  /// Open/close the channel list sidebar
+  void _toggleChannelList() {
+    setState(() => _showChannelList = !_showChannelList);
+    if (_showChannelList) {
+      _scrollToCurrentChannel();
+      _restartChannelListTimer();
+      // Focus direct sur la chaîne en cours : la télécommande navigue dans la
+      // liste sans étape intermédiaire. Second essai après l'animation de
+      // scroll (300 ms), l'item actif pouvant ne pas encore être construit.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showChannelList) {
+          _channelListItemFocusNode.requestFocus();
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted &&
+            _showChannelList &&
+            !_channelListItemFocusNode.hasFocus) {
+          _channelListItemFocusNode.requestFocus();
+        }
+      });
+    } else {
+      _channelListTimer?.cancel();
+    }
+  }
+
+  /// (Re)arme l'auto-fermeture de la sidebar. Relancé à chaque interaction
+  /// (focus D-pad, scroll) pour ne pas fermer la liste sous les doigts.
+  void _restartChannelListTimer() {
+    _channelListTimer?.cancel();
+    _channelListTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _showChannelList = false);
+    });
+  }
+
+  /// Scroll channel list to keep current channel visible
+  void _scrollToCurrentChannel() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_channelListScrollController.hasClients) return;
+      const itemHeight = 64.0;
+      final offset = (_currentIndex * itemHeight) -
+          (_channelListScrollController.position.viewportDimension / 2) +
+          (itemHeight / 2);
+      _channelListScrollController.animateTo(
+        offset.clamp(0, _channelListScrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     final key = event.logicalKey;
+
+    // Sidebar ouverte : Back/Menu la ferment, le reste part au système de
+    // Focus (navigation + OK sur un item). On relance juste l'auto-fermeture.
+    if (_showChannelList) {
+      if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack ||
+          key == LogicalKeyboardKey.contextMenu ||
+          key == LogicalKeyboardKey.keyM) {
+        _channelListTimer?.cancel();
+        setState(() => _showChannelList = false);
+        return true;
+      }
+      _restartChannelListTimer();
+      return false;
+    }
+
+    // Menu key or 'M' → toggle channel list sidebar
+    if (key == LogicalKeyboardKey.contextMenu ||
+        key == LogicalKeyboardKey.keyM) {
+      if (widget.streamType == model.StreamType.live &&
+          widget.channels != null) {
+        _toggleChannelList();
+        return true;
+      }
+    }
 
     if (key == LogicalKeyboardKey.channelUp) {
       if (widget.channels != null) {
@@ -397,6 +489,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     _epgTimer?.cancel();
     _controlsTimer?.cancel();
     _stabilizationTimer?.cancel();
+    _channelListTimer?.cancel();
+    _channelListScrollController.dispose();
     _controller?.pause(); // Force stop audio immediately
     _controller?.dispose();
     _xtreamService?.dispose();
@@ -404,6 +498,8 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
     _playPauseFocusNode.dispose();
     _prevFocusNode.dispose();
     _nextFocusNode.dispose();
+    _channelListButtonFocusNode.dispose();
+    _channelListItemFocusNode.dispose();
 
     super.dispose();
   }
@@ -419,7 +515,23 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
       // True black behind the video surface, never the warm ink.
       backgroundColor: Colors.black,
       body: GestureDetector(
-        onTap: _onUserInteraction,
+        onTap: () {
+          if (_showChannelList) {
+            _channelListTimer?.cancel();
+            setState(() => _showChannelList = false);
+          } else {
+            _onUserInteraction();
+          }
+        },
+        // Swipe from right edge → open channel list
+        onHorizontalDragEnd: (details) {
+          if (widget.streamType == model.StreamType.live &&
+              widget.channels != null &&
+              details.primaryVelocity != null &&
+              details.primaryVelocity! < -300) {
+            _toggleChannelList();
+          }
+        },
         child: Stack(
           children: [
             // Video Surface
@@ -509,6 +621,13 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
 
             // OSD (EPG + Controls)
             if (_showControls) _buildOSD(title),
+
+            // [TiviMate] Channel list sidebar
+            if (_showChannelList &&
+                widget.streamType == model.StreamType.live &&
+                widget.channels != null &&
+                widget.channels!.isNotEmpty)
+              _buildChannelListSidebar(),
           ],
         ),
       ),
@@ -611,6 +730,20 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
                           ),
                         ),
                       const SizedBox(width: 16),
+
+                      // Channel list sidebar (liste des chaînes de la catégorie)
+                      if (widget.streamType == model.StreamType.live &&
+                          widget.channels != null &&
+                          widget.channels!.isNotEmpty)
+                        TVFocusable(
+                          focusNode: _channelListButtonFocusNode,
+                          onPressed: _toggleChannelList,
+                          child: const Icon(
+                            Icons.playlist_play_rounded,
+                            color: AppColors.onSurface,
+                            size: 36,
+                          ),
+                        ),
                       const SizedBox(width: 16),
                       // Deinterlace Button (Switches to Native Player with forced Deinterlace)
                       TVFocusable(
@@ -769,6 +902,180 @@ class _LitePlayerScreenState extends ConsumerState<LitePlayerScreen>
               _isSeeking = false;
               _onUserInteraction();
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// [TiviMate] Channel list sidebar — slide-in panel on the right
+  Widget _buildChannelListSidebar() {
+    final channels = widget.channels!;
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      right: 0,
+      child: Container(
+        width: 280,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+            colors: [Color(0xE6000000), Color(0x99000000)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.onSurface12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.list,
+                        color: AppColors.onSurface70, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Chaînes',
+                        style: TextStyle(
+                          color: AppColors.onSurface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        _channelListTimer?.cancel();
+                        setState(() => _showChannelList = false);
+                      },
+                      child: const Icon(Icons.close,
+                          color: AppColors.onSurface54, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+              // Channel list
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (_) {
+                    _restartChannelListTimer();
+                    return false;
+                  },
+                  child: ListView.builder(
+                    controller: _channelListScrollController,
+                    itemCount: channels.length,
+                    itemExtent: 64.0,
+                    itemBuilder: (context, index) {
+                      final ch = channels[index];
+                      final isActive = index == _currentIndex;
+                      return TVFocusable(
+                        // Le focusNode externe n'est posé que sur la chaîne
+                        // active ; la clé force un remontage quand isActive
+                        // change (TVFocusable ne gère pas didUpdateWidget).
+                        key: ValueKey('sidebar-ch-$index-$isActive'),
+                        focusNode: isActive ? _channelListItemFocusNode : null,
+                        scale: 1.0,
+                        borderRadius: BorderRadius.zero,
+                        onFocus: _restartChannelListTimer,
+                        onPressed: () {
+                          _channelListTimer?.cancel();
+                          _switchChannel(index);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.primaryFill.withValues(alpha: 0.6)
+                                : Colors.transparent,
+                            border: isActive
+                                ? const Border(
+                                    left: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 3,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Row(
+                            children: [
+                              // Logo
+                              Container(
+                                width: 40,
+                                height: 40,
+                                margin: const EdgeInsets.only(right: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.onSurface12,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: ch.streamIcon.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: CachedNetworkImage(
+                                          imageUrl: ch.streamIcon,
+                                          fit: BoxFit.contain,
+                                          errorWidget: (_, __, ___) =>
+                                              const Icon(Icons.tv,
+                                                  color: AppColors.onSurface38,
+                                                  size: 20),
+                                        ),
+                                      )
+                                    : const Icon(Icons.tv,
+                                        color: AppColors.onSurface38, size: 20),
+                              ),
+                              // Name + num
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      ch.name,
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? AppColors.onSurface
+                                            : AppColors.onSurface70,
+                                        fontSize: 13,
+                                        fontWeight: isActive
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'CH ${index + 1}',
+                                      style: const TextStyle(
+                                        color: AppColors.onSurface38,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Active indicator
+                              if (isActive)
+                                const Icon(
+                                  Icons.play_arrow,
+                                  color: AppColors.primary,
+                                  size: 18,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

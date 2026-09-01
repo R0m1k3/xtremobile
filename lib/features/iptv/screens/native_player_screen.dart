@@ -73,6 +73,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   final FocusNode _sliderFocusNode = FocusNode();
   final FocusNode _backFocusNode = FocusNode();
   final FocusNode _audioFocusNode = FocusNode();
+  final FocusNode _channelListButtonFocusNode = FocusNode();
+
+  /// Focus D-pad de la chaîne active dans la sidebar : permet d'atterrir
+  /// directement dessus à l'ouverture de la liste.
+  final FocusNode _channelListItemFocusNode = FocusNode();
 
   bool _isLoading = true;
   bool _isFirstLoad = true; // true = black overlay; false = silent spinner
@@ -605,6 +610,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _sliderFocusNode.dispose();
     _backFocusNode.dispose();
     _audioFocusNode.dispose();
+    _channelListButtonFocusNode.dispose();
+    _channelListItemFocusNode.dispose();
 
     // Restore normal orientation
     SystemChrome.setPreferredOrientations([
@@ -1054,13 +1061,34 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     setState(() => _showChannelList = !_showChannelList);
     if (_showChannelList) {
       _scrollToCurrentChannel();
-      _channelListTimer?.cancel();
-      _channelListTimer = Timer(const Duration(seconds: 6), () {
-        if (mounted) setState(() => _showChannelList = false);
+      _restartChannelListTimer();
+      // Focus direct sur la chaîne en cours : la télécommande navigue dans la
+      // liste sans étape intermédiaire. Second essai après l'animation de
+      // scroll (300 ms), l'item actif pouvant ne pas encore être construit.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showChannelList) {
+          _channelListItemFocusNode.requestFocus();
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted &&
+            _showChannelList &&
+            !_channelListItemFocusNode.hasFocus) {
+          _channelListItemFocusNode.requestFocus();
+        }
       });
     } else {
       _channelListTimer?.cancel();
     }
+  }
+
+  /// (Re)arme l'auto-fermeture de la sidebar. Relancé à chaque interaction
+  /// (focus D-pad, scroll) pour ne pas fermer la liste sous les doigts.
+  void _restartChannelListTimer() {
+    _channelListTimer?.cancel();
+    _channelListTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _showChannelList = false);
+    });
   }
 
   /// Scroll channel list to keep current channel visible
@@ -1110,6 +1138,21 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
     try {
       final key = event.logicalKey;
+
+      // Sidebar ouverte : Back/Menu la ferment, le reste part au système de
+      // Focus (navigation + OK sur un item). On relance juste l'auto-fermeture.
+      if (_showChannelList) {
+        if (key == LogicalKeyboardKey.escape ||
+            key == LogicalKeyboardKey.goBack ||
+            key == LogicalKeyboardKey.contextMenu ||
+            key == LogicalKeyboardKey.keyM) {
+          _channelListTimer?.cancel();
+          setState(() => _showChannelList = false);
+          return true;
+        }
+        _restartChannelListTimer();
+        return false;
+      }
 
       // Explicit Play
       if (key == LogicalKeyboardKey.mediaPlay) {
@@ -1222,16 +1265,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           _onUserInteraction();
           return true;
         }
-      }
-
-      // OK / Select when channel list is open → switch to focused channel
-      if (_showChannelList &&
-          (key == LogicalKeyboardKey.enter ||
-              key == LogicalKeyboardKey.select ||
-              key == LogicalKeyboardKey.numpadEnter)) {
-        // Channel list handles its own tap, this closes it
-        setState(() => _showChannelList = false);
-        return true;
       }
 
       // Menu key or 'M' → toggle channel list sidebar
@@ -1597,6 +1630,19 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                   ),
                   const SizedBox(width: 16),
 
+                  // Channel list sidebar (liste des chaînes de la catégorie)
+                  if (widget.channels != null && widget.channels!.isNotEmpty)
+                    TVFocusable(
+                      focusNode: _channelListButtonFocusNode,
+                      onPressed: _toggleChannelList,
+                      onFocus: () => _noteFocus(_channelListButtonFocusNode),
+                      child: const Icon(
+                        Icons.playlist_play_rounded,
+                        color: AppColors.onSurface,
+                        size: 36,
+                      ),
+                    ),
+
                   // Disable Deinterlace Button
                   if (widget.forceDeinterlace) ...[
                     const SizedBox(width: 16),
@@ -1945,15 +1991,28 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               ),
               // Channel list
               Expanded(
-                child: ListView.builder(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (_) {
+                    _restartChannelListTimer();
+                    return false;
+                  },
+                  child: ListView.builder(
                   controller: _channelListScrollController,
                   itemCount: channels.length,
                   itemExtent: 64.0,
                   itemBuilder: (context, index) {
                     final ch = channels[index];
                     final isActive = index == _currentIndex;
-                    return GestureDetector(
-                      onTap: () {
+                    return TVFocusable(
+                      // Le focusNode externe n'est posé que sur la chaîne
+                      // active ; la clé force un remontage quand isActive
+                      // change (TVFocusable ne gère pas didUpdateWidget).
+                      key: ValueKey('sidebar-ch-$index-$isActive'),
+                      focusNode: isActive ? _channelListItemFocusNode : null,
+                      scale: 1.0,
+                      borderRadius: BorderRadius.zero,
+                      onFocus: _restartChannelListTimer,
+                      onPressed: () {
                         _channelListTimer?.cancel();
                         _switchChannel(index);
                       },
@@ -2041,6 +2100,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
                       ),
                     );
                   },
+                  ),
                 ),
               ),
             ],
