@@ -14,6 +14,11 @@ name: Build iOS
 on:
   push:
     branches: [main]
+    # Un run macOS coûte 10x en minutes : inutile d'en lancer un pour une
+    # modification qui ne touche que de la documentation.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -73,4 +78,6 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: XtremMobile v${{ steps.version.outputs.version }}
           files: xtremobile-v${{ steps.version.outputs.version }}-unsigned.ipa
-          generate_release_notes: true
+          # Les notes sont déjà produites par le workflow APK ; les régénérer
+          # ici les ajouterait une seconde fois au corps de la release.
+          generate_release_notes: false
