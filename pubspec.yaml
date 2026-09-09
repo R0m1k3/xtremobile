@@ -57,7 +57,11 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.10.1
   wakelock_plus: ^1.2.8
-  device_info_plus: ^12.3.0
+  # Épinglé : la 12.4.0 appelle NSProcessInfo.isiOSAppOnVision derrière un
+  # `@available(iOS 26.1, *)`, ce qui exige le SDK d'Xcode 26.1 — plus récent
+  # que celui du runner macOS. 12.3.0 est la dernière version sans cet appel.
+  # À relâcher le jour où le workflow iOS utilisera un Xcode >= 26.1.
+  device_info_plus: 12.3.0
   shelf_router: ^1.1.4
   shelf_static: ^1.1.3
   flutter_cache_manager: ^3.4.1
