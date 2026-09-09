@@ -34,6 +34,13 @@ dependencies:
   media_kit: ^1.1.11
   media_kit_video: ^1.2.5
   media_kit_libs_video: ^1.0.5
+  # Épinglé : tiré par media_kit_video (^3.0.2). À partir de 3.4.2, le plugin
+  # iOS utilise FlutterSceneLifeCycleDelegate / addSceneDelegate, des API
+  # apparues dans Flutter 3.38, sans relever sa contrainte `flutter:` — pub le
+  # sélectionne donc et la compilation Swift échoue sur le Flutter 3.35.3 des
+  # workflows. 3.4.1 est la dernière version sans ces appels.
+  # À relâcher le jour où les workflows passeront à Flutter >= 3.38.
+  volume_controller: 3.4.1
   
   # UI Components
   google_fonts: ^6.2.1

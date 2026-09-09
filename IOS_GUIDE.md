@@ -94,6 +94,23 @@ Plus simple mais sans renouvellement automatique : installer Sideloadly, branche
 l'appareil, glisser l'IPA, saisir l'Apple ID, cliquer sur *Start*. À refaire tous
 les 7 jours.
 
+### Si l'appareil n'est pas toujours sur le même réseau
+
+C'est la limite d'AltStore : son renouvellement automatique exige qu'AltServer
+tourne sur **le même Wi-Fi** que l'appareil. Un iPad souvent hors du réseau
+domestique verra l'app expirer au bout de 7 jours, loin de tout ordinateur.
+
+Deux réponses :
+
+* **SideStore** — variante d'AltStore qui renouvelle la signature *depuis
+  l'appareil*, sans AltServer ni réseau local. Un ordinateur reste nécessaire
+  une seule fois, pour générer le fichier de pairage. Ensuite l'iPad se
+  débrouille seul, en 4G comme en Wi-Fi. Gratuit, mais l'installation initiale
+  est plus technique.
+* **Compte Apple Developer (99 €/an)** — la signature tient **un an** : il n'y a
+  plus rien à renouveler, donc plus aucune contrainte de réseau. C'est la
+  solution la plus simple pour un appareil nomade.
+
 ### Avec un compte Apple Developer (99 €/an)
 
 La signature tient **un an** et l'app cesse d'expirer toutes les semaines. Deux
