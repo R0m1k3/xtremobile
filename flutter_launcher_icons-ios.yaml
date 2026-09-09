@@ -1,0 +1,10 @@
+# Icônes iOS uniquement : le dossier ios/ étant régénéré à chaque build CI,
+# l'AppIcon doit être reconstruite après `scripts/prepare_ios.sh`.
+# Les icônes Android, elles, sont versionnées dans android/app/src/main/res.
+# Usage : dart run flutter_launcher_icons -f flutter_launcher_icons-ios.yaml
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: "assets/images/logo_xtremflow.png"
+  # L'App Store et iOS refusent une icône avec canal alpha.
+  remove_alpha_ios: true

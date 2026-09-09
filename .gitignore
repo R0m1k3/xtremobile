@@ -32,6 +32,19 @@ migrate_working_dir/
 
 # Web related
 
+# iOS related (le projet Xcode est régénéré par scripts/prepare_ios.sh)
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/ios/Podfile.lock
+**/ios/.symlinks/
+*.ipa
+
 # Symbolication related
 app.*.symbols
 

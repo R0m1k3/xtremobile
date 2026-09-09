@@ -1,6 +1,13 @@
-# XtremFlow - IPTV Web Application
+# XtremFlow - IPTV Application
 
-High-performance, containerized IPTV Web Application using Flutter Web and Xtream Codes API.
+High-performance IPTV application built with Flutter and the Xtream Codes API,
+running on Android, iPhone and iPad.
+
+## Installation
+
+- **Android** : télécharger l'APK depuis la [dernière release](../../releases) et l'installer.
+- **iPhone / iPad** : un IPA non signé est publié sur la même release ; voir
+  [`IOS_GUIDE.md`](IOS_GUIDE.md) pour l'installer sans passer par l'App Store.
 
 ## Features
 

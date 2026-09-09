@@ -1,0 +1,76 @@
+# Construit un IPA *non signé* pour iPhone / iPad et le publie sur la GitHub
+# Release de la version courante, à côté de l'APK Android.
+#
+# L'IPA n'est volontairement pas signé : la signature est faite au moment de
+# l'installation par AltStore / SideStore / Sideloadly avec l'Apple ID de
+# l'utilisateur (voir IOS_GUIDE.md). Aucun compte développeur n'est donc
+# nécessaire pour produire ce fichier.
+#
+# Le job tourne sur un runner macOS (Xcode obligatoire) et consomme 10x plus
+# de minutes GitHub Actions qu'un runner Linux : il n'est donc pas déclenché
+# sur les pull requests.
+name: Build iOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.3
+          cache: true
+
+      - name: Read app version from pubspec.yaml
+        id: version
+        run: echo "version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)" >> "$GITHUB_OUTPUT"
+
+      - run: flutter pub get
+
+      # Régénère ios/ (absent du dépôt) et applique les réglages IPTV :
+      # ATS, audio en arrière-plan, orientations iPad, bundle id.
+      - name: Prepare iOS project
+        run: ./scripts/prepare_ios.sh
+
+      - name: Generate iOS app icon
+        run: dart run flutter_launcher_icons -f flutter_launcher_icons-ios.yaml
+
+      - name: Build release app (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      # Un IPA n'est qu'une archive zip contenant Payload/<App>.app.
+      - name: Package unsigned IPA
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd build/ios/iphoneos
+          rm -rf Payload
+          mkdir Payload
+          cp -R Runner.app Payload/
+          zip -qry "$GITHUB_WORKSPACE/xtremobile-v${VERSION}-unsigned.ipa" Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xtremobile-v${{ steps.version.outputs.version }}-ipa
+          path: xtremobile-v${{ steps.version.outputs.version }}-unsigned.ipa
+
+      # Même tag que le workflow APK : l'IPA est ajouté à la release existante.
+      - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: XtremMobile v${{ steps.version.outputs.version }}
+          files: xtremobile-v${{ steps.version.outputs.version }}-unsigned.ipa
+          generate_release_notes: true
