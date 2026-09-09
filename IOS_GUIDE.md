@@ -105,11 +105,38 @@ Deux réponses :
 * **SideStore** — variante d'AltStore qui renouvelle la signature *depuis
   l'appareil*, sans AltServer ni réseau local. Un ordinateur reste nécessaire
   une seule fois, pour générer le fichier de pairage. Ensuite l'iPad se
-  débrouille seul, en 4G comme en Wi-Fi. Gratuit, mais l'installation initiale
-  est plus technique.
+  débrouille seul, en 4G comme en Wi-Fi. **C'est la seule voie gratuite adaptée
+  à un appareil nomade** ; la marche à suivre est détaillée ci-dessous.
 * **Compte Apple Developer (99 €/an)** — la signature tient **un an** : il n'y a
-  plus rien à renouveler, donc plus aucune contrainte de réseau. C'est la
-  solution la plus simple pour un appareil nomade.
+  plus rien à renouveler, donc plus aucune contrainte de réseau.
+
+### Marche à suivre avec SideStore (gratuit, appareil nomade)
+
+L'ordinateur ne sert qu'à l'étape 1 ; ensuite l'iPad est autonome.
+
+1. **Fichier de pairage** — sur un PC Windows ou un Mac, installer le générateur
+   de pairage fourni par SideStore (`SideStore Pairing File Generator`,
+   sidestore.io), brancher l'iPad en USB, accepter « Faire confiance à cet
+   ordinateur », lancer l'outil : il produit un fichier `.mobiledevicepairing`.
+2. **Installer SideStore** — toujours depuis l'ordinateur, installer l'app
+   SideStore sur l'iPad (l'outil d'installation de sidestore.io le fait avec ton
+   Apple ID). Sur l'iPad : **Réglages → Général → VPN et gestion de l'appareil**
+   → faire confiance au profil développeur.
+3. **Activer le tunnel** — installer **StosVPN** depuis l'App Store et l'activer.
+   SideStore l'utilise pour dialoguer avec le service d'installation d'iOS ; sans
+   lui, le renouvellement échoue.
+4. **Configurer SideStore** — ouvrir SideStore sur l'iPad, importer le fichier de
+   pairage de l'étape 1, saisir l'Apple ID.
+5. **Installer l'app** — télécharger `xtremobile-vX.Y.Z-unsigned.ipa` depuis la
+   GitHub Release *directement sur l'iPad*, puis dans SideStore : **My Apps → +**
+   → sélectionner l'IPA. SideStore le signe et l'installe.
+
+À partir de là, SideStore renouvelle la signature tout seul avant l'échéance des
+7 jours, sur n'importe quel réseau — Wi-Fi public, partage de connexion ou 4G.
+Il suffit que l'iPad ait accès à Internet au moins une fois par semaine.
+
+Limites du compte Apple ID gratuit, qui subsistent : **3 apps sideloadées au
+maximum** et **10 App IDs par semaine**.
 
 ### Avec un compte Apple Developer (99 €/an)
 
