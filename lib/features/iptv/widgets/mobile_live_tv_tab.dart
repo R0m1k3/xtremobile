@@ -27,7 +27,11 @@ class MobileLiveTVTab extends ConsumerStatefulWidget {
 }
 
 class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+  /// Coming back to the foreground after this long refetches the channel list,
+  /// so an app left running for days on a TV box picks up provider changes.
+  static const _autoRefreshAfter = Duration(hours: 4);
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -36,12 +40,16 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   bool _isSearchEditing = false;
   bool _justReturnedFromPlayer =
       false; // Flag to prevent PopScope interception after player
+  bool _isRefreshing = false;
 
   Timer? _searchTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Anchor the auto-refresh clock to this first load.
+    ref.read(liveCatalogRefreshedAtProvider);
     // [P1-1 FIX] Debounce search input to prevent per-keystroke rebuilds
     _searchTimer = null;
     _searchController.addListener(() {
@@ -62,6 +70,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -71,6 +80,39 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final lastRefresh = ref.read(liveCatalogRefreshedAtProvider);
+    if (DateTime.now().difference(lastRefresh) >= _autoRefreshAfter) {
+      _refreshChannels();
+    }
+  }
+
+  /// Refetch categories and the open category's channels. The current lists
+  /// stay on screen until the new ones arrive.
+  Future<void> _refreshChannels() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+
+    refreshLiveCatalog(ref);
+    final categoryId = ref.read(mobileLiveTvUiStateProvider).selectedCategoryId;
+    try {
+      await Future.wait<Object>([
+        ref.read(mobileLiveCategoriesProvider(widget.playlist).future),
+        if (categoryId != null)
+          ref.read(
+            mobileLiveChannelsByCategoryProvider((widget.playlist, categoryId))
+                .future,
+          ),
+      ]);
+    } catch (_) {
+      // Errors surface through the providers' own error states.
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,197 +252,228 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
               return SafeArea(
                 bottom: false,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  slivers: [
-                    // Floating Header (Search + Navigation)
-                    SliverAppBar(
-                      floating: false,
-                      pinned: true,
-                      snap: false,
-                      backgroundColor: const Color(0xFF000000), // Opaque black
-                      elevation: 0,
-                      scrolledUnderElevation: 0,
-                      automaticallyImplyLeading: false,
-                      toolbarHeight: _searchQuery.isNotEmpty ||
-                              _showFavoritesOnly ||
-                              !uiState.isCategoryView
-                          ? 120.0
-                          : 110.0,
-                      flexibleSpace: FlexibleSpaceBar(
-                        background: Container(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Search Bar
-                              TVFocusable(
-                                scale: 1.0,
-                                focusColor: AppColors.onSurface,
-                                onPressed: () {
-                                  setState(() => _isSearchEditing = true);
-                                  WidgetsBinding.instance
-                                      .addPostFrameCallback((_) {
-                                    _searchFocusNode.requestFocus();
-                                    SystemChannels.textInput
-                                        .invokeMethod('TextInput.show');
-                                  });
-                                },
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  height: 48,
-                                  decoration: AppDecorations.searchBar(context),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.search,
-                                        color: AppDecorations.textSecondary(
-                                            context),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ExcludeFocus(
-                                          excluding: !_isSearchEditing,
-                                          child: TextField(
-                                            cursorColor: AppColors.onSurface,
-                                            controller: _searchController,
-                                            focusNode: _searchFocusNode,
-                                            readOnly: !_isSearchEditing,
-                                            style: TextStyle(
-                                              color: AppDecorations.textPrimary(
-                                                  context),
-                                            ),
-                                            decoration: const InputDecoration(
-                                              hintText:
-                                                  'Rechercher une chaîne...',
-                                              border: InputBorder.none,
-                                              focusedBorder: InputBorder.none,
-                                              enabledBorder: InputBorder.none,
-                                              isDense: true,
-                                            ),
-                                            onSubmitted: (_) => setState(
-                                              () => _isSearchEditing = false,
+                child: RefreshIndicator(
+                  onRefresh: _refreshChannels,
+                  color: AppColors.primary,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      // Floating Header (Search + Navigation)
+                      SliverAppBar(
+                        floating: false,
+                        pinned: true,
+                        snap: false,
+                        backgroundColor:
+                            const Color(0xFF000000), // Opaque black
+                        elevation: 0,
+                        scrolledUnderElevation: 0,
+                        automaticallyImplyLeading: false,
+                        toolbarHeight: _searchQuery.isNotEmpty ||
+                                _showFavoritesOnly ||
+                                !uiState.isCategoryView
+                            ? 120.0
+                            : 110.0,
+                        flexibleSpace: FlexibleSpaceBar(
+                          background: Container(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Search Bar
+                                TVFocusable(
+                                  scale: 1.0,
+                                  focusColor: AppColors.onSurface,
+                                  onPressed: () {
+                                    setState(() => _isSearchEditing = true);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      _searchFocusNode.requestFocus();
+                                      SystemChannels.textInput
+                                          .invokeMethod('TextInput.show');
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    height: 48,
+                                    decoration:
+                                        AppDecorations.searchBar(context),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.search,
+                                          color: AppDecorations.textSecondary(
+                                              context),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ExcludeFocus(
+                                            excluding: !_isSearchEditing,
+                                            child: TextField(
+                                              cursorColor: AppColors.onSurface,
+                                              controller: _searchController,
+                                              focusNode: _searchFocusNode,
+                                              readOnly: !_isSearchEditing,
+                                              style: TextStyle(
+                                                color:
+                                                    AppDecorations.textPrimary(
+                                                        context),
+                                              ),
+                                              decoration: const InputDecoration(
+                                                hintText:
+                                                    'Rechercher une chaîne...',
+                                                border: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                isDense: true,
+                                              ),
+                                              onSubmitted: (_) => setState(
+                                                () => _isSearchEditing = false,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      if (_searchQuery.isNotEmpty)
-                                        GestureDetector(
-                                          onTap: () =>
-                                              _searchController.clear(),
-                                          child: Icon(
-                                            Icons.close,
-                                            color: AppDecorations.textSecondary(
-                                                context),
+                                        if (_searchQuery.isNotEmpty)
+                                          GestureDetector(
+                                            onTap: () =>
+                                                _searchController.clear(),
+                                            child: Icon(
+                                              Icons.close,
+                                              color:
+                                                  AppDecorations.textSecondary(
+                                                      context),
+                                            ),
                                           ),
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
 
-                              const SizedBox(height: 12),
+                                const SizedBox(height: 12),
 
-                              // Title / Navigation Row
-                              Row(
-                                children: [
-                                  if (!showGrid ||
-                                      _showFavoritesOnly ||
-                                      _searchQuery.isNotEmpty) ...[
+                                // Title / Navigation Row
+                                Row(
+                                  children: [
+                                    if (!showGrid ||
+                                        _showFavoritesOnly ||
+                                        _searchQuery.isNotEmpty) ...[
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.arrow_back,
+                                          color: AppDecorations.textPrimary(
+                                              context),
+                                        ),
+                                        onPressed: () {
+                                          if (_searchQuery.isNotEmpty) {
+                                            _searchController.clear();
+                                          } else if (_showFavoritesOnly) {
+                                            setState(
+                                              () => _showFavoritesOnly = false,
+                                            );
+                                          } else {
+                                            uiNotifier.state = uiState.copyWith(
+                                              isCategoryView: true,
+                                            );
+                                          }
+                                        },
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                      const SizedBox(width: 12),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        _searchQuery.isNotEmpty
+                                            ? 'Résultats de recherche'
+                                            : _showFavoritesOnly
+                                                ? 'Favoris'
+                                                : showGrid
+                                                    ? 'Catégories'
+                                                    : uiState
+                                                            .selectedCategory ??
+                                                        'Chaînes',
+                                        style: TextStyle(
+                                          color: AppDecorations.textPrimary(
+                                              context),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Actualiser les chaînes',
+                                      icon: _isRefreshing
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.refresh,
+                                              color:
+                                                  AppDecorations.textSecondary(
+                                                      context),
+                                            ),
+                                      onPressed: _isRefreshing
+                                          ? null
+                                          : _refreshChannels,
+                                    ),
                                     IconButton(
                                       icon: Icon(
-                                        Icons.arrow_back,
-                                        color:
-                                            AppDecorations.textPrimary(context),
+                                        _showFavoritesOnly
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        color: _showFavoritesOnly
+                                            ? AppColors.live
+                                            : AppDecorations.textSecondary(
+                                                context),
                                       ),
-                                      onPressed: () {
-                                        if (_searchQuery.isNotEmpty) {
-                                          _searchController.clear();
-                                        } else if (_showFavoritesOnly) {
-                                          setState(
-                                            () => _showFavoritesOnly = false,
-                                          );
-                                        } else {
+                                      onPressed: () => setState(() {
+                                        _showFavoritesOnly =
+                                            !_showFavoritesOnly;
+                                        if (_showFavoritesOnly) {
                                           uiNotifier.state = uiState.copyWith(
-                                            isCategoryView: true,
+                                            isCategoryView: false,
                                           );
                                         }
-                                      },
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                        if (!_showFavoritesOnly) {
+                                          uiNotifier.state = uiState.copyWith(
+                                              isCategoryView: true);
+                                        }
+                                      }),
                                     ),
-                                    const SizedBox(width: 12),
                                   ],
-                                  Expanded(
-                                    child: Text(
-                                      _searchQuery.isNotEmpty
-                                          ? 'Résultats de recherche'
-                                          : _showFavoritesOnly
-                                              ? 'Favoris'
-                                              : showGrid
-                                                  ? 'Catégories'
-                                                  : uiState.selectedCategory ??
-                                                      'Chaînes',
-                                      style: TextStyle(
-                                        color:
-                                            AppDecorations.textPrimary(context),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      _showFavoritesOnly
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: _showFavoritesOnly
-                                          ? AppColors.live
-                                          : AppDecorations.textSecondary(
-                                              context),
-                                    ),
-                                    onPressed: () => setState(() {
-                                      _showFavoritesOnly = !_showFavoritesOnly;
-                                      if (_showFavoritesOnly) {
-                                        uiNotifier.state = uiState.copyWith(
-                                          isCategoryView: false,
-                                        );
-                                      }
-                                      if (!_showFavoritesOnly) {
-                                        uiNotifier.state = uiState.copyWith(
-                                            isCategoryView: true);
-                                      }
-                                    }),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // Main Content Sliver
-                    if (showGrid)
-                      _buildCategorySliver(categories, uiNotifier, uiState)
-                    else
-                      _ChannelListView(
-                        playlist: widget.playlist,
-                        uiState: uiState,
-                        searchQuery: _searchQuery,
-                        showFavoritesOnly: _showFavoritesOnly,
-                        onPlay: (channel, channels, index) => _playChannel(
-                          context,
-                          channel,
-                          channels,
-                          widget.playlist,
-                          index,
+                      // Main Content Sliver
+                      if (showGrid)
+                        _buildCategorySliver(categories, uiNotifier, uiState)
+                      else
+                        _ChannelListView(
+                          playlist: widget.playlist,
+                          uiState: uiState,
+                          searchQuery: _searchQuery,
+                          showFavoritesOnly: _showFavoritesOnly,
+                          onPlay: (channel, channels, index) => _playChannel(
+                            context,
+                            channel,
+                            channels,
+                            widget.playlist,
+                            index,
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },

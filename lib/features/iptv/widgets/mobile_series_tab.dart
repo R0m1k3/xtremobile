@@ -216,6 +216,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    ref.listen<int>(fullCatalogRefreshTickProvider, (_, __) => _refresh());
     final settings = ref.watch(mobileSettingsProvider);
 
     if (_categories.isEmpty && !_isLoading) {

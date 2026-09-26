@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 // import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
@@ -106,7 +107,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.6.1',
+                      'Version 1.7.2',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppDecorations.textSecondary(context),
@@ -179,8 +180,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           _buildSettingItem(
             icon: Icons.public,
             title: 'EPG communautaire',
-            subtitle:
-                'Repli quand le fournisseur ne renvoie aucun programme',
+            subtitle: 'Repli quand le fournisseur ne renvoie aucun programme',
             value: settings.useCommunityEpg ? 'Activé' : 'Désactivé',
             onTap: () => ref
                 .read(mobileSettingsProvider.notifier)
@@ -197,9 +197,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             onTap: () => _showKeyboardDialog(
               'URL XMLTV',
               _xmltvController,
-              (val) => ref
-                  .read(mobileSettingsProvider.notifier)
-                  .setXmltvUrl(val),
+              (val) =>
+                  ref.read(mobileSettingsProvider.notifier).setXmltvUrl(val),
             ),
           ),
 
@@ -254,8 +253,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
 
           _buildSettingItem(
             icon: _isRefreshingCache ? Icons.hourglass_empty : Icons.refresh,
-            title: 'Actualiser le cache',
-            subtitle: 'Recharge films, séries et EPG',
+            title: 'Forcer l\'actualisation',
+            subtitle: 'Recharge chaînes, films, séries et EPG',
             value: _isRefreshingCache ? '...' : 'Appuyer',
             onTap: _isRefreshingCache ? null : _refreshCache,
           ),
@@ -319,15 +318,15 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     setState(() => _isRefreshingCache = true);
 
     try {
-      // final dir = await getApplicationDocumentsDirectory();
-      // final cacheStore = HiveCacheStore(dir.path);
-      // await cacheStore.clean();
-      await Future.delayed(const Duration(seconds: 1));
+      refreshFullCatalog(ref);
+      // Brief pause so the tap visibly registers on a TV remote.
+      await Future.delayed(const Duration(milliseconds: 600));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Cache actualisé ! Relancez l\'app pour recharger.'),
+            content:
+                Text('Chaînes, films, séries et EPG en cours de rechargement'),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 3),
           ),
@@ -336,7 +335,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text('Erreur: $e'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -390,54 +390,60 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                     builder: (ctx, constraints) {
                       return Row(
                         children: segments.map((seg) {
-                        final (mode, icon, label) = seg;
-                        final selected = themeState.appThemeMode == mode;
-                        final accentColor = Theme.of(context).colorScheme.primary;
-                        return Expanded(
-                          child: TVFocusable(
-                            onPressed: () => notifier.setThemeMode(mode),
-                            borderRadius: BorderRadius.circular(8),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? accentColor
-                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    icon,
-                                    size: 16,
-                                    color: selected
-                                        ? AppColors.onSurface
-                                        : AppDecorations.textSecondary(context),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: selected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
+                          final (mode, icon, label) = seg;
+                          final selected = themeState.appThemeMode == mode;
+                          final accentColor =
+                              Theme.of(context).colorScheme.primary;
+                          return Expanded(
+                            child: TVFocusable(
+                              onPressed: () => notifier.setThemeMode(mode),
+                              borderRadius: BorderRadius.circular(8),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? accentColor
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      icon,
+                                      size: 16,
                                       color: selected
                                           ? AppColors.onSurface
-                                          : AppDecorations.textSecondary(context),
+                                          : AppDecorations.textSecondary(
+                                              context),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: selected
+                                            ? AppColors.onSurface
+                                            : AppDecorations.textSecondary(
+                                                context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
                       );
                     },
                   ),
@@ -483,7 +489,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           ),
           child: Row(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
+              Icon(icon,
+                  color: Theme.of(context).colorScheme.primary, size: 24),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -514,7 +521,10 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -562,7 +572,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           ),
           child: Row(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
+              Icon(icon,
+                  color: Theme.of(context).colorScheme.primary, size: 24),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -592,7 +603,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   ],
                 ),
               ),
-              Icon(Icons.edit, color: AppDecorations.textSecondary(context), size: 20),
+              Icon(Icons.edit,
+                  color: AppDecorations.textSecondary(context), size: 20),
             ],
           ),
         ),

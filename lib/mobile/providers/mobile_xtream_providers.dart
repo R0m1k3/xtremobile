@@ -30,9 +30,43 @@ final mobileXtreamServiceProvider =
     }
   });
 
+  // A full catalogue refresh from the settings also drops the cached EPG.
+  ref.listen<int>(
+      fullCatalogRefreshTickProvider, (_, __) => service.clearCache());
+
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// When the live catalogue was last fetched or explicitly refreshed.
+/// Drives the auto-refresh when the app comes back to the foreground.
+final liveCatalogRefreshedAtProvider =
+    StateProvider<DateTime>((ref) => DateTime.now());
+
+/// Bumped by the settings "force refresh". The movies and series tabs, which
+/// hold their lists in local state, listen to it to reload.
+final fullCatalogRefreshTickProvider = StateProvider<int>((ref) => 0);
+
+/// Forces the live categories and channels to be refetched from the panel.
+///
+/// The Xtream service is kept: it falls back to its last good lists if the
+/// refetch fails, so a flaky network never empties the screen.
+void refreshLiveCatalog(WidgetRef ref) {
+  ref.invalidate(mobileLiveCategoriesProvider);
+  ref.invalidate(mobileLiveChannelsByCategoryProvider);
+  ref.invalidate(mobileLiveChannelsProvider);
+  ref.read(liveCatalogRefreshedAtProvider.notifier).state = DateTime.now();
+}
+
+/// Forces the whole catalogue (live, movies, series) and the EPG to reload.
+void refreshFullCatalog(WidgetRef ref) {
+  refreshLiveCatalog(ref);
+  ref.invalidate(mobileMoviesProvider);
+  ref.invalidate(mobileSeriesCategoriesProvider);
+  ref.invalidate(mobileSeriesProvider);
+  ref.invalidate(mobileSeriesInfoByPlaylistProvider);
+  ref.read(fullCatalogRefreshTickProvider.notifier).state++;
+}
 
 /// Mobile-specific live categories provider (for Live TV category grid)
 final mobileLiveCategoriesProvider =
@@ -43,9 +77,9 @@ final mobileLiveCategoriesProvider =
 });
 
 /// Mobile-specific live channels provider (loads channels for a specific category)
-final mobileLiveChannelsByCategoryProvider = FutureProvider.family<
-    List<model.Channel>,
-    (PlaylistConfig, String)>((ref, params) async {
+final mobileLiveChannelsByCategoryProvider =
+    FutureProvider.family<List<model.Channel>, (PlaylistConfig, String)>(
+        (ref, params) async {
   final (playlist, categoryId) = params;
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getLiveChannels(categoryId);
@@ -79,8 +113,9 @@ final mobileLiveChannelsProvider =
 
   for (int batchNum = 0; batchNum < totalBatches; batchNum++) {
     int startIdx = batchNum * batchSize;
-    int endIdx =
-        (startIdx + batchSize < categories.length) ? startIdx + batchSize : categories.length;
+    int endIdx = (startIdx + batchSize < categories.length)
+        ? startIdx + batchSize
+        : categories.length;
     final batch = categories.sublist(startIdx, endIdx);
 
     print(
@@ -120,7 +155,8 @@ final mobileLiveChannelsProvider =
 
 /// Mobile-specific movies provider
 final mobileMoviesProvider =
-    FutureProvider.family<List<model.VodItem>, PlaylistConfig>((ref, playlist) async {
+    FutureProvider.family<List<model.VodItem>, PlaylistConfig>(
+        (ref, playlist) async {
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getMoviesByCategory(""); // Fetch all or default
 });
@@ -134,8 +170,9 @@ final mobileSeriesCategoriesProvider =
 });
 
 /// Mobile-specific series pagination provider
-final mobileSeriesProvider = FutureProvider.family<List<model.Series>,
-    (PlaylistConfig, String?)>((ref, params) async {
+final mobileSeriesProvider =
+    FutureProvider.family<List<model.Series>, (PlaylistConfig, String?)>(
+        (ref, params) async {
   final (playlist, categoryId) = params;
   final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
   return service.getSeriesPaginated(categoryId: categoryId);
@@ -161,7 +198,8 @@ class SeriesInfoRequest {
 }
 
 final mobileSeriesInfoByPlaylistProvider =
-    FutureProvider.family<model.SeriesInfo?, SeriesInfoRequest>((ref, request) async {
+    FutureProvider.family<model.SeriesInfo?, SeriesInfoRequest>(
+        (ref, request) async {
   final service =
       await ref.watch(mobileXtreamServiceProvider(request.playlist).future);
   return service.getSeriesInfo(request.seriesId);

@@ -98,6 +98,14 @@ class XtreamServiceMobile {
   /// changing any call site.
   final Map<String, model.Channel> _channelIndex = {};
 
+  /// Last non-empty live lists, keyed by category id ('' = all channels).
+  ///
+  /// The fetchers swallow errors and return `[]`, so a refresh attempted while
+  /// the network is down (typically right after a TV wakes from standby) would
+  /// otherwise replace a good list with an empty screen.
+  final Map<String, List<model.Channel>> _lastLiveChannels = {};
+  List<model.Category>? _lastLiveCategories;
+
   late final XmltvService _xmltv = XmltvService(cacheDir);
 
   /// User-provided XMLTV URL (empty = not configured).
@@ -200,7 +208,18 @@ class XtreamServiceMobile {
 
   /// Get live channels for a category (with batch EPG support)
   /// If categoryId is empty, fetches ALL channels from all categories
+  ///
+  /// Falls back to the last good list for this category when the fetch fails.
   Future<List<model.Channel>> getLiveChannels(String categoryId) async {
+    final channels = await _fetchLiveChannels(categoryId);
+    if (channels.isNotEmpty) {
+      _lastLiveChannels[categoryId] = channels;
+      return channels;
+    }
+    return _lastLiveChannels[categoryId] ?? channels;
+  }
+
+  Future<List<model.Channel>> _fetchLiveChannels(String categoryId) async {
     try {
       final queryParams = {
         'username': _username,
@@ -463,7 +482,18 @@ class XtreamServiceMobile {
   }
 
   /// Get live TV categories
+  ///
+  /// Falls back to the last good list when the fetch fails.
   Future<List<model.Category>> getLiveCategories() async {
+    final categories = await _fetchLiveCategories();
+    if (categories.isNotEmpty) {
+      _lastLiveCategories = categories;
+      return categories;
+    }
+    return _lastLiveCategories ?? categories;
+  }
+
+  Future<List<model.Category>> _fetchLiveCategories() async {
     try {
       if (kDebugMode) print('🔍 Loading live TV categories with 8s timeout...');
 

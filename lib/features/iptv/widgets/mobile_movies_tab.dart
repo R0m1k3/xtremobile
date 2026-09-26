@@ -225,6 +225,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
+    ref.listen<int>(fullCatalogRefreshTickProvider, (_, __) => _refresh());
     final settings = ref.watch(mobileSettingsProvider);
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
 
