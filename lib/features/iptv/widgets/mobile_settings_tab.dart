@@ -85,7 +85,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                   height: 48,
                   // No decoration for free-floating logo
                   child: Image.asset(
-                    'assets/images/logo_xtremobile.png',
+                    'assets/images/logo_xtremflow.png',
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => Icon(
                       Icons.play_circle_filled,

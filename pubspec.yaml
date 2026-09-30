@@ -79,12 +79,12 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   hive_generator: ^2.0.1
 
+# Les icônes Android (mipmap, adaptative, bannière TV) sont générées par
+# scripts/generate_icons.py et versionnées : ne pas les écraser ici.
 flutter_launcher_icons:
-  android: true
+  android: false
   ios: true
-  image_path: "assets/images/logo_xtremflow.png"
-  adaptive_icon_background: "#1a1a2e"
-  adaptive_icon_foreground: "assets/images/logo_xtremflow.png"
+  image_path: "assets/images/app_icon_ios.png"
   # iOS refuse une icône comportant un canal alpha.
   remove_alpha_ios: true
   
