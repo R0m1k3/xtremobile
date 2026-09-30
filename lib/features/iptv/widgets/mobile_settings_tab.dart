@@ -107,7 +107,7 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.7.2',
+                      'Version 1.7.3',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppDecorations.textSecondary(context),
