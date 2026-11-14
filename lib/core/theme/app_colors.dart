@@ -22,6 +22,10 @@ class AppColors {
   static const Color onBackground = Color(0xFFF5F5F7);
 
   static const Color surface = Color(0xFF26262C);
+
+  /// Opaque pinned headers of the tabs: the top colour of
+  /// [backgroundGradient], so the header blends into the page.
+  static const Color headerBackground = Color(0xFF303038);
   static const Color surfaceDim = Color(0xFF1F1F24);
   static const Color surfaceBright = Color(0xFF54545E);
 
