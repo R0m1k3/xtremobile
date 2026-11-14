@@ -18,6 +18,8 @@ import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/utils/category_sort.dart';
+import 'package:xtremobile/mobile/widgets/adaptive_grid.dart';
+import 'package:xtremobile/mobile/widgets/tab_header_title.dart';
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -142,7 +144,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
         uiState.isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly;
 
     return Container(
-      color: const Color(0xFF000000),
+      decoration: AppDecorations.background(context),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: PopScope(
@@ -265,8 +267,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                         floating: false,
                         pinned: true,
                         snap: false,
-                        backgroundColor:
-                            const Color(0xFF000000), // Opaque black
+                        backgroundColor: AppColors.headerBackground,
                         elevation: 0,
                         scrolledUnderElevation: 0,
                         automaticallyImplyLeading: false,
@@ -385,8 +386,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                       const SizedBox(width: 12),
                                     ],
                                     Expanded(
-                                      child: Text(
-                                        _searchQuery.isNotEmpty
+                                      child: TabHeaderTitle(
+                                        title: _searchQuery.isNotEmpty
                                             ? 'Résultats de recherche'
                                             : _showFavoritesOnly
                                                 ? 'Favoris'
@@ -395,13 +396,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                                     : uiState
                                                             .selectedCategory ??
                                                         'Chaînes',
-                                        style: TextStyle(
-                                          color: AppDecorations.textPrimary(
-                                              context),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                        count: showGrid
+                                            ? categories.length
+                                            : null,
                                       ),
                                     ),
                                     IconButton(
@@ -514,12 +511,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            childAspectRatio: 1.0,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
+          gridDelegate: AdaptiveGrid.liveTiles(context),
           delegate: SliverChildBuilderDelegate(
             (context, index) {
               final category = items[index];
@@ -527,6 +519,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                 key: ValueKey('live-cat-${category.categoryId}'),
                 title: category.categoryName,
                 icon: Icons.live_tv_rounded,
+                iconColor: AppColors.live,
                 isFavorite: favorite,
                 onTap: () {
                   uiNotifier.state = LiveTvUiState(
@@ -765,12 +758,7 @@ class _ChannelListView extends ConsumerWidget {
         return SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
           sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              childAspectRatio: 1.0,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
+            gridDelegate: AdaptiveGrid.liveTiles(context),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final channel = displayedChannels[index];
@@ -905,13 +893,13 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                           // Favorite badge
                           if (isFavorite)
                             Positioned(
-                              top: 4,
-                              right: 4,
+                              top: 6,
+                              right: 6,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.error,
-                                  borderRadius: BorderRadius.circular(12),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.live,
+                                  shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
                                   Icons.favorite,
@@ -928,7 +916,7 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                   Expanded(
                     flex: 2,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -936,20 +924,20 @@ class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
                             widget.channel.name,
                             style: const TextStyle(
                               color: AppColors.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (_epgTitle != null) ...[
-                            const SizedBox(height: 1),
+                            const SizedBox(height: 2),
                             Text(
                               _epgTitle!,
                               style: const TextStyle(
-                                color: AppColors.ratingGold,
-                                fontSize: 8,
+                                color: AppColors.textTertiary,
+                                fontSize: 10,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
