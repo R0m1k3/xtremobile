@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
 import 'package:xtremobile/mobile/widgets/mobile_category_card.dart';
+import 'package:xtremobile/mobile/widgets/adaptive_grid.dart';
+import 'package:xtremobile/mobile/widgets/tab_header_title.dart';
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
@@ -334,7 +336,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                   pinned: true,
                   floating: false,
                   snap: false,
-                  backgroundColor: const Color(0xFF000000),
+                  backgroundColor: AppColors.headerBackground,
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   automaticallyImplyLeading: false,
@@ -412,18 +414,13 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                                 const SizedBox(width: 12),
                               ],
                               Expanded(
-                                child: Text(
-                                  showingMovies
+                                child: TabHeaderTitle(
+                                  title: showingMovies
                                       ? (_selectedCategoryName ?? 'Films')
                                       : showingSearch
                                           ? 'Résultats de recherche'
                                           : 'Catégories',
-                                  style: TextStyle(
-                                    color: AppDecorations.textPrimary(context),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                                  count: _isLoading ? null : itemCount,
                                 ),
                               ),
                             ],
@@ -438,12 +435,9 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                   sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: showingCategories ? 6 : 8,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: showingCategories ? 2.0 : 0.67,
-                    ),
+                    gridDelegate: showingCategories
+                        ? AdaptiveGrid.categoryTiles(context)
+                        : AdaptiveGrid.posters(context),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         if (showingCategories) {
@@ -452,6 +446,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
                           return MobileCategoryCard(
                             title: cat.value,
                             icon: Icons.movie_filter_rounded,
+                            iconColor: AppColors.movies,
                             onTap: () => _selectCategory(cat.key, cat.value),
                           );
                         } else if (showingMovies) {

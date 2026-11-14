@@ -403,6 +403,45 @@ final mobileFavoritesProvider =
   return MobileFavoritesNotifier();
 });
 
+/// Favourite Live TV groups (categories), pinned at the top of the grid.
+///
+/// Category ids are only unique within one provider, so each entry is keyed by
+/// playlist: `"<playlistId>:<categoryId>"` (see [keyFor]).
+class MobileFavoriteCategoriesNotifier extends StateNotifier<Set<String>> {
+  static const String _boxName = 'mobile_favorite_categories';
+  static const String _key = 'live';
+  Box? _box;
+
+  MobileFavoriteCategoriesNotifier() : super({}) {
+    _init();
+  }
+
+  static String keyFor(String playlistId, String categoryId) =>
+      '$playlistId:$categoryId';
+
+  Future<void> _init() async {
+    _box = await Hive.openBox(_boxName);
+    final saved = _box?.get(_key, defaultValue: <String>[]) as List?;
+    state = saved?.cast<String>().toSet() ?? {};
+  }
+
+  /// Adds or removes the group; returns true when it is now a favourite.
+  bool toggle(String playlistId, String categoryId) {
+    final key = keyFor(playlistId, categoryId);
+    final updated = {...state};
+    final added = updated.add(key);
+    if (!added) updated.remove(key);
+    state = updated;
+    _box?.put(_key, updated.toList());
+    return added;
+  }
+}
+
+final mobileFavoriteCategoriesProvider =
+    StateNotifierProvider<MobileFavoriteCategoriesNotifier, Set<String>>((ref) {
+  return MobileFavoriteCategoriesNotifier();
+});
+
 /// Per-channel deinterlace settings (stored locally)
 class DeinterlaceSettingsNotifier extends StateNotifier<Set<String>> {
   static const String _boxName = 'deinterlace_settings';

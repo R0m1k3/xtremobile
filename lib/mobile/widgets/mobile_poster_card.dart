@@ -92,7 +92,7 @@ class MobilePosterCard extends StatelessWidget {
 
         // Title with fixed height to avoid pushing the image
         SizedBox(
-          height: 16,
+          height: 18,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
@@ -102,7 +102,7 @@ class MobilePosterCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: AppDecorations.textPrimary(context),
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
