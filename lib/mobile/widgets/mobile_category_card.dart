@@ -6,13 +6,17 @@ import 'package:xtremobile/core/theme/app_colors.dart';
 class MobileCategoryCard extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final IconData icon;
   final Color iconColor;
+  final bool isFavorite;
 
   const MobileCategoryCard({
     super.key,
     required this.title,
     required this.onTap,
+    this.onLongPress,
+    this.isFavorite = false,
     this.icon = Icons.folder_rounded,
     this.iconColor = AppColors.primary,
   });
@@ -21,6 +25,7 @@ class MobileCategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return TVFocusable(
       onPressed: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(16),
       child: Stack(
         children: [
@@ -40,6 +45,30 @@ class MobileCategoryCard extends StatelessWidget {
               ),
             ),
           ),
+          if (isFavorite)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.ratingGold.withValues(alpha: 0.7),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (isFavorite)
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: Icon(
+                Icons.star_rounded,
+                color: AppColors.ratingGold,
+                size: 18,
+              ),
+            ),
           // Content
           Positioned.fill(
             child: Padding(

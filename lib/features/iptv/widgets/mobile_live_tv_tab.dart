@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/utils/category_sort.dart';
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -457,7 +458,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
                       // Main Content Sliver
                       if (showGrid)
-                        _buildCategorySliver(categories, uiNotifier, uiState)
+                        ..._buildCategorySlivers(categories, uiNotifier)
                       else
                         _ChannelListView(
                           playlist: widget.playlist,
@@ -483,51 +484,132 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     );
   }
 
-  Widget _buildCategorySliver(
+  List<Widget> _buildCategorySlivers(
     List<model.Category> categories,
     StateController<LiveTvUiState> uiNotifier,
-    LiveTvUiState uiState,
   ) {
     if (categories.isEmpty) {
-      return SliverFillRemaining(
-        child: Center(
-          child: Text(
-            'Aucune catégorie trouvée',
-            style:
-                GoogleFonts.inter(color: AppDecorations.textSecondary(context)),
+      return [
+        SliverFillRemaining(
+          child: Center(
+            child: Text(
+              'Aucune catégorie trouvée',
+              style: GoogleFonts.inter(
+                color: AppDecorations.textSecondary(context),
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final playlistId = widget.playlist.id;
+    final favoriteKeys = ref.watch(mobileFavoriteCategoriesProvider);
+    bool isFavorite(model.Category c) => favoriteKeys.contains(
+          MobileFavoriteCategoriesNotifier.keyFor(playlistId, c.categoryId),
+        );
+    final split = splitFavorites(categories, isFavorite);
+
+    Widget grid(List<model.Category> items, {required bool favorite}) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            childAspectRatio: 1.0,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final category = items[index];
+              return MobileCategoryCard(
+                key: ValueKey('live-cat-${category.categoryId}'),
+                title: category.categoryName,
+                icon: Icons.live_tv_rounded,
+                isFavorite: favorite,
+                onTap: () {
+                  uiNotifier.state = LiveTvUiState(
+                    selectedCategory: category.categoryName,
+                    selectedCategoryId: category.categoryId,
+                    isCategoryView: false,
+                  );
+                },
+                onLongPress: () => _toggleFavoriteCategory(category),
+              );
+            },
+            childCount: items.length,
           ),
         ),
       );
     }
 
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5,
-          childAspectRatio: 1.0,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+    return [
+      if (split.favorites.isNotEmpty) ...[
+        _sectionHeader('Favoris', Icons.star_rounded, AppColors.ratingGold),
+        grid(split.favorites, favorite: true),
+        _sectionHeader(
+          'Tous les groupes',
+          Icons.grid_view_rounded,
+          AppDecorations.textSecondary(context),
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final category = categories[index];
-            return MobileCategoryCard(
-              title: category.categoryName,
-              icon: Icons.live_tv_rounded,
-              onTap: () {
-                uiNotifier.state = LiveTvUiState(
-                  selectedCategory: category.categoryName,
-                  selectedCategoryId: category.categoryId,
-                  isCategoryView: false,
-                );
-              },
-            );
-          },
-          childCount: categories.length,
+      ] else
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Text(
+              'Astuce : un appui long sur un groupe l\'épingle en haut de la liste.',
+              style: TextStyle(
+                color: AppDecorations.textSecondary(context),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      if (split.others.isNotEmpty) grid(split.others, favorite: false),
+      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+    ];
+  }
+
+  Widget _sectionHeader(String title, IconData icon, Color color) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: AppDecorations.textPrimary(context),
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  void _toggleFavoriteCategory(model.Category category) {
+    final added = ref
+        .read(mobileFavoriteCategoriesProvider.notifier)
+        .toggle(widget.playlist.id, category.categoryId);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            added
+                ? '« ${category.categoryName} » épinglé en haut'
+                : '« ${category.categoryName} » retiré des favoris',
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   void _playChannel(
