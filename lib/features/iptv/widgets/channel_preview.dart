@@ -25,7 +25,7 @@ class ChannelPreview extends ConsumerStatefulWidget {
     required this.playlist,
     required this.channel,
     this.active = true,
-    this.settle = const Duration(milliseconds: 700),
+    this.settle = const Duration(milliseconds: 350),
   });
 
   final PlaylistConfig playlist;
@@ -55,6 +55,9 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Create mpv and its video surface now, not on the first channel: the
+    // first preview no longer pays for it.
+    _ensurePlayer();
     _schedule();
   }
 
@@ -141,7 +144,19 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
     final mpv = player.platform as dynamic;
     // A preview: no audio decoding, small cache, give up quickly.
     mpv?.setProperty('aid', 'no');
+    mpv?.setProperty('sid', 'no');
     mpv?.setProperty('cache-secs', '2');
+    // Show the first frames at once instead of waiting for the cache.
+    mpv?.setProperty('cache-pause', 'no');
+    // Stream analysis before the first frame. FFmpeg's default goes up to
+    // 5 s, and IPTV streams with teletext or data tracks always use all of
+    // it (those tracks are never "identified"). The preview needs the video
+    // only: 1.5 s / 1 MB is enough to find it (H.264 / HEVC parameters come
+    // with every keyframe).
+    mpv?.setProperty(
+      'demuxer-lavf-o',
+      'analyzeduration=1500000,probesize=1000000',
+    );
     mpv?.setProperty('network-timeout', '15');
     mpv?.setProperty('tls-verify', 'no');
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -161,8 +176,8 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
         }),
       );
     _player = player;
-    // Rendered at 640×360, the size it is shown at, not at the stream's
-    // 1080p / 4K: far less work for the Fire TV's GPU on every frame.
+    // Rendered at 640×360, the size it is shown at (iOS, desktop; Android's
+    // media_kit ignores it and renders at the stream's size).
     _controller = VideoController(
       player,
       configuration:
