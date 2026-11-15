@@ -231,10 +231,11 @@ class TvGroupCard extends StatelessWidget {
               children: [
                 Text(
                   label.name,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTheme.body(
                     fontSize: 17,
+                    height: 1.2,
                     fontWeight: FontWeight.w500,
                     color: lit ? AppColors.onFocus : AppColors.textPrimary,
                   ),
@@ -363,6 +364,7 @@ class FavoriteGroupCard extends ConsumerWidget {
     required this.onLongPress,
     this.width = 245,
     this.height = 126,
+    this.nameLines = 1,
     this.autofocus = false,
   });
 
@@ -372,6 +374,9 @@ class FavoriteGroupCard extends ConsumerWidget {
   final VoidCallback onLongPress;
   final double width;
   final double height;
+
+  /// 2 on TV, where names must never be cut short.
+  final int nameLines;
   final bool autofocus;
 
   @override
@@ -399,7 +404,7 @@ class FavoriteGroupCard extends ConsumerWidget {
           builder: (context) {
             final lit = TVFocusable.isFocused(context);
             final logos = channels?.take(3).toList() ?? const [];
-            final more = (channels?.length ?? 0) - logos.length;
+            final channelCount = channels?.length ?? 0;
             return AnimatedContainer(
               duration: AppTheme.durationFocus,
               curve: AppTheme.curveFocus,
@@ -416,10 +421,11 @@ class FavoriteGroupCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           label.name,
-                          maxLines: 1,
+                          maxLines: nameLines,
                           overflow: TextOverflow.ellipsis,
                           style: AppTheme.body(
                             fontSize: 18,
+                            height: 1.2,
                             fontWeight: FontWeight.w500,
                             color:
                                 lit ? AppColors.onFocus : AppColors.textPrimary,
@@ -447,29 +453,42 @@ class FavoriteGroupCard extends ConsumerWidget {
                   ),
                   const Spacer(),
                   if (logos.isNotEmpty)
-                    Row(
-                      children: [
-                        for (final c in logos) ...[
-                          ChannelLogo(
-                            url: c.streamIcon,
-                            name: c.name,
-                            width: 52,
-                            height: 32,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (more > 0)
-                          Text(
-                            '+$more',
-                            style: AppTheme.body(
-                              fontSize: 14,
-                              color: lit
-                                  ? AppColors.onFocusMuted
-                                  : AppColors.textMuted,
-                              fontFeatures: AppTheme.tabular,
-                            ),
-                          ),
-                      ],
+                    // As many logos as the card's width allows (the TV grid
+                    // narrows when the rail opens), the rest as "+N".
+                    LayoutBuilder(
+                      builder: (context, box) {
+                        const slot = 52.0 + 8;
+                        const moreWidth = 36.0;
+                        final fit = ((box.maxWidth - moreWidth) / slot)
+                            .floor()
+                            .clamp(1, logos.length);
+                        final more = channelCount - fit;
+                        return Row(
+                          children: [
+                            for (final c in logos.take(fit)) ...[
+                              ChannelLogo(
+                                url: c.streamIcon,
+                                name: c.name,
+                                width: 52,
+                                height: 32,
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            if (more > 0)
+                              Text(
+                                '+$more',
+                                maxLines: 1,
+                                style: AppTheme.body(
+                                  fontSize: 14,
+                                  color: lit
+                                      ? AppColors.onFocusMuted
+                                      : AppColors.textMuted,
+                                  fontFeatures: AppTheme.tabular,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                 ],
               ),
@@ -759,10 +778,14 @@ class NowPanel extends ConsumerWidget {
     super.key,
     required this.playlist,
     required this.channel,
+    this.preview,
   });
 
   final PlaylistConfig playlist;
   final model.Channel? channel;
+
+  /// Live picture shown on top (TV); without it, the big logo is shown.
+  final Widget? preview;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -771,24 +794,23 @@ class NowPanel extends ConsumerWidget {
     final now =
         ref.watch(channelNowProvider((playlist, c.streamId))).valueOrNull;
     final group = GroupLabel.parse(c.categoryName);
+    final hasPreview = preview != null;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final info = Padding(
+      padding: EdgeInsets.fromLTRB(20, hasPreview ? 16 : 24, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ChannelLogo(
-            url: c.streamIcon,
-            name: c.name,
-            width: 128,
-            height: 80,
-            radius: 10,
-          ),
-          const SizedBox(height: 16),
+          if (!hasPreview) ...[
+            ChannelLogo(
+              url: c.streamIcon,
+              name: c.name,
+              width: 128,
+              height: 80,
+              radius: 10,
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(
             [
               if (c.num.isNotEmpty) c.num,
@@ -809,7 +831,7 @@ class NowPanel extends ConsumerWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: AppTheme.body(
-              fontSize: 24,
+              fontSize: hasPreview ? 20 : 24,
               fontWeight: FontWeight.w500,
               height: 1.2,
               color:
@@ -826,30 +848,55 @@ class NowPanel extends ConsumerWidget {
                 fontFeatures: AppTheme.tabular,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             LiveLine(progress: now.progress, height: 4),
-            if (now.description.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                now.description,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: AppTheme.body(
-                  fontSize: 15,
-                  height: 1.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+            const SizedBox(height: 14),
           ],
-          const Spacer(),
+          // The description gets whatever height is left, in whole lines only.
+          Expanded(
+            child: now == null || now.description.isEmpty
+                ? const SizedBox.shrink()
+                : LayoutBuilder(
+                    builder: (context, box) {
+                      const size = 15.0, height = 1.45;
+                      final lines = (box.maxHeight / (size * height)).floor();
+                      if (lines < 1) return const SizedBox.shrink();
+                      return Text(
+                        now.description,
+                        maxLines: lines.clamp(1, 5),
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.body(
+                          fontSize: size,
+                          height: height,
+                          color: AppColors.textSecondary,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 8),
           const Row(
             children: [
               KeyCap('OK'),
               SizedBox(width: 8),
-              _Hint('Regarder'),
+              _Hint('Plein écran'),
             ],
           ),
+        ],
+      ),
+    );
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasPreview) AspectRatio(aspectRatio: 16 / 9, child: preview),
+          Expanded(child: info),
         ],
       ),
     );
