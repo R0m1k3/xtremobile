@@ -9,6 +9,7 @@ import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/utils/category_sort.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
@@ -208,6 +209,8 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       setState(() => _showFavoritesOnly = false);
     } else if (layout != _Layout.split && !uiState.isCategoryView) {
       _backToGroups();
+    } else if (TvMenu.focusIfAway()) {
+      // TV: the first Back goes up to the menu.
     } else {
       final shouldExit = await showDialog<bool>(
         context: context,
@@ -284,8 +287,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       if (ref.read(mobileDashboardIndexProvider) == 0) _openSearch();
     });
 
+    // Transparent: the ambient page of the scaffold shows through the glass.
     return ColoredBox(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -393,7 +397,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
   // ─── TV ────────────────────────────────────────────────────────────────────
 
-  static const _tvPadding = EdgeInsets.fromLTRB(24, 28, 48, 28);
+  static const _tvPadding = EdgeInsets.fromLTRB(48, 16, 48, 28);
 
   Widget _buildTv(_GroupLists groups) {
     final uiState = ref.watch(mobileLiveTvUiStateProvider);
@@ -520,25 +524,21 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '‹ Direct',
-            style: AppTheme.body(fontSize: 14, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 4),
-          // Name on its own line, full width: long group names stay whole.
+          // One line: the menu above already says "Direct".
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      label.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.display(fontSize: 28),
+                    Flexible(
+                      child: Text(
+                        label.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.display(fontSize: 28),
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(width: 16),
                     Text(
                       label.meta(channelCount: count),
                       style: AppTheme.body(
@@ -564,7 +564,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             const SizedBox(height: 16),
             _searchField('Rechercher dans le groupe', tv: true),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: _withChannels(
               categoryId: uiState.selectedCategoryId,
@@ -578,7 +578,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 400,
+                      width: 460,
                       child: ListView.separated(
                         clipBehavior: Clip.none,
                         itemCount: channels.length,
@@ -1251,10 +1251,7 @@ class _TvIconButton extends StatelessWidget {
             duration: AppTheme.durationFocus,
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
-              color: lit ? AppColors.focus : AppColors.surface,
-              shape: BoxShape.circle,
-            ),
+            decoration: AppDecorations.tvCard(lit: lit, radius: 20),
             child: busy
                 ? const Padding(
                     padding: EdgeInsets.all(10),

@@ -265,7 +265,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     }
 
     return Container(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) async {
@@ -296,6 +296,8 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
             _onBack();
             return;
           }
+
+          if (TvMenu.focusIfAway()) return; // TV: first up to the menu
 
           final shouldExit = await showDialog<bool>(
             context: context,

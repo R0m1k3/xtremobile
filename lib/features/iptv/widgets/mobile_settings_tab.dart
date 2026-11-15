@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/mobile/widgets/mobile_scaffold.dart';
+import 'package:xtremobile/core/utils/form_factor.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/providers/theme_provider.dart';
@@ -71,9 +73,12 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
       if (!_initialized) _syncControllers(settings);
     });
 
-    return SafeArea(
+    final tv = FormFactors.of(context) == FormFactor.tv;
+    final list = SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: tv
+            ? const EdgeInsets.fromLTRB(48, 16, 48, 28)
+            : const EdgeInsets.all(16),
         children: [
           // Header
           Padding(
@@ -283,6 +288,18 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           const SizedBox(height: 100),
         ],
       ),
+    );
+    if (!tv) return list;
+    // TV: Back goes up to the menu, then to the Direct tab.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || ref.read(mobileDashboardIndexProvider) != 3) return;
+        if (!TvMenu.focusIfAway()) {
+          ref.read(mobileDashboardIndexProvider.notifier).state = 0;
+        }
+      },
+      child: list,
     );
   }
 

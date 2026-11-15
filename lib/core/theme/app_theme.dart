@@ -197,7 +197,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: AppColors.surfaceHigh,
+        indicatorColor: AppColors.accentFill,
         height: 64,
         elevation: 0,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
@@ -205,7 +205,7 @@ class AppTheme {
           (states) => IconThemeData(
             size: 22,
             color: states.contains(WidgetState.selected)
-                ? AppColors.textPrimary
+                ? AppColors.accent
                 : AppColors.textMuted,
           ),
         ),
@@ -221,11 +221,11 @@ class AppTheme {
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: AppColors.rail,
-        indicatorColor: AppColors.surfaceHigh,
+        indicatorColor: AppColors.accentFill,
         minWidth: 80,
         labelType: NavigationRailLabelType.all,
         selectedIconTheme:
-            const IconThemeData(size: 22, color: AppColors.textPrimary),
+            const IconThemeData(size: 22, color: AppColors.accent),
         unselectedIconTheme:
             const IconThemeData(size: 22, color: AppColors.textMuted),
         selectedLabelTextStyle: body(

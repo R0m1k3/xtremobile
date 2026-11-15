@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
 import 'package:xtremobile/core/utils/group_label.dart';
@@ -48,10 +49,7 @@ class MobileCategoryCard extends StatelessWidget {
             duration: AppTheme.durationFocus,
             curve: AppTheme.curveFocus,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: lit ? AppColors.focus : AppColors.surface,
-              borderRadius: radius,
-            ),
+            decoration: AppDecorations.tvCard(lit: lit, radius: 12),
             child: Row(
               children: [
                 Expanded(
@@ -91,7 +89,7 @@ class MobileCategoryCard extends StatelessWidget {
                   Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: lit ? AppColors.onFocus : AppColors.textSecondary,
+                    color: lit ? AppColors.accentStrong : AppColors.accent,
                   ),
                 if (!tv)
                   const Padding(

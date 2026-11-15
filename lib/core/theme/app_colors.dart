@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 /// ([focus]) — and one accent exists: [live], the red "on air" line that shows
 /// how far the current programme has run. Nothing else is red.
 ///
+/// A touch of light blue, the blue of the XtremFlow logo, marks what is
+/// "yours" or "here": the current tab, favourite stars, the card edges.
+///
 /// Performance rule: every surface is opaque. Depth comes from surface steps
 /// and hairlines, never from blur (`BackdropFilter` repaints every frame and
 /// is the first thing to drop frames on low-end Android and Fire TV).
@@ -16,10 +19,10 @@ class AppColors {
 
   // ============ RAMP « SALLE OBSCURE » ============
   /// Scaffold / page background.
-  static const Color background = Color(0xFF0E0E0F);
+  static const Color background = Color(0xFF0D0E11);
 
   /// TV navigation rail, a step below the page.
-  static const Color rail = Color(0xFF0A0A0B);
+  static const Color rail = Color(0xFF090A0D);
 
   /// Cards, panels, bottom bar, text fields.
   static const Color surface = Color(0xFF18181A);
@@ -29,6 +32,30 @@ class AppColors {
 
   /// Progress track, the highest neutral step.
   static const Color track = Color(0xFF2E2E31);
+
+  /// TV cards (tvOS-style platters): a lighter top, a darker bottom, and a
+  /// light edge so the shape reads on the near-black page.
+  static const Color cardTop = Color(0xFF2D2F35);
+  static const Color cardBottom = Color(0xFF222328);
+  static const Color cardEdge = Color(0x24A9C9FF);
+
+  // ============ LIGHT BLUE (the logo's) ============
+  /// Light blue on dark: current tab, favourite stars.
+  static const Color accent = Color(0xFF8AB9FF);
+
+  /// The logo's blue, for marks on the lit (light) card.
+  static const Color accentStrong = Color(0xFF0A84FF);
+
+  /// Tinted fill behind the current tab.
+  static const Color accentFill = Color(0x330A84FF);
+
+  // ============ GLASS (see glass.dart) ============
+  /// Resting glass: white at 13 % fading to 5 %, over the ambient page.
+  static const Color glassTop = Color(0x21FFFFFF);
+  static const Color glassBottom = Color(0x0DFFFFFF);
+
+  /// The blue pooling in the bottom-right corner of the glass.
+  static const Color glassTint = Color(0x1F0A84FF);
 
   /// Separators: primary text at 8 %.
   static const Color hairline = Color(0x14EDEDED);
@@ -40,6 +67,9 @@ class AppColors {
 
   // The lit element (TV focus).
   static const Color focus = Color(0xFFF2F1EE);
+
+  /// Top of the lit card: a touch brighter, as if lit from above.
+  static const Color focusTop = Color(0xFFFFFFFF);
   static const Color onFocus = Color(0xFF111112);
   static const Color onFocusMuted = Color(0xFF55555A);
   static const Color focusTrack = Color(0xFFD4D3CF);
@@ -186,11 +216,18 @@ class AppColors {
 
   // ============ SHADOWS ============
   /// Neutral shadow, only under the focused (lit) element.
+  /// The lit card floats above the page.
   static const BoxShadow focusShadow = BoxShadow(
-    color: Color(0x80000000),
-    blurRadius: 24,
-    offset: Offset(0, 8),
+    color: Color(0x66000000),
+    blurRadius: 36,
+    offset: Offset(0, 12),
   );
+
+  /// The lit card floats, with a halo of the logo's blue around it.
+  static const List<BoxShadow> focusShadows = [
+    focusShadow,
+    BoxShadow(color: Color(0x800A84FF), blurRadius: 32, spreadRadius: 2),
+  ];
 
   static Color glowPrimary(double opacity) =>
       const Color(0xFF000000).withValues(alpha: opacity);
@@ -212,7 +249,6 @@ class AppColors {
   // ============ COMPATIBILITY ALIASES ============
   static const Color backgroundSecondary = surface;
   static const Color surfaceElevated = surfaceHigh;
-  static const Color accent = textSecondary;
   static const Color appleBlue = primaryFill;
 
   static const RadialGradient appleTvGradient = projectorGradient;

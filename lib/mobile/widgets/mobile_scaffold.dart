@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/theme/glass.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
 
-/// Bumped when the TV rail's "Rechercher" destination is chosen: the visible
+/// Bumped when the TV menu's "Rechercher" destination is chosen: the visible
 /// tab listens and opens its own search field. Search is a destination on
 /// TV, not a permanent text field.
 final tabSearchRequestProvider = StateProvider<int>((ref) => 0);
@@ -26,8 +27,7 @@ const _destinations = [
 ];
 
 /// App shell. One structure per form factor:
-/// * TV — a rail on the left, icons only, that unfolds while it has focus
-///   (press left from the first column);
+/// * TV — a menu bar on top (up from the first row, or Back);
 /// * tablet — a Material navigation rail;
 /// * phone — a navigation bar at the bottom.
 class MobileScaffold extends ConsumerWidget {
@@ -48,17 +48,11 @@ class MobileScaffold extends ConsumerWidget {
       case FormFactor.tv:
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                left: _TvRail.collapsedWidth,
-                child: child,
-              ),
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: _TvRail(
+          body: AmbientBackground(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TvTopMenu(
                   currentIndex: currentIndex,
                   onIndexChanged: onIndexChanged,
                   onSearch: () {
@@ -66,8 +60,9 @@ class MobileScaffold extends ConsumerWidget {
                     ref.read(tabSearchRequestProvider.notifier).state++;
                   },
                 ),
-              ),
-            ],
+                Expanded(child: child),
+              ],
+            ),
           ),
         );
       case FormFactor.tablet:
@@ -79,6 +74,10 @@ class MobileScaffold extends ConsumerWidget {
                 selectedIndex: currentIndex,
                 onDestinationSelected: onIndexChanged,
                 groupAlignment: -1,
+                leading: const Padding(
+                  padding: EdgeInsets.only(top: 12, bottom: 16),
+                  child: _Logo(size: 40),
+                ),
                 destinations: [
                   for (final d in _destinations)
                     NavigationRailDestination(
@@ -89,14 +88,14 @@ class MobileScaffold extends ConsumerWidget {
                     ),
                 ],
               ),
-              Expanded(child: child),
+              Expanded(child: AmbientBackground(child: child)),
             ],
           ),
         );
       case FormFactor.phone:
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: child,
+          body: AmbientBackground(child: child),
           bottomNavigationBar: NavigationBar(
             selectedIndex: currentIndex,
             onDestinationSelected: onIndexChanged,
@@ -114,14 +113,20 @@ class MobileScaffold extends ConsumerWidget {
   }
 }
 
-/// TV rail: 104 dp of icons, unfolding to 240 dp with labels while one of its
-/// items has focus. It overlays the content instead of pushing it, so the
-/// grid does not reflow each time the remote goes left.
-class _TvRail extends StatefulWidget {
-  static const double collapsedWidth = 104;
-  static const double expandedWidth = 240;
+/// TV only. Back at the root of a tab first brings the focus up to the top
+/// menu; once the menu has it, Back does what it did before.
+abstract final class TvMenu {
+  static _TvTopMenuState? _current;
 
-  const _TvRail({
+  /// Moves the focus to the selected tab of the menu. False when there is no
+  /// menu (phone, tablet) or the focus is already in it.
+  static bool focusIfAway() => _current?._focusIfAway() ?? false;
+}
+
+/// TV menu bar: the tabs on the left, search and settings on the right.
+/// Entering it from the content always lands on the current tab.
+class _TvTopMenu extends StatefulWidget {
+  const _TvTopMenu({
     required this.currentIndex,
     required this.onIndexChanged,
     required this.onSearch,
@@ -132,106 +137,141 @@ class _TvRail extends StatefulWidget {
   final VoidCallback onSearch;
 
   @override
-  State<_TvRail> createState() => _TvRailState();
+  State<_TvTopMenu> createState() => _TvTopMenuState();
 }
 
-class _TvRailState extends State<_TvRail> {
-  bool _expanded = false;
+class _TvTopMenuState extends State<_TvTopMenu> {
+  final _nodes = List.generate(
+    _destinations.length,
+    (i) => FocusNode(debugLabel: 'menu-${_destinations[i].label}'),
+  );
+  final _group = FocusNode(
+    canRequestFocus: false,
+    skipTraversal: true,
+    debugLabel: 'tv-menu',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    TvMenu._current = this;
+  }
+
+  @override
+  void dispose() {
+    if (TvMenu._current == this) TvMenu._current = null;
+    for (final n in _nodes) {
+      n.dispose();
+    }
+    _group.dispose();
+    super.dispose();
+  }
+
+  bool _focusIfAway() {
+    if (_group.hasFocus) return false;
+    _nodes[widget.currentIndex].requestFocus();
+    return true;
+  }
+
+  bool _inside = false;
+
+  void _onFocusChange(bool hasFocus) {
+    // Up from the content lands on the nearest item: go to the current tab.
+    if (hasFocus && !_inside) {
+      final target = _nodes[widget.currentIndex];
+      if (!target.hasPrimaryFocus) target.requestFocus();
+    }
+    _inside = hasFocus;
+  }
 
   @override
   Widget build(BuildContext context) {
+    Widget item(int i, {bool iconOnly = false}) => _MenuItem(
+          focusNode: _nodes[i],
+          icon: _destinations[i].icon,
+          selectedIcon: _destinations[i].selectedIcon,
+          label: iconOnly ? null : _destinations[i].label,
+          selected: widget.currentIndex == i,
+          onPressed: () => widget.onIndexChanged(i),
+        );
+
     return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onFocusChange: (hasFocus) => setState(() => _expanded = hasFocus),
-      child: AnimatedContainer(
-        duration: AppTheme.durationNormal,
-        curve: AppTheme.curveFocus,
-        width: _expanded ? _TvRail.expandedWidth : _TvRail.collapsedWidth,
-        color: AppColors.rail,
-        padding: const EdgeInsets.fromLTRB(32, 28, 16, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 28,
-              child: AnimatedOpacity(
-                opacity: _expanded ? 1 : 0,
-                duration: AppTheme.durationFast,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 12),
-                  child: Text(
-                    'XtremFlow',
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                    softWrap: false,
-                    style: AppTheme.body(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+      focusNode: _group,
+      onFocusChange: _onFocusChange,
+      child: Padding(
+        // Clear of the TV overscan: 48 dp on the sides, 16 on top.
+        padding: const EdgeInsets.fromLTRB(48, 16, 48, 0),
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            children: [
+              const _Logo(size: 34),
+              const SizedBox(width: 10),
+              Text(
+                'XtremFlow',
+                style: AppTheme.body(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _RailItem(
-              icon: Icons.search,
-              label: 'Rechercher',
-              selected: false,
-              expanded: _expanded,
-              onPressed: widget.onSearch,
-            ),
-            const SizedBox(height: 20),
-            for (var i = 0; i < 3; i++) ...[
-              _RailItem(
-                icon: _destinations[i].icon,
-                selectedIcon: _destinations[i].selectedIcon,
-                label: _destinations[i].label,
-                selected: widget.currentIndex == i,
-                expanded: _expanded,
-                onPressed: () => widget.onIndexChanged(i),
+              const SizedBox(width: 28),
+              // The tabs sit in a glass capsule, tvOS style.
+              _GlassCapsule(
+                children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    item(i),
+                  ],
+                ],
               ),
-              const SizedBox(height: 8),
+              const Spacer(),
+              _GlassCapsule(
+                children: [
+                  _MenuItem(
+                    icon: Icons.search,
+                    tooltip: 'Rechercher',
+                    selected: false,
+                    onPressed: widget.onSearch,
+                  ),
+                  const SizedBox(width: 4),
+                  item(3, iconOnly: true),
+                ],
+              ),
             ],
-            const Spacer(),
-            _RailItem(
-              icon: _destinations[3].icon,
-              selectedIcon: _destinations[3].selectedIcon,
-              label: _destinations[3].label,
-              selected: widget.currentIndex == 3,
-              expanded: _expanded,
-              onPressed: () => widget.onIndexChanged(3),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _RailItem extends StatefulWidget {
-  const _RailItem({
+class _MenuItem extends StatefulWidget {
+  const _MenuItem({
     required this.icon,
-    required this.label,
     required this.selected,
-    required this.expanded,
     required this.onPressed,
     this.selectedIcon,
+    this.label,
+    this.tooltip,
+    this.focusNode,
   });
 
   final IconData icon;
   final IconData? selectedIcon;
-  final String label;
+
+  /// Null: a round icon button.
+  final String? label;
+  final String? tooltip;
   final bool selected;
-  final bool expanded;
   final VoidCallback onPressed;
+  final FocusNode? focusNode;
 
   @override
-  State<_RailItem> createState() => _RailItemState();
+  State<_MenuItem> createState() => _MenuItemState();
 }
 
-class _RailItemState extends State<_RailItem> {
+class _MenuItemState extends State<_MenuItem> {
   bool _focused = false;
 
   @override
@@ -242,62 +282,63 @@ class _RailItemState extends State<_RailItem> {
       background = AppColors.focus;
       foreground = AppColors.onFocus;
     } else if (widget.selected) {
-      background = AppColors.surfaceHigh;
-      foreground = AppColors.textPrimary;
+      background = AppColors.accentFill;
+      foreground = AppColors.accent;
     } else {
       background = Colors.transparent;
       foreground = AppColors.textMuted;
     }
+    final label = widget.label;
 
-    return Focus(
-      onFocusChange: (f) => setState(() => _focused = f),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.select ||
-                event.logicalKey == LogicalKeyboardKey.enter ||
-                event.logicalKey == LogicalKeyboardKey.numpadEnter ||
-                event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
-          widget.onPressed();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: AppTheme.durationFocus,
-          curve: AppTheme.curveFocus,
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          // The label joins once the rail is wide enough, not as soon as it
-          // starts to unfold.
-          child: LayoutBuilder(
-            builder: (context, box) => Row(
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: label ?? widget.tooltip,
+      child: Focus(
+        focusNode: widget.focusNode,
+        onFocusChange: (f) => setState(() => _focused = f),
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+                  event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                  event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: AppTheme.durationFocus,
+            curve: AppTheme.curveFocus,
+            height: 40,
+            width: label == null ? 40 : null,
+            padding: EdgeInsets.symmetric(horizontal: label == null ? 0 : 16),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   widget.selected
                       ? (widget.selectedIcon ?? widget.icon)
                       : widget.icon,
-                  size: 24,
+                  size: 22,
                   color: foreground,
                 ),
-                if (widget.expanded && box.maxWidth >= 24 + 16 + 48) ...[
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
-                      style: AppTheme.body(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: foreground,
-                      ),
+                if (label != null) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    label,
+                    style: AppTheme.body(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                      color: foreground,
                     ),
                   ),
                 ],
@@ -308,4 +349,39 @@ class _RailItemState extends State<_RailItem> {
       ),
     );
   }
+}
+
+/// The blue XtremFlow play button.
+class _Logo extends StatelessWidget {
+  const _Logo({required this.size});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+        'assets/images/logo_xtremflow.png',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.play_circle_filled,
+          size: size,
+          color: AppColors.accent,
+        ),
+      );
+}
+
+/// A row of menu items on a strip of glass.
+class _GlassCapsule extends StatelessWidget {
+  const _GlassCapsule({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const GlassDecoration(radius: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Row(mainAxisSize: MainAxisSize.min, children: children),
+        ),
+      );
 }

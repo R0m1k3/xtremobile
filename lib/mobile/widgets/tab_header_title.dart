@@ -87,7 +87,7 @@ class CatalogHeader extends StatelessWidget {
   final VoidCallback onClear;
 
   /// Same insets as the Live TV tab on TV: clear of the overscan.
-  static const tvPadding = EdgeInsets.fromLTRB(24, 28, 48, 0);
+  static const tvPadding = EdgeInsets.fromLTRB(48, 16, 48, 0);
 
   @override
   Widget build(BuildContext context) {
