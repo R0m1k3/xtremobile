@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/theme/glass.dart';
+import 'package:xtremobile/core/widgets/xtremflow_mark.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
 
 /// Bumped when the TV menu's "Rechercher" destination is chosen: the visible
@@ -77,7 +78,7 @@ class MobileScaffold extends ConsumerWidget {
                 groupAlignment: -1,
                 leading: const Padding(
                   padding: EdgeInsets.only(top: 12, bottom: 16),
-                  child: _Logo(size: 40),
+                  child: XtremFlowMark(height: 30),
                 ),
                 destinations: [
                   for (final d in _destinations)
@@ -200,22 +201,14 @@ class _TvTopMenuState extends State<_TvTopMenu> {
       focusNode: _group,
       onFocusChange: _onFocusChange,
       child: Padding(
-        // Clear of the TV overscan: 48 dp on the sides, 16 on top.
-        padding: const EdgeInsets.fromLTRB(48, 16, 48, 0),
+        // Clear of the TV overscan: 48 dp on the sides, 32 on top (TVs may
+        // crop up to 27 dp).
+        padding: const EdgeInsets.fromLTRB(48, 32, 48, 0),
         child: SizedBox(
           height: 48,
           child: Row(
             children: [
-              const _Logo(size: 34),
-              const SizedBox(width: 10),
-              Text(
-                'XtremFlow',
-                style: AppTheme.body(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              const XtremFlowWordmark(),
               const SizedBox(width: 28),
               // The tabs sit in a glass capsule, tvOS style.
               _GlassCapsule(
@@ -287,7 +280,7 @@ class _MenuItemState extends State<_MenuItem> {
       foreground = AppColors.accent;
     } else {
       background = Colors.transparent;
-      foreground = AppColors.textMuted;
+      foreground = AppColors.textSecondary;
     }
     final label = widget.label;
 
@@ -350,26 +343,6 @@ class _MenuItemState extends State<_MenuItem> {
       ),
     );
   }
-}
-
-/// The blue XtremFlow play button.
-class _Logo extends StatelessWidget {
-  const _Logo({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Image.asset(
-        'assets/images/logo_xtremflow.png',
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (_, __, ___) => Icon(
-          Icons.play_circle_filled,
-          size: size,
-          color: AppColors.accent,
-        ),
-      );
 }
 
 /// A row of menu items on a strip of glass.

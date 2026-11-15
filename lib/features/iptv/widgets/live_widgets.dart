@@ -7,6 +7,7 @@ import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/theme/glass.dart';
 import 'package:xtremobile/core/utils/group_label.dart';
 import 'package:xtremobile/core/utils/image_cache_config.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
@@ -42,6 +43,39 @@ extension ShortEpgTimes on model.ShortEPG {
 
 // ─── Small pieces ──────────────────────────────────────────────────────────────
 
+/// "FR| BEIN SPORTS MAX 10 FHD HEVC (EVENTS)" -> "BEIN SPORTS MAX 10": the
+/// words worth reading on a logo tile.
+String shortChannelName(String name) {
+  var n = name.replaceFirst(RegExp(r'^\s*[A-Z]{2,3}\s*[|:\-]\s*'), '');
+  n = n.replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), ' ');
+  const tags = {
+    'FHD',
+    'HD',
+    'UHD',
+    'SD',
+    '4K',
+    '8K',
+    'HEVC',
+    'H265',
+    'H.265',
+    'H264',
+    'HDR',
+    'FULLHD',
+    '50FPS',
+    '60FPS',
+    'MULTI-AUDIO',
+    'MULTI',
+    'VIP',
+    'RAW',
+  };
+  final words = n
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty && !tags.contains(w.toUpperCase()))
+      .toList();
+  if (words.isEmpty) return name.trim();
+  return words.take(4).join(' ');
+}
+
 /// A channel logo on its dark tile. The tile stays dark even when the row
 /// is lit, so the logo keeps its own colours.
 class ChannelLogo extends StatelessWidget {
@@ -67,20 +101,45 @@ class ChannelLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasUrl = url.startsWith('http');
-    // No logo: the channel name, shrunk to fit the tile rather than cut.
-    final fallback = Center(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          name,
-          maxLines: 1,
-          style: AppTheme.body(
-            fontSize: height * 0.3,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+    // No logo: the short name (no country prefix, no quality tags). Two
+    // lines on big tiles; on small ones the first word, shrunk to fit but
+    // never below 11 dp (shrinking the whole name made scribbles).
+    final inner = height * (1 - 2 * 0.12);
+    final fallback = LayoutBuilder(
+      builder: (context, box) {
+        final short = shortChannelName(name);
+        final twoLines = inner >= 34;
+        final text = twoLines ? short : short.split(' ').first;
+        var size = (inner / (twoLines ? 2 : 1) / 1.15).clamp(11.0, 14.0);
+        if (!twoLines) {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: text,
+              style: AppTheme.body(fontSize: size, fontWeight: FontWeight.w600),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+          )..layout();
+          if (painter.width > box.maxWidth) {
+            size = (size * box.maxWidth / painter.width).clamp(11.0, size);
+          }
+          painter.dispose();
+        }
+        return Center(
+          child: Text(
+            text,
+            maxLines: twoLines ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: AppTheme.body(
+              fontSize: size,
+              height: 1.1,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     return Container(
       width: width,
@@ -109,10 +168,14 @@ class LiveLine extends StatelessWidget {
     required this.progress,
     this.height = 3,
     this.lit = false,
+    this.subdued = false,
   });
 
   final double progress;
   final double height;
+
+  /// In a list: one bar per row, so each one quieter.
+  final bool subdued;
 
   /// On a lit (focused) surface the track lightens.
   final bool lit;
@@ -125,7 +188,11 @@ class LiveLine extends StatelessWidget {
         height: height,
         child: LinearProgressIndicator(
           value: progress.clamp(0.0, 1.0),
-          color: AppColors.live,
+          color: lit
+              ? AppColors.liveOnLight
+              : subdued
+                  ? AppColors.live.withValues(alpha: .7)
+                  : AppColors.live,
           backgroundColor: lit ? AppColors.focusTrack : AppColors.track,
           minHeight: height,
         ),
@@ -224,10 +291,10 @@ class TvGroupCard extends StatelessWidget {
           return AnimatedContainer(
             duration: AppTheme.durationFocus,
             curve: AppTheme.curveFocus,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            // Title at the top, with or without a subtitle under it.
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             decoration: AppDecorations.tvCard(lit: lit, radius: 12),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -241,7 +308,10 @@ class TvGroupCard extends StatelessWidget {
                     color: lit ? AppColors.onFocus : AppColors.textPrimary,
                   ),
                 ),
-                if (label.country != null) ...[
+                // "BE | Belgique": the country would repeat the name.
+                if (label.country != null &&
+                    label.country!.toLowerCase() !=
+                        label.name.toLowerCase()) ...[
                   const SizedBox(height: 2),
                   Text(
                     label.country!,
@@ -249,7 +319,9 @@ class TvGroupCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTheme.body(
                       fontSize: 14,
-                      color: lit ? AppColors.onFocusMuted : AppColors.textMuted,
+                      color: lit
+                          ? AppColors.onFocusMuted
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -433,7 +505,7 @@ class FavoriteGroupCard extends ConsumerWidget {
                       Icon(
                         Icons.star_rounded,
                         size: 16,
-                        color: lit ? AppColors.accentStrong : AppColors.accent,
+                        color: lit ? AppColors.accentOnLight : AppColors.accent,
                       ),
                     ],
                   ),
@@ -444,7 +516,9 @@ class FavoriteGroupCard extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTheme.body(
                       fontSize: 14,
-                      color: lit ? AppColors.onFocusMuted : AppColors.textMuted,
+                      color: lit
+                          ? AppColors.onFocusMuted
+                          : AppColors.textSecondary,
                       fontFeatures: AppTheme.tabular,
                     ),
                   ),
@@ -552,9 +626,13 @@ class ChannelRow extends ConsumerWidget {
             curve: AppTheme.curveFocus,
             height: height,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: lit ? AppColors.focus : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+            // Same lit glass as the cards; nothing at rest; no halo (rows
+            // are 4 dp apart).
+            decoration: GlassDecoration(
+              lit: lit ? 1 : 0,
+              radius: 10,
+              bare: true,
+              halo: false,
             ),
             child: Row(
               children: [
@@ -605,7 +683,7 @@ class ChannelRow extends ConsumerWidget {
                                 Icons.star_rounded,
                                 size: 16,
                                 color: lit
-                                    ? AppColors.accentStrong
+                                    ? AppColors.accentOnLight
                                     : AppColors.accent,
                               ),
                             ),
@@ -615,8 +693,8 @@ class ChannelRow extends ConsumerWidget {
                               child: Text(
                                 now!.timeRange!,
                                 style: AppTheme.body(
-                                  fontSize: 13,
-                                  color: muted,
+                                  fontSize: 15,
+                                  color: secondary,
                                   fontFeatures: AppTheme.tabular,
                                 ),
                               ),
@@ -635,7 +713,12 @@ class ChannelRow extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        LiveLine(progress: now.progress, lit: lit),
+                        LiveLine(
+                          progress: now.progress,
+                          lit: lit,
+                          height: lit ? 3 : 2,
+                          subdued: !lit,
+                        ),
                       ],
                     ],
                   ),
@@ -813,7 +896,7 @@ class NowPanel extends ConsumerWidget {
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
       style: AppTheme.body(
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: FontWeight.w600,
         height: 1.2,
         color: AppColors.textPrimary,
@@ -844,7 +927,7 @@ class NowPanel extends ConsumerWidget {
               builder: (context, box) => _NowProgramme(
                 now: now,
                 height: box.maxHeight,
-                titleSize: hasPreview ? 16 : 22,
+                titleSize: hasPreview ? 18 : 22,
               ),
             ),
           ),
@@ -935,11 +1018,21 @@ class _NowProgramme extends StatelessWidget {
       );
     }
 
-    // Times (one line) + gap + progress line.
-    const timesBlock = 4 + _timesSize * _lineHeight + 8 + 4;
-    final titleLines =
-        ((height - timesBlock) / titleLine).floor().clamp(0, 2).toInt();
-    final left = height - timesBlock - titleLines * titleLine;
+    // What fits, by priority: the title (it says what is on), the progress
+    // line, the times, a second title line, then the description.
+    const barBlock = 8.0 + 4;
+    const timesBlock = 4 + _timesSize * _lineHeight;
+    if (height < titleLine) return const SizedBox.shrink();
+    var titleLines = 1;
+    var left = height - titleLine;
+    final showBar = left >= barBlock;
+    if (showBar) left -= barBlock;
+    final showTimes = left >= timesBlock;
+    if (showTimes) left -= timesBlock;
+    if (left >= titleLine) {
+      titleLines = 2;
+      left -= titleLine;
+    }
     final descLines = now.description.isEmpty
         ? 0
         : ((left - 14) / (_descSize * _descHeight)).floor().clamp(0, 5).toInt();
@@ -950,26 +1043,31 @@ class _NowProgramme extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (titleLines > 0)
-              Text(
-                now.title,
-                maxLines: titleLines,
-                overflow: TextOverflow.ellipsis,
-                style: titleStyle,
-              ),
-            const SizedBox(height: 4),
             Text(
-              [now.timeRange, now.remaining()].whereType<String>().join(' · '),
-              maxLines: 1,
-              style: AppTheme.body(
-                fontSize: _timesSize,
-                height: _lineHeight,
-                color: AppColors.textSecondary,
-                fontFeatures: AppTheme.tabular,
-              ),
+              now.title,
+              maxLines: titleLines,
+              overflow: TextOverflow.ellipsis,
+              style: titleStyle,
             ),
-            const SizedBox(height: 8),
-            LiveLine(progress: now.progress, height: 4),
+            if (showTimes) ...[
+              const SizedBox(height: 4),
+              Text(
+                [now.timeRange, now.remaining()]
+                    .whereType<String>()
+                    .join(' · '),
+                maxLines: 1,
+                style: AppTheme.body(
+                  fontSize: _timesSize,
+                  height: _lineHeight,
+                  color: AppColors.textSecondary,
+                  fontFeatures: AppTheme.tabular,
+                ),
+              ),
+            ],
+            if (showBar) ...[
+              const SizedBox(height: 8),
+              LiveLine(progress: now.progress, height: 4),
+            ],
             if (descLines > 0) ...[
               const SizedBox(height: 14),
               Text(

@@ -6,6 +6,7 @@ import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
 import 'package:xtremobile/mobile/widgets/mobile_scaffold.dart';
+import 'package:xtremobile/core/widgets/xtremflow_mark.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
 import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
@@ -85,19 +86,10 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 48,
                   height: 48,
-                  // No decoration for free-floating logo
-                  child: Image.asset(
-                    'assets/images/logo_xtremflow.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.play_circle_filled,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 28,
-                    ),
-                  ),
+                  child: Center(child: XtremFlowMark(height: 30)),
                 ),
                 const SizedBox(width: 16),
                 Column(

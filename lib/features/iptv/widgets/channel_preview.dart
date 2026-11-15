@@ -56,8 +56,13 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Create mpv and its video surface now, not on the first channel: the
-    // first preview no longer pays for it.
-    _ensurePlayer();
+    // first preview no longer pays for it. If mpv cannot start, the list
+    // still shows (no preview), and _open() reports the failure.
+    try {
+      _ensurePlayer();
+    } catch (e) {
+      debugPrint('ChannelPreview: $e');
+    }
     _schedule();
   }
 
@@ -114,6 +119,7 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
         return;
       }
       final player = _ensurePlayer();
+      if (!mounted) return;
       setState(() {
         _openedId = streamId;
         _hasVideo = false;
