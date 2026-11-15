@@ -71,7 +71,6 @@ class MobilePosterCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(10),
-                    boxShadow: lit ? AppColors.focusShadows : null,
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),

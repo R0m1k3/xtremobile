@@ -69,7 +69,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   bool _isRefreshing = false;
 
   /// TV: the channel whose programme the panel shows.
-  model.Channel? _focusedChannel;
+  /// Channel under the focus in the TV list. A notifier, not state: moving
+  /// in the list rebuilds the panel on the right only, not the whole tab.
+  final _focusedChannel = ValueNotifier<model.Channel?>(null);
 
   Timer? _searchTimer;
 
@@ -103,6 +105,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     _searchController.dispose();
     _searchFocusNode.dispose();
     _searchTimer?.cancel();
+    _focusedChannel.dispose();
     super.dispose();
   }
 
@@ -177,7 +180,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   }
 
   void _openGroup(model.Category category) {
-    _focusedChannel = null;
+    _focusedChannel.value = null;
     ref.read(mobileLiveTvUiStateProvider.notifier).state = LiveTvUiState(
       selectedCategory: category.categoryName,
       selectedCategoryId: category.categoryId,
@@ -405,9 +408,10 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       return _buildTvChannels(uiState);
     }
 
+    // Clipped: rows scrolled up must not slide over the menu.
     return CustomScrollView(
       controller: _scrollController,
-      clipBehavior: Clip.none,
+      clipBehavior: Clip.hardEdge,
       slivers: [
         SliverPadding(
           padding: _tvPadding.copyWith(bottom: 0),
@@ -571,44 +575,55 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
               message: (child) => child,
               builder: (channels) {
                 final favorites = ref.watch(mobileFavoritesProvider);
-                final focused = channels.contains(_focusedChannel)
-                    ? _focusedChannel
-                    : channels.first;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
                       width: 460,
-                      child: ListView.separated(
-                        clipBehavior: Clip.none,
-                        itemCount: channels.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 4),
-                        itemBuilder: (context, i) {
-                          final channel = channels[i];
-                          return ChannelRow(
-                            key: ValueKey('ch-${channel.streamId}'),
-                            playlist: widget.playlist,
-                            channel: channel,
-                            dense: true,
-                            autofocus: i == 0 && !_searchOpen,
-                            isFavorite: favorites.contains(channel.streamId),
-                            onFocus: () =>
-                                setState(() => _focusedChannel = channel),
-                            onPressed: () =>
-                                _playChannel(context, channel, channels, i),
-                            onLongPress: () => _toggleChannelFavorite(channel),
-                          );
-                        },
+                      // Cut at the top and bottom only: the lit row grows
+                      // past the list's sides.
+                      child: ClipRect(
+                        clipper: const _VerticalClip(),
+                        child: ListView.separated(
+                          clipBehavior: Clip.none,
+                          itemCount: channels.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 4),
+                          itemBuilder: (context, i) {
+                            final channel = channels[i];
+                            return ChannelRow(
+                              key: ValueKey('ch-${channel.streamId}'),
+                              playlist: widget.playlist,
+                              channel: channel,
+                              dense: true,
+                              autofocus: i == 0 && !_searchOpen,
+                              isFavorite: favorites.contains(channel.streamId),
+                              onFocus: () => _focusedChannel.value = channel,
+                              onPressed: () =>
+                                  _playChannel(context, channel, channels, i),
+                              onLongPress: () =>
+                                  _toggleChannelFavorite(channel),
+                            );
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(width: 24),
                     Expanded(
-                      child: NowPanel(
-                        playlist: widget.playlist,
-                        channel: focused,
-                        preview: focused == null
-                            ? null
-                            : ChannelPreview(
+                      // Own layer: the preview's frames and the list's focus
+                      // moves do not repaint each other.
+                      child: RepaintBoundary(
+                        child: ValueListenableBuilder<model.Channel?>(
+                          valueListenable: _focusedChannel,
+                          builder: (context, value, _) {
+                            final focused =
+                                value != null && channels.contains(value)
+                                    ? value
+                                    : channels.first;
+                            return NowPanel(
+                              playlist: widget.playlist,
+                              channel: focused,
+                              preview: ChannelPreview(
                                 key: _previewKey,
                                 playlist: widget.playlist,
                                 channel: focused,
@@ -617,6 +632,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                                     ref.watch(mobileDashboardIndexProvider) ==
                                         0,
                               ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],
@@ -1267,4 +1285,16 @@ class _TvIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Clips above and below only; leaves room on the sides for the lit row.
+class _VerticalClip extends CustomClipper<Rect> {
+  const _VerticalClip();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-48, 0, size.width + 48, size.height);
+
+  @override
+  bool shouldReclip(_VerticalClip oldClipper) => false;
 }

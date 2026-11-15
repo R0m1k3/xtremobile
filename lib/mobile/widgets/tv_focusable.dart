@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
@@ -87,14 +88,37 @@ class _TVFocusableState extends State<TVFocusable> {
     }
   }
 
+  /// Scrolls only when the item is cut or too close to an edge, and only by
+  /// what is needed. Centring every item made the whole page slide (and
+  /// redraw) on each press of the remote.
   void _scrollToVisible() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Scrollable.ensureVisible(
-        context,
-        alignment: 0.5,
-        duration: AppTheme.durationLg,
-        curve: AppTheme.curveFocus,
+      final ro = context.findRenderObject();
+      final scrollable = Scrollable.maybeOf(context);
+      if (ro == null || !ro.attached || scrollable == null) return;
+      final viewport = RenderAbstractViewport.maybeOf(ro);
+      if (viewport == null) return;
+      final pos = scrollable.position;
+      if (!pos.hasContentDimensions || !pos.hasViewportDimension) return;
+      // Offsets that put the item at the leading / trailing edge.
+      final lead = viewport.getOffsetToReveal(ro, 0).offset;
+      final trail = viewport.getOffsetToReveal(ro, 1).offset;
+      // Keep some of the neighbours in sight (and room for the lit halo).
+      final margin = pos.viewportDimension * .12;
+      double? target;
+      if (pos.pixels > lead - margin) {
+        target = lead - margin;
+      } else if (pos.pixels < trail + margin) {
+        target = trail + margin;
+      }
+      if (target == null) return;
+      target = target.clamp(pos.minScrollExtent, pos.maxScrollExtent);
+      if ((target - pos.pixels).abs() < 1) return;
+      pos.animateTo(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
       );
     });
   }
@@ -166,30 +190,23 @@ class _TVFocusableState extends State<TVFocusable> {
           ),
           builder: (context, double scale, child) {
             final radius = widget.borderRadius ?? BorderRadius.circular(12);
+            // No shadow: a blurred shadow costs a full pass on every frame,
+            // and the TV redraws everything for each frame of the preview.
             return Transform.scale(
               scale: scale,
-              child: DecoratedBox(
-                decoration: _isFocused
-                    ? BoxDecoration(
+              child: _isFocused && !widget.paintsOwnFocus
+                  ? DecoratedBox(
+                      position: DecorationPosition.foreground,
+                      decoration: BoxDecoration(
                         borderRadius: radius,
-                        boxShadow: AppColors.focusShadows,
-                      )
-                    : const BoxDecoration(),
-                position: DecorationPosition.background,
-                child: _isFocused && !widget.paintsOwnFocus
-                    ? DecoratedBox(
-                        position: DecorationPosition.foreground,
-                        decoration: BoxDecoration(
-                          borderRadius: radius,
-                          border: Border.all(
-                            color: widget.focusColor,
-                            width: widget.borderWidth,
-                          ),
+                        border: Border.all(
+                          color: widget.focusColor,
+                          width: widget.borderWidth,
                         ),
-                        child: child,
-                      )
-                    : child,
-              ),
+                      ),
+                      child: child,
+                    )
+                  : child,
             );
           },
           child: _TVFocusScope(

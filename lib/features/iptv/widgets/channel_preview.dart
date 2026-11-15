@@ -161,7 +161,13 @@ class ChannelPreviewState extends ConsumerState<ChannelPreview>
         }),
       );
     _player = player;
-    _controller = VideoController(player);
+    // Rendered at 640×360, the size it is shown at, not at the stream's
+    // 1080p / 4K: far less work for the Fire TV's GPU on every frame.
+    _controller = VideoController(
+      player,
+      configuration:
+          const VideoControllerConfiguration(width: 640, height: 360),
+    );
     return player;
   }
 

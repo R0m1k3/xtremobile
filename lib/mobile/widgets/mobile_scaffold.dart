@@ -47,7 +47,8 @@ class MobileScaffold extends ConsumerWidget {
     switch (FormFactors.of(context)) {
       case FormFactor.tv:
         return Scaffold(
-          backgroundColor: AppColors.background,
+          // The ambient image is opaque: no second full-screen fill.
+          backgroundColor: Colors.transparent,
           body: AmbientBackground(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -94,7 +95,7 @@ class MobileScaffold extends ConsumerWidget {
         );
       case FormFactor.phone:
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: Colors.transparent,
           body: AmbientBackground(child: child),
           bottomNavigationBar: NavigationBar(
             selectedIndex: currentIndex,
