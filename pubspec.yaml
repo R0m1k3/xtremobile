@@ -1,7 +1,7 @@
 name: xtremobile
 description: High-performance IPTV application (Android, iPhone, iPad) with Xtream Codes API
 publish_to: 'none'
-version: 1.9.5+24
+version: 1.9.6+25
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -42,6 +42,9 @@ dependencies:
   # À relâcher le jour où les workflows passeront à Flutter >= 3.38.
   volume_controller: 3.4.1
   
+  # Version affichée dans les Réglages (déjà tirée par une dépendance)
+  package_info_plus: ^9.0.1
+
   # UI Components
   google_fonts: ^6.2.1
   cached_network_image: ^3.3.1

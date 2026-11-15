@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 // import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
@@ -15,6 +16,12 @@ import 'package:xtremobile/features/iptv/screens/mobile_playlist_selection_scree
 import 'package:xtremobile/core/theme/app_colors.dart';
 
 /// Simplified mobile settings tab - optimized for TV remote control
+/// Version de l'application lue dans le paquet installé (pubspec.yaml).
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return info.version;
+});
+
 class MobileSettingsTab extends ConsumerStatefulWidget {
   const MobileSettingsTab({super.key});
 
@@ -104,7 +111,10 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
                       ),
                     ),
                     Text(
-                      'Version 1.7.3',
+                      ref.watch(appVersionProvider).maybeWhen(
+                            data: (v) => 'Version $v',
+                            orElse: () => 'Version',
+                          ),
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: AppDecorations.textSecondary(context),
