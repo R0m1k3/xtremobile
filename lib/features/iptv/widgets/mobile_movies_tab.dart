@@ -277,7 +277,7 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
     }
 
     return Container(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) async {

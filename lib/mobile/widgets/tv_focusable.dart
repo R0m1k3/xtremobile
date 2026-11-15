@@ -172,7 +172,7 @@ class _TVFocusableState extends State<TVFocusable> {
                 decoration: _isFocused
                     ? BoxDecoration(
                         borderRadius: radius,
-                        boxShadow: const [AppColors.focusShadow],
+                        boxShadow: AppColors.focusShadows,
                       )
                     : const BoxDecoration(),
                 position: DecorationPosition.background,

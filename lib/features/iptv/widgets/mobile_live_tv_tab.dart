@@ -9,6 +9,7 @@ import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_decorations.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/utils/category_sort.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
@@ -286,8 +287,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
       if (ref.read(mobileDashboardIndexProvider) == 0) _openSearch();
     });
 
+    // Transparent: the ambient page of the scaffold shows through the glass.
     return ColoredBox(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -1249,19 +1251,7 @@ class _TvIconButton extends StatelessWidget {
             duration: AppTheme.durationFocus,
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: lit
-                    ? const [AppColors.focusTop, AppColors.focus]
-                    : const [AppColors.cardTop, AppColors.cardBottom],
-              ),
-              border: Border.all(
-                color: lit ? const Color(0x00FFFFFF) : AppColors.cardEdge,
-              ),
-              shape: BoxShape.circle,
-            ),
+            decoration: AppDecorations.tvCard(lit: lit, radius: 20),
             child: busy
                 ? const Padding(
                     padding: EdgeInsets.all(10),

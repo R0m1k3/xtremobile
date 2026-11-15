@@ -331,7 +331,7 @@ class GroupRow extends StatelessWidget {
                     child: Icon(
                       Icons.star_rounded,
                       size: 16,
-                      color: AppColors.textSecondary,
+                      color: AppColors.accent,
                     ),
                   ),
                 if (showChevron)
@@ -433,8 +433,7 @@ class FavoriteGroupCard extends ConsumerWidget {
                       Icon(
                         Icons.star_rounded,
                         size: 16,
-                        color:
-                            lit ? AppColors.onFocus : AppColors.textSecondary,
+                        color: lit ? AppColors.accentStrong : AppColors.accent,
                       ),
                     ],
                   ),
@@ -605,7 +604,9 @@ class ChannelRow extends ConsumerWidget {
                               child: Icon(
                                 Icons.star_rounded,
                                 size: 16,
-                                color: secondary,
+                                color: lit
+                                    ? AppColors.accentStrong
+                                    : AppColors.accent,
                               ),
                             ),
                           if (now?.timeRange != null)
@@ -724,7 +725,7 @@ class ChannelTile extends ConsumerWidget {
                           const Icon(
                             Icons.star_rounded,
                             size: 16,
-                            color: AppColors.textSecondary,
+                            color: AppColors.accent,
                           ),
                       ],
                     ),

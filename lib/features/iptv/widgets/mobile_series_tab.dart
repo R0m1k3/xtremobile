@@ -265,7 +265,7 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
     }
 
     return Container(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) async {

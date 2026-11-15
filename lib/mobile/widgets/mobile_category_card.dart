@@ -89,7 +89,7 @@ class MobileCategoryCard extends StatelessWidget {
                   Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: lit ? AppColors.onFocus : AppColors.textSecondary,
+                    color: lit ? AppColors.accentStrong : AppColors.accent,
                   ),
                 if (!tv)
                   const Padding(

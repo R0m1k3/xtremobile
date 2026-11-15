@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/theme/glass.dart';
 import 'package:xtremobile/core/utils/form_factor.dart';
 
 /// Bumped when the TV menu's "Rechercher" destination is chosen: the visible
@@ -47,19 +48,21 @@ class MobileScaffold extends ConsumerWidget {
       case FormFactor.tv:
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TvTopMenu(
-                currentIndex: currentIndex,
-                onIndexChanged: onIndexChanged,
-                onSearch: () {
-                  if (currentIndex == 3) onIndexChanged(0);
-                  ref.read(tabSearchRequestProvider.notifier).state++;
-                },
-              ),
-              Expanded(child: child),
-            ],
+          body: AmbientBackground(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TvTopMenu(
+                  currentIndex: currentIndex,
+                  onIndexChanged: onIndexChanged,
+                  onSearch: () {
+                    if (currentIndex == 3) onIndexChanged(0);
+                    ref.read(tabSearchRequestProvider.notifier).state++;
+                  },
+                ),
+                Expanded(child: child),
+              ],
+            ),
           ),
         );
       case FormFactor.tablet:
@@ -71,6 +74,10 @@ class MobileScaffold extends ConsumerWidget {
                 selectedIndex: currentIndex,
                 onDestinationSelected: onIndexChanged,
                 groupAlignment: -1,
+                leading: const Padding(
+                  padding: EdgeInsets.only(top: 12, bottom: 16),
+                  child: _Logo(size: 40),
+                ),
                 destinations: [
                   for (final d in _destinations)
                     NavigationRailDestination(
@@ -81,14 +88,14 @@ class MobileScaffold extends ConsumerWidget {
                     ),
                 ],
               ),
-              Expanded(child: child),
+              Expanded(child: AmbientBackground(child: child)),
             ],
           ),
         );
       case FormFactor.phone:
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: child,
+          body: AmbientBackground(child: child),
           bottomNavigationBar: NavigationBar(
             selectedIndex: currentIndex,
             onDestinationSelected: onIndexChanged,
@@ -192,34 +199,45 @@ class _TvTopMenuState extends State<_TvTopMenu> {
       focusNode: _group,
       onFocusChange: _onFocusChange,
       child: Padding(
-        // Clear of the TV overscan: 48 dp on the sides, 20 on top.
-        padding: const EdgeInsets.fromLTRB(48, 20, 48, 0),
+        // Clear of the TV overscan: 48 dp on the sides, 16 on top.
+        padding: const EdgeInsets.fromLTRB(48, 16, 48, 0),
         child: SizedBox(
-          height: 40,
+          height: 48,
           child: Row(
             children: [
+              const _Logo(size: 34),
+              const SizedBox(width: 10),
               Text(
                 'XtremFlow',
                 style: AppTheme.body(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: 32),
-              for (var i = 0; i < 3; i++) ...[
-                item(i),
-                const SizedBox(width: 8),
-              ],
-              const Spacer(),
-              _MenuItem(
-                icon: Icons.search,
-                tooltip: 'Rechercher',
-                selected: false,
-                onPressed: widget.onSearch,
+              const SizedBox(width: 28),
+              // The tabs sit in a glass capsule, tvOS style.
+              _GlassCapsule(
+                children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    item(i),
+                  ],
+                ],
               ),
-              const SizedBox(width: 8),
-              item(3, iconOnly: true),
+              const Spacer(),
+              _GlassCapsule(
+                children: [
+                  _MenuItem(
+                    icon: Icons.search,
+                    tooltip: 'Rechercher',
+                    selected: false,
+                    onPressed: widget.onSearch,
+                  ),
+                  const SizedBox(width: 4),
+                  item(3, iconOnly: true),
+                ],
+              ),
             ],
           ),
         ),
@@ -264,8 +282,8 @@ class _MenuItemState extends State<_MenuItem> {
       background = AppColors.focus;
       foreground = AppColors.onFocus;
     } else if (widget.selected) {
-      background = AppColors.surfaceHigh;
-      foreground = AppColors.textPrimary;
+      background = AppColors.accentFill;
+      foreground = AppColors.accent;
     } else {
       background = Colors.transparent;
       foreground = AppColors.textMuted;
@@ -331,4 +349,39 @@ class _MenuItemState extends State<_MenuItem> {
       ),
     );
   }
+}
+
+/// The blue XtremFlow play button.
+class _Logo extends StatelessWidget {
+  const _Logo({required this.size});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+        'assets/images/logo_xtremflow.png',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.play_circle_filled,
+          size: size,
+          color: AppColors.accent,
+        ),
+      );
+}
+
+/// A row of menu items on a strip of glass.
+class _GlassCapsule extends StatelessWidget {
+  const _GlassCapsule({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const GlassDecoration(radius: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Row(mainAxisSize: MainAxisSize.min, children: children),
+        ),
+      );
 }

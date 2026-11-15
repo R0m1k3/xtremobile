@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'glass.dart';
 
 /// Decoration helpers — « Salle obscure ».
 ///
@@ -31,31 +32,17 @@ class AppDecorations {
         boxShadow: const [AppColors.focusShadow],
       );
 
-  /// TV card, tvOS style: a grey platter, lighter at the top, with a light
-  /// edge that draws its shape on the dark page. Lit, it becomes the light
-  /// card. Both states are gradients with a border of the same width, so
-  /// `AnimatedContainer` blends one into the other.
-  static BoxDecoration tvCard({required bool lit, double radius = 14}) =>
-      BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: lit
-              ? const [AppColors.focusTop, AppColors.focus]
-              : const [AppColors.cardTop, AppColors.cardBottom],
-        ),
-        border: Border.all(
-          color: lit ? const Color(0x00FFFFFF) : AppColors.cardEdge,
-        ),
-        borderRadius: BorderRadius.circular(radius),
-      );
+  /// TV card: blur-free glass (see [GlassDecoration]). Lit, it becomes
+  /// the frosted white card; `AnimatedContainer` blends the two.
+  static Decoration tvCard({required bool lit, double radius = 14}) =>
+      GlassDecoration(lit: lit ? 1 : 0, radius: radius);
 
   /// Dark tile behind a channel logo. Stays dark when its card is lit, so
   /// the logo keeps its own colours. [inset]: sunk into a TV card.
   static BoxDecoration logoTile({double radius = 6, bool inset = false}) =>
       BoxDecoration(
-        color: inset ? AppColors.background : AppColors.surfaceHigh,
-        border: inset ? Border.all(color: AppColors.cardEdge) : null,
+        color: inset ? const Color(0xFF15161A) : AppColors.surfaceHigh,
+        border: inset ? Border.all(color: const Color(0x1AFFFFFF)) : null,
         borderRadius: BorderRadius.circular(radius),
       );
 
