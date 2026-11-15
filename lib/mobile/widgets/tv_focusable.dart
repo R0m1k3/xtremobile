@@ -2,7 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_theme.dart';
 
+/// Remote-control focus. One focus state across the app: the focused item is
+/// the only lit thing on screen — a slight scale-up and a neutral shadow.
+///
+/// * Default: a light outline is drawn around the child (screens that were
+///   not redesigned rely on it).
+/// * [paintsOwnFocus]: no outline; the child reads [TVFocusable.isFocused]
+///   and turns itself into the lit surface (cards, rows).
 class TVFocusable extends StatefulWidget {
   final Widget child;
   final VoidCallback? onPressed;
@@ -16,6 +24,14 @@ class TVFocusable extends StatefulWidget {
   final BorderRadius? borderRadius;
   final Duration longPressDuration;
 
+  /// The child draws the focused look itself (see [TVFocusable.isFocused]).
+  final bool paintsOwnFocus;
+
+  /// Whether the nearest enclosing [TVFocusable] has focus.
+  static bool isFocused(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TVFocusScope>()?.focused ??
+      false;
+
   const TVFocusable({
     super.key,
     required this.child,
@@ -24,11 +40,12 @@ class TVFocusable extends StatefulWidget {
     this.onFocus,
     this.focusNode,
     this.autofocus = false,
-    this.scale = 1.05, // Apple TV subtle lift
-    this.borderWidth = 2.0,
-    this.focusColor = AppColors.onSurface,
+    this.scale = 1.05,
+    this.borderWidth = 3.0,
+    this.focusColor = AppColors.focus,
     this.borderRadius,
     this.longPressDuration = const Duration(seconds: 3),
+    this.paintsOwnFocus = false,
   });
 
   @override
@@ -76,8 +93,8 @@ class _TVFocusableState extends State<TVFocusable> {
       Scrollable.ensureVisible(
         context,
         alignment: 0.5,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: AppTheme.durationLg,
+        curve: AppTheme.curveFocus,
       );
     });
   }
@@ -141,52 +158,56 @@ class _TVFocusableState extends State<TVFocusable> {
         onTap: _handlePress,
         onLongPress: widget.onLongPress,
         child: TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic, // Apple-like snappy curve
+          duration: AppTheme.durationFocus,
+          curve: AppTheme.curveFocus,
           tween: Tween<double>(
             begin: 1.0,
             end: _isFocused ? widget.scale : 1.0,
           ),
           builder: (context, double scale, child) {
+            final radius = widget.borderRadius ?? BorderRadius.circular(12);
             return Transform.scale(
               scale: scale,
-              child: Container(
+              child: DecoratedBox(
                 decoration: _isFocused
                     ? BoxDecoration(
-                        borderRadius:
-                            widget.borderRadius ?? BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withOpacity(0.5), // Deep shadow for lift
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                          const BoxShadow(
-                            color: Color(0x590A84FF), // Apple blue glow
-                            blurRadius: 12,
-                            spreadRadius: 0,
-                          ),
-                        ],
+                        borderRadius: radius,
+                        boxShadow: const [AppColors.focusShadow],
                       )
-                    : null,
-                foregroundDecoration: _isFocused
-                    ? BoxDecoration(
-                        borderRadius:
-                            widget.borderRadius ?? BorderRadius.circular(12),
-                        border: Border.all(
-                          color: widget.focusColor,
-                          width: widget.borderWidth,
+                    : const BoxDecoration(),
+                position: DecorationPosition.background,
+                child: _isFocused && !widget.paintsOwnFocus
+                    ? DecoratedBox(
+                        position: DecorationPosition.foreground,
+                        decoration: BoxDecoration(
+                          borderRadius: radius,
+                          border: Border.all(
+                            color: widget.focusColor,
+                            width: widget.borderWidth,
+                          ),
                         ),
+                        child: child,
                       )
-                    : null,
-                child: child,
+                    : child,
               ),
             );
           },
-          child: widget.child,
+          child: _TVFocusScope(
+            focused: _isFocused,
+            child: widget.child,
+          ),
         ),
       ),
     );
   }
+}
+
+class _TVFocusScope extends InheritedWidget {
+  const _TVFocusScope({required this.focused, required super.child});
+
+  final bool focused;
+
+  @override
+  bool updateShouldNotify(_TVFocusScope oldWidget) =>
+      focused != oldWidget.focused;
 }
