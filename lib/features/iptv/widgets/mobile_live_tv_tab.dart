@@ -1,25 +1,37 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremobile/core/utils/image_cache_config.dart';
 import 'dart:async';
-import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
-import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
-import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
-import 'package:xtremobile/core/models/iptv_models.dart';
-import 'package:xtremobile/core/models/playlist_config.dart';
-import 'package:xtremobile/core/theme/app_decorations.dart';
-import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
-import 'package:xtremobile/mobile/widgets/mobile_category_card.dart';
-import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:xtremobile/core/services/ip_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:xtremobile/core/models/iptv_models.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
+import 'package:xtremobile/core/models/playlist_config.dart';
+import 'package:xtremobile/core/services/ip_service.dart';
 import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_theme.dart';
 import 'package:xtremobile/core/utils/category_sort.dart';
-import 'package:xtremobile/mobile/widgets/adaptive_grid.dart';
-import 'package:xtremobile/mobile/widgets/tab_header_title.dart';
+import 'package:xtremobile/core/utils/form_factor.dart';
+import 'package:xtremobile/core/utils/group_label.dart';
+import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
+import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremobile/features/iptv/widgets/live_widgets.dart';
+import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
+import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
+import 'package:xtremobile/mobile/widgets/mobile_scaffold.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+
+/// How the Live tab is laid out.
+enum _Layout {
+  /// Remote control: favourites shelf + group grid, then list + now panel.
+  tv,
+
+  /// Wide touch screen: groups and the selected group's channels side by side.
+  split,
+
+  /// Phone, or a tablet in portrait: one column at a time.
+  stack,
+}
 
 class MobileLiveTVTab extends ConsumerStatefulWidget {
   final PlaylistConfig playlist;
@@ -35,15 +47,24 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   /// so an app left running for days on a TV box picks up provider changes.
   static const _autoRefreshAfter = Duration(hours: 4);
 
+  /// Below this width a touch screen shows one column at a time.
+  static const _splitMinWidth = 840.0;
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
   bool _isSearchEditing = false;
+
+  /// TV only: search is a destination, the field shows once asked for.
+  bool _searchOpen = false;
   bool _justReturnedFromPlayer =
       false; // Flag to prevent PopScope interception after player
   bool _isRefreshing = false;
+
+  /// TV: the channel whose programme the panel shows.
+  model.Channel? _focusedChannel;
 
   Timer? _searchTimer;
 
@@ -53,14 +74,13 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     WidgetsBinding.instance.addObserver(this);
     // Anchor the auto-refresh clock to this first load.
     ref.read(liveCatalogRefreshedAtProvider);
-    // [P1-1 FIX] Debounce search input to prevent per-keystroke rebuilds
-    _searchTimer = null;
+    // Debounce search input to prevent per-keystroke rebuilds.
     _searchController.addListener(() {
       _searchTimer?.cancel();
-      _searchTimer = Timer(const Duration(milliseconds: 500), () {
+      _searchTimer = Timer(const Duration(milliseconds: 400), () {
         if (mounted) {
           setState(() {
-            _searchQuery = _searchController.text.toLowerCase();
+            _searchQuery = _searchController.text.trim().toLowerCase();
           });
         }
       });
@@ -117,490 +137,987 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
+  _Layout _layoutOf(BuildContext context) {
+    switch (FormFactors.of(context)) {
+      case FormFactor.tv:
+        return _Layout.tv;
+      case FormFactor.tablet:
+        return MediaQuery.sizeOf(context).width >= _splitMinWidth
+            ? _Layout.split
+            : _Layout.stack;
+      case FormFactor.phone:
+        return _Layout.stack;
+    }
+  }
 
-    // Phase 1: always watch categories (fast, ~1 second)
-    final categoriesAsync =
-        ref.watch(mobileLiveCategoriesProvider(widget.playlist));
-    final settings = ref.watch(mobileSettingsProvider);
-    final uiState = ref.watch(mobileLiveTvUiStateProvider);
-    final uiNotifier = ref.read(mobileLiveTvUiStateProvider.notifier);
-
-    // Scroll to top when entering a category so first row is fully visible
-    ref.listen(mobileLiveTvUiStateProvider, (previous, next) {
-      if (previous?.isCategoryView == true && !next.isCategoryView) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.jumpTo(0);
-          }
-        });
-      }
+  void _openSearch() {
+    setState(() {
+      _searchOpen = true;
+      _isSearchEditing = true;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+      SystemChannels.textInput.invokeMethod('TextInput.show');
+    });
+  }
 
-    // Determine if we should show the category grid
-    final bool showGrid =
-        uiState.isCategoryView && _searchQuery.isEmpty && !_showFavoritesOnly;
+  void _clearSearch() {
+    _searchTimer?.cancel();
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _searchOpen = false;
+      _isSearchEditing = false;
+    });
+  }
 
-    return Container(
-      decoration: AppDecorations.background(context),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: PopScope(
-          // Only allow full pop if we're at category view with no filters AND not just returned from player
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-
-            // Only handle back if this tab is currently active (tab index 0)
-            if (ref.read(mobileDashboardIndexProvider) != 0) return;
-
-            // If just returned from player, reset the flag and do nothing (stay on channel list)
-            if (_justReturnedFromPlayer) {
-              _justReturnedFromPlayer = false;
-              return;
-            }
-
-            if (_searchQuery.isNotEmpty) {
-              setState(() {
-                _searchController.clear();
-                _searchQuery = '';
-              });
-            } else if (_showFavoritesOnly) {
-              setState(() => _showFavoritesOnly = false);
-            } else if (!uiState.isCategoryView) {
-              uiNotifier.state = uiState.copyWith(isCategoryView: true);
-            } else {
-              // Root View (Categories) -> Show Exit Dialog
-              final shouldExit = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  backgroundColor: AppColors.surfaceContainerLowest,
-                  title: const Text(
-                    "Quitter l'application",
-                    style: TextStyle(color: AppColors.onSurface),
-                  ),
-                  content: const Text(
-                    "Voulez-vous vraiment quitter l'application ?",
-                    style: TextStyle(color: AppColors.onSurface70),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      autofocus: true,
-                      child: const Text(
-                        'Annuler',
-                        style: TextStyle(color: AppColors.primary),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text(
-                        'Quitter',
-                        style: TextStyle(color: AppColors.error),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              if (shouldExit == true) {
-                SystemNavigator.pop();
-              }
-            }
-          },
-          child: categoriesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Erreur: $e',
-                  style: const TextStyle(color: AppColors.error),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-            data: (allCategories) {
-              // Apply keyword filter and smart geo-sort on categories
-              List<model.Category> categories;
-              if (settings.liveTvKeywords.isNotEmpty) {
-                categories = allCategories
-                    .where(
-                      (cat) => settings.matchesLiveTvFilter(cat.categoryName),
-                    )
-                    .toList();
-                categories.sort(
-                  (a, b) => a.categoryName.compareTo(b.categoryName),
-                );
-              } else {
-                // Smart Sort (GeoIP)
-                final userCountry = IpService().country;
-                categories = List.of(allCategories);
-                categories.sort((a, b) {
-                  if (userCountry != null) {
-                    final aMatches = a.categoryName
-                        .toLowerCase()
-                        .contains(userCountry.toLowerCase());
-                    final bMatches = b.categoryName
-                        .toLowerCase()
-                        .contains(userCountry.toLowerCase());
-                    if (aMatches && !bMatches) return -1;
-                    if (!aMatches && bMatches) return 1;
-                  }
-                  return a.categoryName.compareTo(b.categoryName);
-                });
-              }
-
-              return SafeArea(
-                bottom: false,
-                child: RefreshIndicator(
-                  onRefresh: _refreshChannels,
-                  color: AppColors.primary,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      // Floating Header (Search + Navigation)
-                      SliverAppBar(
-                        floating: false,
-                        pinned: true,
-                        snap: false,
-                        backgroundColor: AppColors.headerBackground,
-                        elevation: 0,
-                        scrolledUnderElevation: 0,
-                        automaticallyImplyLeading: false,
-                        toolbarHeight: _searchQuery.isNotEmpty ||
-                                _showFavoritesOnly ||
-                                !uiState.isCategoryView
-                            ? 120.0
-                            : 110.0,
-                        flexibleSpace: FlexibleSpaceBar(
-                          background: Container(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Search Bar
-                                TVFocusable(
-                                  scale: 1.0,
-                                  focusColor: AppColors.onSurface,
-                                  onPressed: () {
-                                    setState(() => _isSearchEditing = true);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      _searchFocusNode.requestFocus();
-                                      SystemChannels.textInput
-                                          .invokeMethod('TextInput.show');
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    height: 48,
-                                    decoration:
-                                        AppDecorations.searchBar(context),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.search,
-                                          color: AppDecorations.textSecondary(
-                                              context),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: ExcludeFocus(
-                                            excluding: !_isSearchEditing,
-                                            child: TextField(
-                                              cursorColor: AppColors.onSurface,
-                                              controller: _searchController,
-                                              focusNode: _searchFocusNode,
-                                              readOnly: !_isSearchEditing,
-                                              style: TextStyle(
-                                                color:
-                                                    AppDecorations.textPrimary(
-                                                        context),
-                                              ),
-                                              decoration: const InputDecoration(
-                                                hintText:
-                                                    'Rechercher une chaîne...',
-                                                border: InputBorder.none,
-                                                focusedBorder: InputBorder.none,
-                                                enabledBorder: InputBorder.none,
-                                                isDense: true,
-                                              ),
-                                              onSubmitted: (_) => setState(
-                                                () => _isSearchEditing = false,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        if (_searchQuery.isNotEmpty)
-                                          GestureDetector(
-                                            onTap: () =>
-                                                _searchController.clear(),
-                                            child: Icon(
-                                              Icons.close,
-                                              color:
-                                                  AppDecorations.textSecondary(
-                                                      context),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // Title / Navigation Row
-                                Row(
-                                  children: [
-                                    if (!showGrid ||
-                                        _showFavoritesOnly ||
-                                        _searchQuery.isNotEmpty) ...[
-                                      IconButton(
-                                        icon: Icon(
-                                          Icons.arrow_back,
-                                          color: AppDecorations.textPrimary(
-                                              context),
-                                        ),
-                                        onPressed: () {
-                                          if (_searchQuery.isNotEmpty) {
-                                            _searchController.clear();
-                                          } else if (_showFavoritesOnly) {
-                                            setState(
-                                              () => _showFavoritesOnly = false,
-                                            );
-                                          } else {
-                                            uiNotifier.state = uiState.copyWith(
-                                              isCategoryView: true,
-                                            );
-                                          }
-                                        },
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                      ),
-                                      const SizedBox(width: 12),
-                                    ],
-                                    Expanded(
-                                      child: TabHeaderTitle(
-                                        title: _searchQuery.isNotEmpty
-                                            ? 'Résultats de recherche'
-                                            : _showFavoritesOnly
-                                                ? 'Favoris'
-                                                : showGrid
-                                                    ? 'Catégories'
-                                                    : uiState
-                                                            .selectedCategory ??
-                                                        'Chaînes',
-                                        count: showGrid
-                                            ? categories.length
-                                            : null,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Actualiser les chaînes',
-                                      icon: _isRefreshing
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : Icon(
-                                              Icons.refresh,
-                                              color:
-                                                  AppDecorations.textSecondary(
-                                                      context),
-                                            ),
-                                      onPressed: _isRefreshing
-                                          ? null
-                                          : _refreshChannels,
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        _showFavoritesOnly
-                                            ? Icons.favorite
-                                            : Icons.favorite_border,
-                                        color: _showFavoritesOnly
-                                            ? AppColors.live
-                                            : AppDecorations.textSecondary(
-                                                context),
-                                      ),
-                                      onPressed: () => setState(() {
-                                        _showFavoritesOnly =
-                                            !_showFavoritesOnly;
-                                        if (_showFavoritesOnly) {
-                                          uiNotifier.state = uiState.copyWith(
-                                            isCategoryView: false,
-                                          );
-                                        }
-                                        if (!_showFavoritesOnly) {
-                                          uiNotifier.state = uiState.copyWith(
-                                              isCategoryView: true);
-                                        }
-                                      }),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Main Content Sliver
-                      if (showGrid)
-                        ..._buildCategorySlivers(categories, uiNotifier)
-                      else
-                        _ChannelListView(
-                          playlist: widget.playlist,
-                          uiState: uiState,
-                          searchQuery: _searchQuery,
-                          showFavoritesOnly: _showFavoritesOnly,
-                          onPlay: (channel, channels, index) => _playChannel(
-                            context,
-                            channel,
-                            channels,
-                            widget.playlist,
-                            index,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
+  void _openGroup(model.Category category) {
+    _focusedChannel = null;
+    ref.read(mobileLiveTvUiStateProvider.notifier).state = LiveTvUiState(
+      selectedCategory: category.categoryName,
+      selectedCategoryId: category.categoryId,
+      isCategoryView: false,
     );
+    if (_searchQuery.isNotEmpty) _clearSearch();
   }
 
-  List<Widget> _buildCategorySlivers(
-    List<model.Category> categories,
-    StateController<LiveTvUiState> uiNotifier,
-  ) {
-    if (categories.isEmpty) {
-      return [
-        SliverFillRemaining(
-          child: Center(
-            child: Text(
-              'Aucune catégorie trouvée',
-              style: GoogleFonts.inter(
-                color: AppDecorations.textSecondary(context),
-              ),
-            ),
-          ),
-        ),
-      ];
-    }
-
-    final playlistId = widget.playlist.id;
-    final favoriteKeys = ref.watch(mobileFavoriteCategoriesProvider);
-    bool isFavorite(model.Category c) => favoriteKeys.contains(
-          MobileFavoriteCategoriesNotifier.keyFor(playlistId, c.categoryId),
-        );
-    final split = splitFavorites(categories, isFavorite);
-
-    Widget grid(List<model.Category> items, {required bool favorite}) {
-      return SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        sliver: SliverGrid(
-          gridDelegate: AdaptiveGrid.liveTiles(context),
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final category = items[index];
-              return MobileCategoryCard(
-                key: ValueKey('live-cat-${category.categoryId}'),
-                title: category.categoryName,
-                icon: Icons.live_tv_rounded,
-                iconColor: AppColors.live,
-                isFavorite: favorite,
-                onTap: () {
-                  uiNotifier.state = LiveTvUiState(
-                    selectedCategory: category.categoryName,
-                    selectedCategoryId: category.categoryId,
-                    isCategoryView: false,
-                  );
-                },
-                onLongPress: () => _toggleFavoriteCategory(category),
-              );
-            },
-            childCount: items.length,
-          ),
-        ),
-      );
-    }
-
-    return [
-      if (split.favorites.isNotEmpty) ...[
-        _sectionHeader('Favoris', Icons.star_rounded, AppColors.ratingGold),
-        grid(split.favorites, favorite: true),
-        _sectionHeader(
-          'Tous les groupes',
-          Icons.grid_view_rounded,
-          AppDecorations.textSecondary(context),
-        ),
-      ] else
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Text(
-              'Astuce : un appui long sur un groupe l\'épingle en haut de la liste.',
-              style: TextStyle(
-                color: AppDecorations.textSecondary(context),
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-      if (split.others.isNotEmpty) grid(split.others, favorite: false),
-      const SliverToBoxAdapter(child: SizedBox(height: 80)),
-    ];
+  void _backToGroups() {
+    final uiNotifier = ref.read(mobileLiveTvUiStateProvider.notifier);
+    uiNotifier.state = uiNotifier.state.copyWith(isCategoryView: true);
+    setState(() => _showFavoritesOnly = false);
   }
 
-  Widget _sectionHeader(String title, IconData icon, Color color) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: AppDecorations.textPrimary(context),
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
+  Future<void> _handleBack(_Layout layout) async {
+    // Only handle back if this tab is currently active (tab index 0)
+    if (ref.read(mobileDashboardIndexProvider) != 0) return;
+
+    // Just returned from the player: stay on the channel list.
+    if (_justReturnedFromPlayer) {
+      _justReturnedFromPlayer = false;
+      return;
+    }
+
+    final uiState = ref.read(mobileLiveTvUiStateProvider);
+    if (_searchQuery.isNotEmpty || _searchOpen) {
+      _clearSearch();
+    } else if (_showFavoritesOnly) {
+      setState(() => _showFavoritesOnly = false);
+    } else if (layout != _Layout.split && !uiState.isCategoryView) {
+      _backToGroups();
+    } else {
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Quitter l'application"),
+          content: const Text("Voulez-vous vraiment quitter l'application ?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              autofocus: true,
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Quitter',
+                style: TextStyle(color: AppColors.error),
               ),
             ),
           ],
         ),
+      );
+      if (shouldExit == true) SystemNavigator.pop();
+    }
+  }
+
+  /// Keyword filter or smart geo-sort (the user's country first).
+  List<model.Category> _sortedCategories(
+    List<model.Category> all,
+    MobileSettings settings,
+  ) {
+    List<model.Category> categories;
+    if (settings.liveTvKeywords.isNotEmpty) {
+      categories = all
+          .where((cat) => settings.matchesLiveTvFilter(cat.categoryName))
+          .toList()
+        ..sort((a, b) => a.categoryName.compareTo(b.categoryName));
+    } else {
+      final userCountry = IpService().country?.toLowerCase();
+      categories = List.of(all)
+        ..sort((a, b) {
+          if (userCountry != null) {
+            final aMatches = a.categoryName.toLowerCase().contains(userCountry);
+            final bMatches = b.categoryName.toLowerCase().contains(userCountry);
+            if (aMatches && !bMatches) return -1;
+            if (!aMatches && bMatches) return 1;
+          }
+          return a.categoryName.compareTo(b.categoryName);
+        });
+    }
+    return categories;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final categoriesAsync =
+        ref.watch(mobileLiveCategoriesProvider(widget.playlist));
+    final settings = ref.watch(mobileSettingsProvider);
+    final layout = _layoutOf(context);
+
+    // Back to the groups: start at the top so the first row is visible.
+    ref.listen(mobileLiveTvUiStateProvider, (previous, next) {
+      if (previous?.isCategoryView == false && next.isCategoryView) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) _scrollController.jumpTo(0);
+        });
+      }
+    });
+
+    // "Rechercher" chosen in the TV rail while this tab is visible.
+    ref.listen(tabSearchRequestProvider, (_, __) {
+      if (ref.read(mobileDashboardIndexProvider) == 0) _openSearch();
+    });
+
+    return ColoredBox(
+      color: AppColors.background,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _handleBack(layout);
+        },
+        child: categoriesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => _Message('Erreur : $e', error: true),
+          data: (all) {
+            final categories = _sortedCategories(all, settings);
+            final favoriteKeys = ref.watch(mobileFavoriteCategoriesProvider);
+            final split = splitFavorites(
+              categories,
+              (c) => favoriteKeys.contains(
+                MobileFavoriteCategoriesNotifier.keyFor(
+                  widget.playlist.id,
+                  c.categoryId,
+                ),
+              ),
+            );
+            final groups = _GroupLists(
+              favorites: _matching(split.favorites),
+              others: _matching(split.others),
+              total: categories.length,
+            );
+            switch (layout) {
+              case _Layout.tv:
+                return _buildTv(groups);
+              case _Layout.split:
+                return _buildSplit(groups);
+              case _Layout.stack:
+                return _buildStack(groups);
+            }
+          },
+        ),
       ),
     );
   }
+
+  /// At group level, the search filters groups by name.
+  List<model.Category> _matching(List<model.Category> items) {
+    if (_searchQuery.isEmpty) return items;
+    return items
+        .where((c) => c.categoryName.toLowerCase().contains(_searchQuery))
+        .toList();
+  }
+
+  // ─── Channel data shared by every layout ──────────────────────────────────
+
+  /// Loads the selected group's channels and applies the search and the
+  /// favourites filter. Messages (loading, error, empty) go through
+  /// [message].
+  Widget _withChannels({
+    required String? categoryId,
+    required Widget Function(List<Channel> channels) builder,
+    required Widget Function(Widget child) message,
+  }) {
+    if (categoryId == null) {
+      return message(const _Message('Choisissez un groupe'));
+    }
+    final channelsAsync = ref.watch(
+      mobileLiveChannelsByCategoryProvider((widget.playlist, categoryId)),
+    );
+    final favorites = ref.watch(mobileFavoritesProvider);
+    return channelsAsync.when(
+      loading: () => message(const Center(child: CircularProgressIndicator())),
+      error: (e, s) => message(_Message('Erreur : $e', error: true)),
+      data: (channels) {
+        var shown = channels;
+        if (_searchQuery.isNotEmpty) {
+          shown = shown
+              .where((c) => c.name.toLowerCase().contains(_searchQuery))
+              .toList();
+        }
+        if (_showFavoritesOnly) {
+          shown = shown.where((c) => favorites.contains(c.streamId)).toList();
+        }
+        if (shown.isEmpty) {
+          return message(
+            _Message(
+              _showFavoritesOnly
+                  ? 'Aucune chaîne favorite dans ce groupe'
+                  : 'Aucune chaîne trouvée',
+            ),
+          );
+        }
+        return builder(shown);
+      },
+    );
+  }
+
+  int? _channelCount(String? categoryId) {
+    if (categoryId == null) return null;
+    return ref
+        .watch(
+          mobileLiveChannelsByCategoryProvider((widget.playlist, categoryId)),
+        )
+        .valueOrNull
+        ?.length;
+  }
+
+  void _toggleChannelFavorite(Channel channel) {
+    ref.read(mobileFavoritesProvider.notifier).toggle(channel.streamId);
+  }
+
+  // ─── TV ────────────────────────────────────────────────────────────────────
+
+  static const _tvPadding = EdgeInsets.fromLTRB(24, 28, 48, 28);
+
+  Widget _buildTv(_GroupLists groups) {
+    final uiState = ref.watch(mobileLiveTvUiStateProvider);
+    if (!uiState.isCategoryView && uiState.selectedCategoryId != null) {
+      return _buildTvChannels(uiState);
+    }
+
+    return CustomScrollView(
+      controller: _scrollController,
+      clipBehavior: Clip.none,
+      slivers: [
+        SliverPadding(
+          padding: _tvPadding.copyWith(bottom: 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Direct', style: AppTheme.display(fontSize: 28)),
+                    const SizedBox(width: 16),
+                    _TvIconButton(
+                      icon: Icons.refresh,
+                      busy: _isRefreshing,
+                      onPressed: _refreshChannels,
+                    ),
+                    const Spacer(),
+                    const RemoteHint(
+                      before: 'Maintenir',
+                      after: 'pour épingler un groupe',
+                    ),
+                  ],
+                ),
+                if (_searchOpen || _searchQuery.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _searchField('Rechercher un groupe', tv: true),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (groups.favorites.isNotEmpty) ...[
+          _tvSection(const SectionTitle('Favoris')),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 126 + 24,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                padding: EdgeInsets.fromLTRB(
+                  _tvPadding.left,
+                  12,
+                  _tvPadding.right,
+                  12,
+                ),
+                itemCount: groups.favorites.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                itemBuilder: (context, i) {
+                  final category = groups.favorites[i];
+                  return FavoriteGroupCard(
+                    key: ValueKey('fav-${category.categoryId}'),
+                    playlist: widget.playlist,
+                    category: category,
+                    autofocus: i == 0 && !_searchOpen,
+                    onPressed: () => _openGroup(category),
+                    onLongPress: () => _toggleFavoriteCategory(category),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+        _tvSection(
+          SectionTitle('Tous les groupes', count: groups.others.length),
+          top: groups.favorites.isEmpty ? 24 : 12,
+        ),
+        if (groups.others.isEmpty)
+          const SliverToBoxAdapter(child: _Message('Aucun groupe trouvé'))
+        else
+          SliverPadding(
+            padding: _tvPadding.copyWith(top: 12),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisExtent: 72,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 16,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final category = groups.others[i];
+                  return TvGroupCard(
+                    key: ValueKey('live-cat-${category.categoryId}'),
+                    label: GroupLabel.parse(category.categoryName),
+                    autofocus:
+                        i == 0 && groups.favorites.isEmpty && !_searchOpen,
+                    onPressed: () => _openGroup(category),
+                    onLongPress: () => _toggleFavoriteCategory(category),
+                  );
+                },
+                childCount: groups.others.length,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _tvSection(Widget child, {double top = 24}) => SliverPadding(
+        padding: EdgeInsets.fromLTRB(_tvPadding.left, top, _tvPadding.right, 0),
+        sliver: SliverToBoxAdapter(child: child),
+      );
+
+  Widget _buildTvChannels(LiveTvUiState uiState) {
+    final label = GroupLabel.parse(uiState.selectedCategory ?? '');
+    final count = _channelCount(uiState.selectedCategoryId);
+    return Padding(
+      padding: _tvPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '‹ Direct',
+            style: AppTheme.body(fontSize: 14, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  label.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.display(fontSize: 28),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  label.meta(channelCount: count),
+                  style: AppTheme.body(
+                    fontSize: 15,
+                    color: AppColors.textMuted,
+                    fontFeatures: AppTheme.tabular,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              _TvIconButton(
+                icon: _showFavoritesOnly
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                onPressed: () =>
+                    setState(() => _showFavoritesOnly = !_showFavoritesOnly),
+              ),
+            ],
+          ),
+          if (_searchOpen || _searchQuery.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _searchField('Rechercher dans le groupe', tv: true),
+          ],
+          const SizedBox(height: 20),
+          Expanded(
+            child: _withChannels(
+              categoryId: uiState.selectedCategoryId,
+              message: (child) => child,
+              builder: (channels) {
+                final favorites = ref.watch(mobileFavoritesProvider);
+                final focused = channels.contains(_focusedChannel)
+                    ? _focusedChannel
+                    : channels.first;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 432,
+                      child: ListView.separated(
+                        clipBehavior: Clip.none,
+                        itemCount: channels.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 4),
+                        itemBuilder: (context, i) {
+                          final channel = channels[i];
+                          return ChannelRow(
+                            key: ValueKey('ch-${channel.streamId}'),
+                            playlist: widget.playlist,
+                            channel: channel,
+                            dense: true,
+                            autofocus: i == 0 && !_searchOpen,
+                            isFavorite: favorites.contains(channel.streamId),
+                            onFocus: () =>
+                                setState(() => _focusedChannel = channel),
+                            onPressed: () =>
+                                _playChannel(context, channel, channels, i),
+                            onLongPress: () => _toggleChannelFavorite(channel),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: NowPanel(
+                        playlist: widget.playlist,
+                        channel: focused,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Phone (and portrait tablet) ───────────────────────────────────────────
+
+  Widget _buildStack(_GroupLists groups) {
+    final uiState = ref.watch(mobileLiveTvUiStateProvider);
+    final inGroup =
+        !uiState.isCategoryView && uiState.selectedCategoryId != null;
+    return inGroup ? _buildStackChannels(uiState) : _buildStackGroups(groups);
+  }
+
+  Widget _largeTitleBar(
+    String title, {
+    List<Widget> actions = const [],
+    Widget? leading,
+  }) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        textTheme: theme.textTheme.copyWith(
+          headlineMedium: AppTheme.display(
+            fontSize: 34,
+            fontWeight: FontWeight.w600,
+          ),
+          titleLarge: AppTheme.display(fontSize: 20),
+        ),
+      ),
+      child: SliverAppBar.large(
+        pinned: true,
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
+        leading: leading,
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [...actions, const SizedBox(width: 4)],
+      ),
+    );
+  }
+
+  Widget _refreshButton() => IconButton(
+        tooltip: 'Actualiser les chaînes',
+        onPressed: _isRefreshing ? null : _refreshChannels,
+        icon: _isRefreshing
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh, color: AppColors.textSecondary),
+      );
+
+  Widget _buildStackGroups(_GroupLists groups) {
+    return RefreshIndicator(
+      onRefresh: _refreshChannels,
+      color: AppColors.textPrimary,
+      backgroundColor: AppColors.surface,
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          _largeTitleBar('Direct', actions: [_refreshButton()]),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: _searchField('Rechercher un groupe'),
+            ),
+          ),
+          if (groups.favorites.isNotEmpty) ...[
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 28, 16, 12),
+              sliver: SliverToBoxAdapter(
+                child: SectionTitle('Favoris', fontSize: 20),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 120,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: groups.favorites.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, i) {
+                    final category = groups.favorites[i];
+                    return FavoriteGroupCard(
+                      key: ValueKey('fav-${category.categoryId}'),
+                      playlist: widget.playlist,
+                      category: category,
+                      width: 236,
+                      height: 120,
+                      onPressed: () => _openGroup(category),
+                      onLongPress: () => _toggleFavoriteCategory(category),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 28, 16, 4),
+            sliver: SliverToBoxAdapter(
+              child: SectionTitle(
+                'Tous les groupes',
+                count: groups.others.length,
+                fontSize: 20,
+              ),
+            ),
+          ),
+          if (groups.favorites.isEmpty && _searchQuery.isEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  'Appui long sur un groupe pour l’épingler en haut',
+                  style:
+                      AppTheme.body(fontSize: 14, color: AppColors.textMuted),
+                ),
+              ),
+            ),
+          if (groups.others.isEmpty)
+            const SliverToBoxAdapter(child: _Message('Aucun groupe trouvé'))
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
+              sliver: SliverList.separated(
+                itemCount: groups.others.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  indent: 12,
+                  endIndent: 12,
+                ),
+                itemBuilder: (context, i) {
+                  final category = groups.others[i];
+                  return GroupRow(
+                    key: ValueKey('live-cat-${category.categoryId}'),
+                    label: GroupLabel.parse(category.categoryName),
+                    onTap: () => _openGroup(category),
+                    onLongPress: () => _toggleFavoriteCategory(category),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _favoritesFilterButton() => IconButton(
+        tooltip: _showFavoritesOnly
+            ? 'Toutes les chaînes'
+            : 'Chaînes favorites seulement',
+        onPressed: () =>
+            setState(() => _showFavoritesOnly = !_showFavoritesOnly),
+        icon: Icon(
+          _showFavoritesOnly ? Icons.star_rounded : Icons.star_outline_rounded,
+          color: _showFavoritesOnly
+              ? AppColors.textPrimary
+              : AppColors.textSecondary,
+        ),
+      );
+
+  Widget _buildStackChannels(LiveTvUiState uiState) {
+    final label = GroupLabel.parse(uiState.selectedCategory ?? '');
+    final count = _channelCount(uiState.selectedCategoryId);
+    final meta = label.meta(channelCount: count);
+    return RefreshIndicator(
+      onRefresh: _refreshChannels,
+      color: AppColors.textPrimary,
+      backgroundColor: AppColors.surface,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          _largeTitleBar(
+            label.name,
+            leading: IconButton(
+              tooltip: 'Retour',
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _backToGroups,
+            ),
+            actions: [_favoritesFilterButton()],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (meta.isNotEmpty) ...[
+                    Text(
+                      meta,
+                      style: AppTheme.body(
+                        fontSize: 14,
+                        color: AppColors.textMuted,
+                        fontFeatures: AppTheme.tabular,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _searchField('Rechercher dans le groupe'),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+          _withChannels(
+            categoryId: uiState.selectedCategoryId,
+            message: (child) =>
+                SliverFillRemaining(hasScrollBody: false, child: child),
+            builder: (channels) {
+              final favorites = ref.watch(mobileFavoritesProvider);
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
+                sliver: SliverList.separated(
+                  itemCount: channels.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    indent: 12,
+                    endIndent: 12,
+                  ),
+                  itemBuilder: (context, i) {
+                    final channel = channels[i];
+                    return ChannelRow(
+                      key: ValueKey('ch-${channel.streamId}'),
+                      playlist: widget.playlist,
+                      channel: channel,
+                      isFavorite: favorites.contains(channel.streamId),
+                      onPressed: () =>
+                          _playChannel(context, channel, channels, i),
+                      onLongPress: () => _toggleChannelFavorite(channel),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Tablet, landscape: groups | channels ──────────────────────────────────
+
+  Widget _buildSplit(_GroupLists groups) {
+    final uiState = ref.watch(mobileLiveTvUiStateProvider);
+    // Nothing chosen yet: open the first favourite, else the first group.
+    model.Category? fallback;
+    if (uiState.selectedCategoryId == null) {
+      fallback = groups.favorites.isNotEmpty
+          ? groups.favorites.first
+          : (groups.others.isNotEmpty ? groups.others.first : null);
+    }
+    final selectedId = uiState.selectedCategoryId ?? fallback?.categoryId;
+    final selectedName = uiState.selectedCategory ?? fallback?.categoryName;
+
+    Widget row(model.Category category, {required bool favorite}) => GroupRow(
+          key: ValueKey('live-cat-${category.categoryId}'),
+          label: GroupLabel.parse(category.categoryName),
+          height: 56,
+          showChevron: false,
+          isFavorite: favorite,
+          selected: category.categoryId == selectedId,
+          onTap: () => _openGroup(category),
+          onLongPress: () => _toggleFavoriteCategory(category),
+        );
+
+    Widget sectionLabel(String text, {int? count}) => Padding(
+          padding: const EdgeInsets.fromLTRB(12, 24, 12, 8),
+          child: Text.rich(
+            TextSpan(
+              text: text,
+              children: [
+                if (count != null)
+                  TextSpan(
+                    text: '  $count',
+                    style: const TextStyle(color: AppColors.textMuted),
+                  ),
+              ],
+            ),
+            style: AppTheme.body(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+              fontFeatures: AppTheme.tabular,
+            ),
+          ),
+        );
+
+    final label = GroupLabel.parse(selectedName ?? '');
+    final meta = label.meta(channelCount: _channelCount(selectedId));
+
+    return SafeArea(
+      left: false,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 360,
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 8, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Direct',
+                                style: AppTheme.display(fontSize: 32),
+                              ),
+                            ),
+                            _refreshButton(),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _searchField('Rechercher'),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 8, 24),
+                  sliver: SliverList.list(
+                    children: [
+                      if (groups.favorites.isNotEmpty) ...[
+                        sectionLabel('Favoris'),
+                        for (final c in groups.favorites)
+                          row(c, favorite: true),
+                      ],
+                      sectionLabel(
+                        'Tous les groupes',
+                        count: groups.others.length,
+                      ),
+                      if (groups.favorites.isEmpty && _searchQuery.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                          child: Text(
+                            'Appui long sur un groupe pour l’épingler en haut',
+                            style: AppTheme.body(
+                              fontSize: 13,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      for (final c in groups.others) row(c, favorite: false),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTheme.display(fontSize: 28),
+                            ),
+                            if (meta.isNotEmpty)
+                              Text(
+                                meta,
+                                style: AppTheme.body(
+                                  fontSize: 14,
+                                  color: AppColors.textMuted,
+                                  fontFeatures: AppTheme.tabular,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      _favoritesFilterButton(),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _withChannels(
+                      categoryId: selectedId,
+                      message: (child) => child,
+                      builder: (channels) {
+                        final favorites = ref.watch(mobileFavoritesProvider);
+                        return GridView.builder(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 320,
+                            mainAxisExtent: 196,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                          ),
+                          itemCount: channels.length,
+                          itemBuilder: (context, i) {
+                            final channel = channels[i];
+                            return ChannelTile(
+                              key: ValueKey('ch-${channel.streamId}'),
+                              playlist: widget.playlist,
+                              channel: channel,
+                              isFavorite: favorites.contains(channel.streamId),
+                              onPressed: () =>
+                                  _playChannel(context, channel, channels, i),
+                              onLongPress: () =>
+                                  _toggleChannelFavorite(channel),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Search field ──────────────────────────────────────────────────────────
+
+  /// 48 dp field. On TV it is a focusable box that only becomes editable once
+  /// pressed, so the D-pad never gets trapped in a text field.
+  Widget _searchField(String hint, {bool tv = false}) {
+    final editable = !tv || _isSearchEditing;
+    final field = Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.search, size: 22, color: AppColors.textMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ExcludeFocus(
+              excluding: !editable,
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                readOnly: !editable,
+                cursorColor: AppColors.textPrimary,
+                style: AppTheme.body(fontSize: 16),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle:
+                      AppTheme.body(fontSize: 16, color: AppColors.textMuted),
+                  filled: false,
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onSubmitted: (_) {
+                  if (tv) setState(() => _isSearchEditing = false);
+                },
+              ),
+            ),
+          ),
+          if (_searchController.text.isNotEmpty || (tv && _searchOpen))
+            IconButton(
+              tooltip: 'Effacer',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.close, size: 20),
+              color: AppColors.textMuted,
+              onPressed: _clearSearch,
+            ),
+        ],
+      ),
+    );
+    if (!tv) return field;
+    return TVFocusable(
+      scale: 1.0,
+      borderRadius: BorderRadius.circular(12),
+      onPressed: _openSearch,
+      child: field,
+    );
+  }
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
 
   void _toggleFavoriteCategory(model.Category category) {
     final added = ref
         .read(mobileFavoriteCategoriesProvider.notifier)
         .toggle(widget.playlist.id, category.categoryId);
+    final name = GroupLabel.parse(category.categoryName).name;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(
             added
-                ? '« ${category.categoryName} » épinglé en haut'
-                : '« ${category.categoryName} » retiré des favoris',
+                ? '« $name » épinglé en haut'
+                : '« $name » retiré des favoris',
           ),
           duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
         ),
       );
   }
@@ -609,350 +1126,120 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     BuildContext context,
     Channel channel,
     List<Channel> channels,
-    PlaylistConfig playlist,
     int index,
   ) async {
     final settings = ref.read(mobileSettingsProvider);
+    final playlist = widget.playlist;
 
-    // Check if channel has forced deinterlacing enabled
+    // Channels with forced deinterlacing use the lite player.
     final forceDeinterlace =
         settings.deinterlacedChannels.contains(channel.streamId);
 
-    if (forceDeinterlace) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LitePlayerScreen(
-            streamId: channel.streamId,
-            title: channel.name,
-            playlist: playlist,
-            streamType: StreamType.live,
-            channels: channels,
-            initialIndex: index,
-          ),
-        ),
-      );
-    } else {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NativePlayerScreen(
-            streamId: channel.streamId,
-            title: channel.name,
-            playlist: playlist,
-            streamType: StreamType.live,
-            channels: channels,
-            initialIndex: index,
-            forceDeinterlace: false,
-          ),
-        ),
-      );
-    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => forceDeinterlace
+            ? LitePlayerScreen(
+                streamId: channel.streamId,
+                title: channel.name,
+                playlist: playlist,
+                streamType: StreamType.live,
+                channels: channels,
+                initialIndex: index,
+              )
+            : NativePlayerScreen(
+                streamId: channel.streamId,
+                title: channel.name,
+                playlist: playlist,
+                streamType: StreamType.live,
+                channels: channels,
+                initialIndex: index,
+                forceDeinterlace: false,
+              ),
+      ),
+    );
 
-    // When returning from player, set flag to prevent PopScope from going back to categories
-    if (mounted) {
-      setState(() => _justReturnedFromPlayer = true);
-    }
+    // Back from the player: keep PopScope from leaving the channel list.
+    if (mounted) setState(() => _justReturnedFromPlayer = true);
   }
 }
 
-/// Phase 2 widget: loads channels for the selected category (or handles search/favorites)
-class _ChannelListView extends ConsumerWidget {
-  final PlaylistConfig playlist;
-  final LiveTvUiState uiState;
-  final String searchQuery;
-  final bool showFavoritesOnly;
-  final void Function(Channel, List<Channel>, int) onPlay;
-
-  const _ChannelListView({
-    required this.playlist,
-    required this.uiState,
-    required this.searchQuery,
-    required this.showFavoritesOnly,
-    required this.onPlay,
+class _GroupLists {
+  const _GroupLists({
+    required this.favorites,
+    required this.others,
+    required this.total,
   });
+  final List<model.Category> favorites;
+  final List<model.Category> others;
+  final int total;
+}
+
+class _Message extends StatelessWidget {
+  const _Message(this.text, {this.error = false});
+  final String text;
+  final bool error;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final favorites = ref.watch(mobileFavoritesProvider);
-
-    // Determine which category to fetch channels for
-    final categoryId = uiState.selectedCategoryId;
-
-    if (categoryId == null && !showFavoritesOnly && searchQuery.isEmpty) {
-      return const SliverFillRemaining(
-        child: Center(
-          child: Text(
-            'Aucune catégorie sélectionnée',
-            style: TextStyle(color: AppColors.onSurface70),
-          ),
-        ),
-      );
-    }
-
-    // Phase 2: load channels for selected category
-    final channelsAsync = categoryId != null
-        ? ref.watch(
-            mobileLiveChannelsByCategoryProvider((playlist, categoryId)),
-          )
-        : null;
-
-    if (channelsAsync == null) {
-      return SliverFillRemaining(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              showFavoritesOnly
-                  ? 'Sélectionnez une catégorie pour voir vos favoris'
-                  : 'Sélectionnez une catégorie pour rechercher',
-              style: const TextStyle(color: AppColors.onSurface70),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return channelsAsync.when(
-      loading: () => const SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, s) => SliverFillRemaining(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Erreur: $e',
-              style: const TextStyle(color: AppColors.error),
-              textAlign: TextAlign.center,
-            ),
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: AppTheme.body(
+            fontSize: 15,
+            color: error ? AppColors.error : AppColors.textSecondary,
           ),
         ),
       ),
-      data: (channels) {
-        // Apply search or favorites filter
-        List<Channel> displayedChannels;
-        if (searchQuery.isNotEmpty) {
-          displayedChannels = channels
-              .where((c) => c.name.toLowerCase().contains(searchQuery))
-              .toList();
-        } else if (showFavoritesOnly) {
-          displayedChannels =
-              channels.where((c) => favorites.contains(c.streamId)).toList();
-        } else {
-          displayedChannels = channels;
-        }
-
-        if (displayedChannels.isEmpty) {
-          return const SliverFillRemaining(
-            child: Center(
-              child: Text(
-                'Aucune chaîne trouvée',
-                style: TextStyle(color: AppColors.onSurface70),
-              ),
-            ),
-          );
-        }
-
-        return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          sliver: SliverGrid(
-            gridDelegate: AdaptiveGrid.liveTiles(context),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final channel = displayedChannels[index];
-                return _MobileChannelCard(
-                  channel: channel,
-                  playlist: playlist,
-                  onTap: () => onPlay(channel, displayedChannels, index),
-                );
-              },
-              childCount: displayedChannels.length,
-            ),
-          ),
-        );
-      },
     );
   }
 }
 
-class _MobileChannelCard extends ConsumerStatefulWidget {
-  final Channel channel;
-  final VoidCallback onTap;
-  final PlaylistConfig playlist;
-
-  const _MobileChannelCard({
-    required this.channel,
-    required this.onTap,
-    required this.playlist,
+/// Round TV icon button, lit when focused.
+class _TvIconButton extends StatelessWidget {
+  const _TvIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.busy = false,
   });
 
-  @override
-  ConsumerState<_MobileChannelCard> createState() => _MobileChannelCardState();
-}
-
-class _MobileChannelCardState extends ConsumerState<_MobileChannelCard> {
-  String? _epgTitle;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadEpg();
-  }
-
-  Future<void> _loadEpg() async {
-    try {
-      final service =
-          await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
-      final epg = await service.getShortEPG(widget.channel.streamId);
-      if (mounted && epg.nowPlaying.isNotEmpty) {
-        setState(() {
-          _epgTitle = epg.nowPlaying;
-        });
-      }
-    } catch (e) {
-      // Ignore EPG errors
-    }
-  }
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
-    final iconUrl = widget.channel.streamIcon.isNotEmpty &&
-            widget.channel.streamIcon.startsWith('http')
-        ? widget.channel.streamIcon
-        : null;
-
-    final favorites = ref.watch(mobileFavoritesProvider);
-    final isFavorite = favorites.contains(widget.channel.streamId);
-
     return TVFocusable(
-      onPressed: widget.onTap,
-      onLongPress: () {
-        ref
-            .read(mobileFavoritesProvider.notifier)
-            .toggle(widget.channel.streamId);
-      },
-      child: Container(
-        decoration: AppDecorations.glossyCard(context, radius: 12),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            // Glossy highlight overlay (top shimmer)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 40,
-              child: Container(
-                decoration: AppDecorations.glossShimmer(context, radius: 12),
-              ),
+      paintsOwnFocus: true,
+      scale: 1.08,
+      borderRadius: BorderRadius.circular(20),
+      onPressed: busy ? null : onPressed,
+      child: Builder(
+        builder: (context) {
+          final lit = TVFocusable.isFocused(context);
+          return AnimatedContainer(
+            duration: AppTheme.durationFocus,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: lit ? AppColors.focus : AppColors.surface,
+              shape: BoxShape.circle,
             ),
-            // Content
-            Positioned.fill(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Channel Logo
-                  Expanded(
-                    flex: 3,
-                    child: Container(
-                      decoration: AppDecorations.channelCardBase(context),
-                      child: Stack(
-                        children: [
-                          // Logo
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: iconUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: iconUrl,
-                                      fit: BoxFit.contain,
-                                      memCacheHeight: 120,
-                                      cacheManager: AppCacheManager.instance,
-                                      errorWidget: (_, __, ___) => Icon(
-                                        Icons.tv,
-                                        color:
-                                            AppDecorations.iconMuted(context),
-                                        size: 30,
-                                      ),
-                                      placeholder: (_, __) => Icon(
-                                        Icons.tv,
-                                        color:
-                                            AppDecorations.iconMuted(context),
-                                        size: 30,
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.tv,
-                                      color: AppDecorations.iconMuted(context),
-                                      size: 30,
-                                    ),
-                            ),
-                          ),
-                          // Favorite badge
-                          if (isFavorite)
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.live,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.favorite,
-                                  color: AppColors.onSurface,
-                                  size: 10,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+            child: busy
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    icon,
+                    size: 22,
+                    color: lit ? AppColors.onFocus : AppColors.textSecondary,
                   ),
-                  // Channel Info
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            widget.channel.name,
-                            style: const TextStyle(
-                              color: AppColors.onSurface,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (_epgTitle != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              _epgTitle!,
-                              style: const TextStyle(
-                                color: AppColors.textTertiary,
-                                fontSize: 10,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

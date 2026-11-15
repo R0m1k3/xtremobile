@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xtremobile/core/utils/form_factor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'core/theme/app_theme.dart';
@@ -33,6 +34,10 @@ void main() async {
   } catch (e) {
     debugPrint('XtremFlow: DeviceInfo init failed: $e');
   }
+
+  // TV / tablet / phone: decides navigation and density.
+  await FormFactors.init();
+  StartupProfiler.mark('form_factor_init');
 
   // [P0-2 FIX] Implement TTL-based cache instead of destructive clearing
   // Cache is now persistent with TTL:

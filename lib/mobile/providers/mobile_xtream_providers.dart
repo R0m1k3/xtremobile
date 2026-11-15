@@ -85,6 +85,22 @@ final mobileLiveChannelsByCategoryProvider =
   return service.getLiveChannels(categoryId);
 });
 
+/// Programme on now for one channel, shared by the channel row and the TV
+/// "en ce moment" panel. `null` when the provider has no guide for it.
+/// Auto-disposed: rows that scroll away release their entry, the service
+/// keeps its own one-hour cache.
+final channelNowProvider = FutureProvider.autoDispose
+    .family<model.ShortEPG?, (PlaylistConfig, String)>((ref, params) async {
+  final (playlist, streamId) = params;
+  final service = await ref.watch(mobileXtreamServiceProvider(playlist).future);
+  try {
+    final epg = await service.getShortEPG(streamId);
+    return epg.title.isEmpty ? null : epg;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Load ALL live channels efficiently
 /// Strategy: Load categories, then load channels in SMALL BATCHES (5 at a time)
 /// This balances speed with robustness - not too slow, not too many parallel requests

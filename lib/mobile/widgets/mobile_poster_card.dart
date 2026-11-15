@@ -1,14 +1,21 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:xtremobile/core/theme/app_decorations.dart';
-import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
-import 'package:xtremobile/core/utils/image_cache_config.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:flutter/material.dart';
 
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/utils/form_factor.dart';
+import 'package:xtremobile/core/utils/image_cache_config.dart';
+import 'package:xtremobile/mobile/widgets/adaptive_grid.dart';
+import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+
+/// A movie or series poster. The artwork carries the colour; the caption is
+/// quiet. On TV the focused poster gets a light 4 dp outline and is the only
+/// one showing its title, so the wall of posters stays calm.
 class MobilePosterCard extends StatelessWidget {
   final String title;
   final String? imageUrl;
   final String? rating;
+  final String? year;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool isWatched;
@@ -19,130 +26,139 @@ class MobilePosterCard extends StatelessWidget {
     required this.title,
     required this.imageUrl,
     this.rating,
+    this.year,
     required this.onTap,
     this.onLongPress,
     this.isWatched = false,
-    this.placeholderIcon = Icons.movie,
+    this.placeholderIcon = Icons.movie_outlined,
   });
+
+  String get _meta => [
+        if (year != null && year!.isNotEmpty) year!,
+        if (rating != null && rating!.isNotEmpty) '$rating / 10',
+      ].join(' · ');
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // FIXED Aspect Ratio for the image part to avoid stretching
-        AspectRatio(
-          aspectRatio: 2 / 3,
-          child: Container(
-            decoration: AppDecorations.glossyCard(context, radius: 12),
-            child: TVFocusable(
-              onPressed: onTap,
-              onLongPress: onLongPress,
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Image / placeholder (clipped)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: imageUrl != null && imageUrl!.isNotEmpty
-                        ? CachedNetworkImage(
+    final tv = FormFactors.of(context) == FormFactor.tv;
+
+    return TVFocusable(
+      onPressed: onTap,
+      onLongPress: onLongPress,
+      scale: 1.06,
+      borderWidth: 4,
+      borderRadius: BorderRadius.circular(10),
+      // The outline goes on the artwork only, the caption stays outside.
+      paintsOwnFocus: true,
+      child: Builder(
+        builder: (context) {
+          final lit = TVFocusable.isFocused(context);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 2 / 3,
+                child: AnimatedContainer(
+                  duration: AppTheme.durationFocus,
+                  curve: AppTheme.curveFocus,
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: lit
+                        ? Border.all(color: AppColors.focus, width: 4)
+                        : null,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: lit ? const [AppColors.focusShadow] : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (imageUrl != null && imageUrl!.isNotEmpty)
+                          CachedNetworkImage(
                             imageUrl: imageUrl!,
                             fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            memCacheWidth: 200, // Increased for better quality
-                            memCacheHeight: 300,
+                            memCacheWidth: 240,
+                            memCacheHeight: 360,
                             maxWidthDiskCache: 400,
                             maxHeightDiskCache: 600,
                             cacheManager: AppCacheManager.instance,
-                            errorWidget: (_, __, ___) => _buildPlaceholder(context),
-                            placeholder: (_, __) => _buildPlaceholder(context),
+                            fadeInDuration: AppTheme.durationFast,
+                            errorWidget: (_, __, ___) => _placeholder(),
+                            placeholder: (_, __) => _placeholder(),
                           )
-                        : _buildPlaceholder(context),
-                  ),
-
-                  // Rating badge
-                  if (rating != null && rating!.isNotEmpty)
-                    _buildRatingBadge(),
-
-                  // Watched badge
-                  if (isWatched)
-                    _buildWatchedBadge(),
-
-                  // Glossy highlight overlay (top shimmer)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 60,
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: AppDecorations.glossShimmer(context, radius: 12),
-                      ),
+                        else
+                          _placeholder(),
+                        if (isWatched) const _WatchedMark(),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 4),
-
-        // Title with fixed height to avoid pushing the image
-        SizedBox(
-          height: 18,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppDecorations.textPrimary(context),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              SizedBox(
+                height: AdaptiveGrid.posterCaption,
+                child: AnimatedOpacity(
+                  opacity: !tv || lit ? 1 : 0,
+                  duration: AppTheme.durationFocus,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTheme.body(
+                            fontSize: tv ? 15 : 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (_meta.isNotEmpty)
+                          Text(
+                            _meta,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTheme.body(
+                              fontSize: tv ? 13 : 12,
+                              color: AppColors.textMuted,
+                              fontFeatures: AppTheme.tabular,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPlaceholder(BuildContext context) {
-    return Container(
-      decoration: AppDecorations.channelCardBase(context),
-      child: Icon(
-        placeholderIcon,
-        color: AppDecorations.iconMuted(context),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildRatingBadge() {
-    return Positioned(
-      top: 6,
-      left: 6,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+  Widget _placeholder() {
+    return ColoredBox(
+      color: AppColors.surfaceHigh,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.star, color: AppColors.ratingGold, size: 10),
-            const SizedBox(width: 2),
+            Icon(placeholderIcon, size: 22, color: AppColors.textMuted),
+            const SizedBox(height: 8),
             Text(
-              rating!,
-              style: const TextStyle(
-                color: AppColors.onSurface,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+              title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: AppTheme.body(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
               ),
             ),
           ],
@@ -150,22 +166,25 @@ class MobilePosterCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildWatchedBadge() {
+/// Watched: a small neutral check in the corner.
+class _WatchedMark extends StatelessWidget {
+  const _WatchedMark();
+
+  @override
+  Widget build(BuildContext context) {
     return Positioned(
       top: 6,
       right: 6,
       child: Container(
-        padding: const EdgeInsets.all(4),
+        width: 22,
+        height: 22,
         decoration: const BoxDecoration(
-          color: AppColors.success,
+          color: AppColors.background,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
-          Icons.check,
-          size: 10,
-          color: AppColors.onSurface,
-        ),
+        child: const Icon(Icons.check, size: 14, color: AppColors.textPrimary),
       ),
     );
   }
