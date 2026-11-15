@@ -1250,7 +1250,16 @@ class _TvIconButton extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: lit ? AppColors.focus : AppColors.surface,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: lit
+                    ? const [AppColors.focusTop, AppColors.focus]
+                    : const [AppColors.cardTop, AppColors.cardBottom],
+              ),
+              border: Border.all(
+                color: lit ? const Color(0x00FFFFFF) : AppColors.cardEdge,
+              ),
               shape: BoxShape.circle,
             ),
             child: busy

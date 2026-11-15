@@ -52,12 +52,16 @@ class ChannelLogo extends StatelessWidget {
     required this.width,
     required this.height,
     this.radius = 6,
+    this.inset = false,
   });
 
   final String url;
   final String name;
   final double width;
   final double height;
+
+  /// Sunk into a TV card rather than raised on the page.
+  final bool inset;
   final double radius;
 
   @override
@@ -81,7 +85,7 @@ class ChannelLogo extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      decoration: AppDecorations.logoTile(radius: radius),
+      decoration: AppDecorations.logoTile(radius: radius, inset: inset),
       padding: EdgeInsets.all(height * 0.12),
       child: hasUrl
           ? CachedNetworkImage(
@@ -221,10 +225,7 @@ class TvGroupCard extends StatelessWidget {
             duration: AppTheme.durationFocus,
             curve: AppTheme.curveFocus,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: lit ? AppColors.focus : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: AppDecorations.tvCard(lit: lit, radius: 12),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,10 +410,7 @@ class FavoriteGroupCard extends ConsumerWidget {
               duration: AppTheme.durationFocus,
               curve: AppTheme.curveFocus,
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: BoxDecoration(
-                color: lit ? AppColors.focus : AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-              ),
+              decoration: AppDecorations.tvCard(lit: lit),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -471,6 +469,7 @@ class FavoriteGroupCard extends ConsumerWidget {
                                 name: c.name,
                                 width: 52,
                                 height: 32,
+                                inset: true,
                               ),
                               const SizedBox(width: 8),
                             ],
@@ -858,10 +857,7 @@ class NowPanel extends ConsumerWidget {
 
     return Container(
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: AppDecorations.tvCard(lit: false, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

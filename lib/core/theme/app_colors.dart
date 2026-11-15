@@ -30,6 +30,12 @@ class AppColors {
   /// Progress track, the highest neutral step.
   static const Color track = Color(0xFF2E2E31);
 
+  /// TV cards (tvOS-style platters): a lighter top, a darker bottom, and a
+  /// light edge so the shape reads on the near-black page.
+  static const Color cardTop = Color(0xFF2E2E33);
+  static const Color cardBottom = Color(0xFF232327);
+  static const Color cardEdge = Color(0x17FFFFFF);
+
   /// Separators: primary text at 8 %.
   static const Color hairline = Color(0x14EDEDED);
 
@@ -40,6 +46,9 @@ class AppColors {
 
   // The lit element (TV focus).
   static const Color focus = Color(0xFFF2F1EE);
+
+  /// Top of the lit card: a touch brighter, as if lit from above.
+  static const Color focusTop = Color(0xFFFFFFFF);
   static const Color onFocus = Color(0xFF111112);
   static const Color onFocusMuted = Color(0xFF55555A);
   static const Color focusTrack = Color(0xFFD4D3CF);
@@ -186,10 +195,11 @@ class AppColors {
 
   // ============ SHADOWS ============
   /// Neutral shadow, only under the focused (lit) element.
+  /// The lit card floats above the page.
   static const BoxShadow focusShadow = BoxShadow(
-    color: Color(0x80000000),
-    blurRadius: 24,
-    offset: Offset(0, 8),
+    color: Color(0x99000000),
+    blurRadius: 40,
+    offset: Offset(0, 16),
   );
 
   static Color glowPrimary(double opacity) =>

@@ -63,9 +63,10 @@ class MobilePosterCard extends StatelessWidget {
                   curve: AppTheme.curveFocus,
                   foregroundDecoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
+                    // At rest, a light edge keeps dark posters off the page.
                     border: lit
                         ? Border.all(color: AppColors.focus, width: 4)
-                        : null,
+                        : Border.all(color: AppColors.cardEdge),
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
