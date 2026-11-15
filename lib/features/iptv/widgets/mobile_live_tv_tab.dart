@@ -15,6 +15,7 @@ import 'package:xtremobile/core/utils/form_factor.dart';
 import 'package:xtremobile/core/utils/group_label.dart';
 import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
 import 'package:xtremobile/features/iptv/screens/native_player_screen.dart';
+import 'package:xtremobile/features/iptv/widgets/channel_preview.dart';
 import 'package:xtremobile/features/iptv/widgets/live_widgets.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
@@ -55,6 +56,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
+
+  /// TV channel list: the live preview, released before full-screen playback.
+  final _previewKey = GlobalKey<ChannelPreviewState>();
   bool _isSearchEditing = false;
 
   /// TV only: search is a destination, the field shows once asked for.
@@ -432,39 +436,43 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
           ),
         ),
         if (groups.favorites.isNotEmpty) ...[
-          _tvSection(const SectionTitle('Favoris')),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 126 + 24,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                padding: EdgeInsets.fromLTRB(
-                  _tvPadding.left,
-                  12,
-                  _tvPadding.right,
-                  12,
-                ),
-                itemCount: groups.favorites.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (context, i) {
+          _tvSection(
+            SectionTitle('Favoris', count: groups.favorites.length),
+          ),
+          // A wrapping grid rather than a horizontal shelf: every favourite is
+          // reachable with up/down on the remote, nothing hides off-screen.
+          SliverPadding(
+            padding: _tvPadding.copyWith(top: 12, bottom: 0),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisExtent: 140,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
                   final category = groups.favorites[i];
                   return FavoriteGroupCard(
                     key: ValueKey('fav-${category.categoryId}'),
                     playlist: widget.playlist,
                     category: category,
+                    width: double.infinity,
+                    height: double.infinity,
+                    nameLines: 2,
                     autofocus: i == 0 && !_searchOpen,
                     onPressed: () => _openGroup(category),
                     onLongPress: () => _toggleFavoriteCategory(category),
                   );
                 },
+                childCount: groups.favorites.length,
               ),
             ),
           ),
         ],
         _tvSection(
           SectionTitle('Tous les groupes', count: groups.others.length),
-          top: groups.favorites.isEmpty ? 24 : 12,
+          top: groups.favorites.isEmpty ? 24 : 32,
         ),
         if (groups.others.isEmpty)
           const SliverToBoxAdapter(child: _Message('Aucun groupe trouvé'))
@@ -473,8 +481,9 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             padding: _tvPadding.copyWith(top: 12),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisExtent: 72,
+                // 3 columns: long names ("FRANCE HEVC 4K CINÉMA") stay whole.
+                crossAxisCount: 3,
+                mainAxisExtent: 80,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 16,
               ),
@@ -516,30 +525,32 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             style: AppTheme.body(fontSize: 14, color: AppColors.textMuted),
           ),
           const SizedBox(height: 4),
+          // Name on its own line, full width: long group names stay whole.
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Flexible(
-                child: Text(
-                  label.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTheme.display(fontSize: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.display(fontSize: 28),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label.meta(channelCount: count),
+                      style: AppTheme.body(
+                        fontSize: 15,
+                        color: AppColors.textMuted,
+                        fontFeatures: AppTheme.tabular,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  label.meta(channelCount: count),
-                  style: AppTheme.body(
-                    fontSize: 15,
-                    color: AppColors.textMuted,
-                    fontFeatures: AppTheme.tabular,
-                  ),
-                ),
-              ),
-              const Spacer(),
+              const SizedBox(width: 16),
               _TvIconButton(
                 icon: _showFavoritesOnly
                     ? Icons.star_rounded
@@ -553,7 +564,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             const SizedBox(height: 16),
             _searchField('Rechercher dans le groupe', tv: true),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Expanded(
             child: _withChannels(
               categoryId: uiState.selectedCategoryId,
@@ -567,7 +578,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 432,
+                      width: 400,
                       child: ListView.separated(
                         clipBehavior: Clip.none,
                         itemCount: channels.length,
@@ -595,6 +606,17 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                       child: NowPanel(
                         playlist: widget.playlist,
                         channel: focused,
+                        preview: focused == null
+                            ? null
+                            : ChannelPreview(
+                                key: _previewKey,
+                                playlist: widget.playlist,
+                                channel: focused,
+                                // Hidden tabs stay mounted (IndexedStack).
+                                active:
+                                    ref.watch(mobileDashboardIndexProvider) ==
+                                        0,
+                              ),
                       ),
                     ),
                   ],
@@ -1135,6 +1157,10 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     final forceDeinterlace =
         settings.deinterlacedChannels.contains(channel.streamId);
 
+    // Free the preview's connection first: many subscriptions allow only one.
+    await _previewKey.currentState?.release();
+    if (!context.mounted) return;
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1161,6 +1187,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
 
     // Back from the player: keep PopScope from leaving the channel list.
     if (mounted) setState(() => _justReturnedFromPlayer = true);
+    _previewKey.currentState?.resume();
   }
 }
 
