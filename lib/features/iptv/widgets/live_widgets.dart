@@ -857,7 +857,8 @@ class NowPanel extends ConsumerWidget {
     );
 
     return Container(
-      clipBehavior: Clip.antiAlias,
+      // No clip on the whole panel: only the picture is rounded, with a
+      // plain rounded-rect clip (cheap), not a path around everything.
       decoration: AppDecorations.tvCard(lit: false, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -865,25 +866,29 @@ class NowPanel extends ConsumerWidget {
           if (hasPreview)
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  preview!,
-                  const Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Color(0xB3000000),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(6, 4, 8, 4),
-                        child: _FullScreenHint(),
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    preview!,
+                    const Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xB3000000),
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(6, 4, 8, 4),
+                          child: _FullScreenHint(),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           Expanded(child: info),

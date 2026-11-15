@@ -1,4 +1,5 @@
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' as ui show Image;
+import 'dart:ui' show PictureRecorder, lerpDouble;
 
 import 'package:flutter/material.dart';
 
@@ -10,9 +11,14 @@ import 'app_colors.dart';
 /// every frame and is the first thing to drop frames on a Fire TV. Here the
 /// page behind the cards is a few soft blue glows ([AmbientBackground]) that
 /// look the same blurred or not, so a translucent fill is enough to read as
-/// frosted glass. The rest is light: a sheen on the top half, a faint
-/// diagonal glint, and a rim lit from the top left that cools to blue at the
-/// bottom right. All of it is a handful of gradients, painted once.
+/// frosted glass. The rest is light: brighter at the top left, a faint
+/// diagonal glint, a breath of blue at the bottom right, and a rim lit from
+/// the top left that cools to blue.
+///
+/// Cost matters more than anything here: with a live preview playing, the
+/// TV redraws the whole screen for every video frame. So a card is exactly
+/// two draws (one gradient body, one gradient rim), no clip, no layer, and
+/// no blurred shadow: the lit card's blue halo is a few plain strokes.
 ///
 /// [lit] goes from 0 (resting glass) to 1 (the lit card: frosted white, dark
 /// ink on it). `AnimatedContainer` blends between the two.
@@ -60,8 +66,42 @@ class _GlassPainter extends BoxPainter {
   _GlassPainter(this.d);
   final GlassDecoration d;
 
-  static Color _a(Color c, double opacity) =>
-      c.withValues(alpha: (c.a * opacity).clamp(0.0, 1.0));
+  // Body, top left to bottom right: light, glint band, blue pool.
+  static const _stops = [0.0, .32, .39, .46, 1.0];
+  static const _rest = [
+    Color(0x29FFFFFF),
+    Color(0x14FFFFFF),
+    Color(0x21FFFFFF),
+    Color(0x12FFFFFF),
+    Color(0x2E3D8FFF),
+  ];
+  static const _lit = [
+    AppColors.focusTop,
+    Color(0xFFF8F8F6),
+    Color(0xFFFAFAF8),
+    Color(0xFFF6F5F2),
+    AppColors.focus,
+  ];
+
+  // Rim: lit top left, dim middle, blue bottom right.
+  static const _rimStops = [0.0, .45, 1.0];
+  static const _rimRest = [
+    Color(0x66FFFFFF),
+    Color(0x14FFFFFF),
+    Color(0x598AB9FF)
+  ];
+  static const _rimLit = [
+    Color(0xFFFFFFFF),
+    Color(0x99FFFFFF),
+    Color(0xCC8AB9FF)
+  ];
+
+  // Lit halo: plain strokes, fading outwards (a blur would cost a pass).
+  static const _halo = [(2.0, .50), (5.0, .26), (8.0, .12), (11.0, .05)];
+
+  static List<Color> _mix(List<Color> a, List<Color> b, double t) => [
+        for (var i = 0; i < a.length; i++) Color.lerp(a[i], b[i], t)!,
+      ];
 
   @override
   void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
@@ -71,77 +111,28 @@ class _GlassPainter extends BoxPainter {
     final r = d.radius.clamp(0.0, size.shortestSide / 2);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(r));
     final l = d.lit.clamp(0.0, 1.0);
-    final rest = 1 - l;
 
-    // 1. Body: translucent white at rest, frosted white when lit.
+    if (l > 0) {
+      final halo = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3;
+      for (final (out, alpha) in _halo) {
+        halo.color = AppColors.accentStrong.withValues(alpha: alpha * l);
+        canvas.drawRRect(rrect.inflate(out - 1.5), halo);
+      }
+    }
+
     canvas.drawRRect(
       rrect,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(AppColors.glassTop, AppColors.focusTop, l)!,
-            Color.lerp(AppColors.glassBottom, AppColors.focus, l)!,
-          ],
+          stops: _stops,
+          colors: l == 0 ? _rest : _mix(_rest, _lit, l),
         ).createShader(rect),
     );
 
-    canvas.save();
-    canvas.clipRRect(rrect);
-
-    // 2. A breath of the logo's blue pooling at the bottom right.
-    if (rest > 0) {
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0x000A84FF),
-              _a(AppColors.glassTint, rest),
-            ],
-          ).createShader(rect),
-      );
-    }
-
-    // 3. Sheen: light falling on the top half.
-    final top =
-        Rect.fromLTWH(rect.left, rect.top, rect.width, rect.height * .5);
-    canvas.drawRect(
-      top,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            _a(const Color(0x1FFFFFFF), rest + l * 2.5),
-            const Color(0x00FFFFFF),
-          ],
-        ).createShader(top),
-    );
-
-    // 4. Glint: a soft diagonal band across the glass.
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0, .30, .38, .46, 1],
-          colors: [
-            const Color(0x00FFFFFF),
-            const Color(0x00FFFFFF),
-            _a(const Color(0x0FFFFFFF), rest),
-            const Color(0x00FFFFFF),
-            const Color(0x00FFFFFF),
-          ],
-        ).createShader(rect),
-    );
-    canvas.restore();
-
-    // 5. Rim: lit from the top left, cooling to blue at the bottom right.
     const w = 1.2;
     canvas.drawRRect(
       rrect.deflate(w / 2),
@@ -151,12 +142,8 @@ class _GlassPainter extends BoxPainter {
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          stops: const [0, .45, 1],
-          colors: [
-            Color.lerp(const Color(0x66FFFFFF), const Color(0xFFFFFFFF), l)!,
-            Color.lerp(const Color(0x14FFFFFF), const Color(0x99FFFFFF), l)!,
-            Color.lerp(const Color(0x598AB9FF), const Color(0xCC8AB9FF), l)!,
-          ],
+          stops: _rimStops,
+          colors: l == 0 ? _rimRest : _mix(_rimRest, _rimLit, l),
         ).createShader(rect),
     );
   }
@@ -164,48 +151,71 @@ class _GlassPainter extends BoxPainter {
 
 /// Page background: near-black with soft blue light, the colour of the logo,
 /// coming from the top left and the bottom right. The glass cards show it
-/// through. Painted once (own layer), never repainted by the content.
+/// through.
+///
+/// Rendered once into a small image (320×180) and stretched: smooth glows
+/// lose nothing, and the screen then costs a single textured draw per frame
+/// instead of several full-screen gradients.
 class AmbientBackground extends StatelessWidget {
   const AmbientBackground({super.key, required this.child});
   final Widget child;
+
+  static ui.Image? _image;
+
+  static ui.Image _bake() {
+    const w = 320.0, h = 180.0;
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    final rect = const Offset(0, 0) & const Size(w, h);
+    canvas.drawRect(rect, Paint()..color = AppColors.background);
+    void glow(Offset c, double radius, Color color) {
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [color, color.withValues(alpha: 0)],
+          ).createShader(Rect.fromCircle(center: c, radius: radius)),
+      );
+    }
+
+    // Behind the logo, top left.
+    glow(const Offset(w * .10, -h * .10), w * .55, const Color(0x4D0A84FF));
+    // Deep indigo, bottom right.
+    glow(const Offset(w * 1.0, h * 1.10), w * .60, const Color(0x403656D6));
+    // A faint cyan in the middle, so the glass has something to catch.
+    glow(const Offset(w * .62, h * .42), w * .38, const Color(0x1458B8FF));
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(w.toInt(), h.toInt());
+    picture.dispose();
+    return image;
+  }
 
   @override
   Widget build(BuildContext context) => Stack(
         fit: StackFit.expand,
         children: [
-          const RepaintBoundary(child: CustomPaint(painter: _AmbientPainter())),
+          RepaintBoundary(
+            child: CustomPaint(painter: _AmbientPainter(_image ??= _bake())),
+          ),
           child,
         ],
       );
 }
 
 class _AmbientPainter extends CustomPainter {
-  const _AmbientPainter();
+  const _AmbientPainter(this.image);
+  final ui.Image image;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = AppColors.background);
-    void glow(Offset c, double radius, Color color) {
-      final r = Rect.fromCircle(center: c, radius: radius);
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
-          ).createShader(r),
-      );
-    }
-
-    final w = size.width, h = size.height;
-    // Behind the logo, top left.
-    glow(Offset(w * .10, -h * .10), w * .55, const Color(0x4D0A84FF));
-    // Deep indigo, bottom right.
-    glow(Offset(w * 1.0, h * 1.10), w * .60, const Color(0x403656D6));
-    // A faint cyan in the middle, so the glass has something to catch.
-    glow(Offset(w * .62, h * .42), w * .38, const Color(0x1458B8FF));
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.low,
+    );
   }
 
   @override
-  bool shouldRepaint(_AmbientPainter oldDelegate) => false;
+  bool shouldRepaint(_AmbientPainter oldDelegate) => oldDelegate.image != image;
 }

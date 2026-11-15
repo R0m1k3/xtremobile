@@ -223,12 +223,6 @@ class AppColors {
     offset: Offset(0, 12),
   );
 
-  /// The lit card floats, with a halo of the logo's blue around it.
-  static const List<BoxShadow> focusShadows = [
-    focusShadow,
-    BoxShadow(color: Color(0x800A84FF), blurRadius: 32, spreadRadius: 2),
-  ];
-
   static Color glowPrimary(double opacity) =>
       const Color(0xFF000000).withValues(alpha: opacity);
   static Color glowPrimaryDim(double opacity) =>
