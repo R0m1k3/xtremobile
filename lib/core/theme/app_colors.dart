@@ -19,7 +19,7 @@ class AppColors {
 
   // ============ RAMP « SALLE OBSCURE » ============
   /// Scaffold / page background.
-  static const Color background = Color(0xFF0D0E11);
+  static const Color background = Color(0xFF101216);
 
   /// TV navigation rail, a step below the page.
   static const Color rail = Color(0xFF090A0D);
@@ -37,17 +37,21 @@ class AppColors {
   /// light edge so the shape reads on the near-black page.
   static const Color cardTop = Color(0xFF2D2F35);
   static const Color cardBottom = Color(0xFF222328);
-  static const Color cardEdge = Color(0x24A9C9FF);
+  static const Color cardEdge = Color(0x248FCFFF);
 
   // ============ LIGHT BLUE (the logo's) ============
+  // Two blues only, both from the logo: its light end and its deep end.
   /// Light blue on dark: current tab, favourite stars.
-  static const Color accent = Color(0xFF8AB9FF);
+  static const Color accent = Color(0xFF8FCFFF);
 
-  /// The logo's blue, for marks on the lit (light) card.
-  static const Color accentStrong = Color(0xFF0A84FF);
+  /// The logo's deep blue: glows, glass pool, focus halo.
+  static const Color accentStrong = Color(0xFF0A82FD);
+
+  /// The deep blue darkened for marks on the lit (light) card: 5:1.
+  static const Color accentOnLight = Color(0xFF0060DF);
 
   /// Tinted fill behind the current tab.
-  static const Color accentFill = Color(0x330A84FF);
+  static const Color accentFill = Color(0x260A82FD);
 
   // ============ GLASS (see glass.dart) ============
   /// Resting glass: white at 13 % fading to 5 %, over the ambient page.
@@ -62,20 +66,23 @@ class AppColors {
 
   // Three text roles.
   static const Color textPrimary = Color(0xFFEDEDED);
-  static const Color textSecondary = Color(0xFFA1A1A6);
-  static const Color textMuted = Color(0xFF85858B);
+  static const Color textSecondary = Color(0xFFBDBDC2);
+  static const Color textMuted = Color(0xFFA8A8AE);
 
   // The lit element (TV focus).
-  static const Color focus = Color(0xFFF2F1EE);
+  static const Color focus = Color(0xFFE9E8E4);
 
   /// Top of the lit card: a touch brighter, as if lit from above.
-  static const Color focusTop = Color(0xFFFFFFFF);
+  static const Color focusTop = Color(0xFFF4F4F2);
   static const Color onFocus = Color(0xFF111112);
   static const Color onFocusMuted = Color(0xFF55555A);
   static const Color focusTrack = Color(0xFFD4D3CF);
 
   /// Red "on air": the progress of the programme on now, and nothing else.
   static const Color live = Color(0xFFF0533F);
+
+  /// The same red, darkened to read on the lit (light) card.
+  static const Color liveOnLight = Color(0xFFD93A26);
 
   // ============ MATERIAL ROLES (mapped onto the ramp) ============
   static const Color baseLevel0 = rail;

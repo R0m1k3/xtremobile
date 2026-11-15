@@ -579,7 +579,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 460,
+                      width: 480,
                       // Cut at the top and bottom only: the lit row grows
                       // past the list's sides.
                       child: ClipRect(

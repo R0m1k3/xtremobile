@@ -68,7 +68,9 @@ class MobileCategoryCard extends StatelessWidget {
                               lit ? AppColors.onFocus : AppColors.textPrimary,
                         ),
                       ),
-                      if (label.country != null) ...[
+                      if (label.country != null &&
+                          label.country!.toLowerCase() !=
+                              label.name.toLowerCase()) ...[
                         const SizedBox(height: 2),
                         Text(
                           label.country!,
@@ -78,7 +80,7 @@ class MobileCategoryCard extends StatelessWidget {
                             fontSize: tv ? 14 : 13,
                             color: lit
                                 ? AppColors.onFocusMuted
-                                : AppColors.textMuted,
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -89,7 +91,7 @@ class MobileCategoryCard extends StatelessWidget {
                   Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: lit ? AppColors.accentStrong : AppColors.accent,
+                    color: lit ? AppColors.accentOnLight : AppColors.accent,
                   ),
                 if (!tv)
                   const Padding(
