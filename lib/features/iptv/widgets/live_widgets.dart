@@ -793,11 +793,35 @@ class NowPanel extends ConsumerWidget {
     if (c == null) return const SizedBox.shrink();
     final now =
         ref.watch(channelNowProvider((playlist, c.streamId))).valueOrNull;
-    final group = GroupLabel.parse(c.categoryName);
     final hasPreview = preview != null;
 
+    // Full channel name, however long: the number leads, dimmed.
+    final name = Text.rich(
+      TextSpan(
+        children: [
+          if (c.num.isNotEmpty)
+            TextSpan(
+              text: '${c.num}  ',
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontFeatures: AppTheme.tabular,
+              ),
+            ),
+          TextSpan(text: c.name),
+        ],
+      ),
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      style: AppTheme.body(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        color: AppColors.textPrimary,
+      ),
+    );
+
     final info = Padding(
-      padding: EdgeInsets.fromLTRB(20, hasPreview ? 16 : 24, 20, 20),
+      padding: EdgeInsets.fromLTRB(20, hasPreview ? 14 : 24, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -811,77 +835,23 @@ class NowPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
-          Text(
-            [
-              if (c.num.isNotEmpty) c.num,
-              c.name,
-              if (group.country != null) group.country!,
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTheme.body(
-              fontSize: 14,
-              color: AppColors.textMuted,
-              fontFeatures: AppTheme.tabular,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            now?.title ?? 'Pas de guide pour cette chaîne',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppTheme.body(
-              fontSize: hasPreview ? 20 : 24,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-              color:
-                  now == null ? AppColors.textSecondary : AppColors.textPrimary,
-            ),
-          ),
-          if (now != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              [now.timeRange, now.remaining()].whereType<String>().join(' · '),
-              style: AppTheme.body(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                fontFeatures: AppTheme.tabular,
+          name,
+          const SizedBox(height: 8),
+          // The programme gets the height left under the name: as many whole
+          // lines of title, then of description, as fit.
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, box) => _NowProgramme(
+                now: now,
+                height: box.maxHeight,
+                titleSize: hasPreview ? 16 : 22,
               ),
             ),
-            const SizedBox(height: 10),
-            LiveLine(progress: now.progress, height: 4),
-            const SizedBox(height: 14),
+          ),
+          if (!hasPreview) ...[
+            const SizedBox(height: 8),
+            const _FullScreenHint(),
           ],
-          // The description gets whatever height is left, in whole lines only.
-          Expanded(
-            child: now == null || now.description.isEmpty
-                ? const SizedBox.shrink()
-                : LayoutBuilder(
-                    builder: (context, box) {
-                      const size = 15.0, height = 1.45;
-                      final lines = (box.maxHeight / (size * height)).floor();
-                      if (lines < 1) return const SizedBox.shrink();
-                      return Text(
-                        now.description,
-                        maxLines: lines.clamp(1, 5),
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTheme.body(
-                          fontSize: size,
-                          height: height,
-                          color: AppColors.textSecondary,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            children: [
-              KeyCap('OK'),
-              SizedBox(width: 8),
-              _Hint('Plein écran'),
-            ],
-          ),
         ],
       ),
     );
@@ -895,12 +865,141 @@ class NowPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (hasPreview) AspectRatio(aspectRatio: 16 / 9, child: preview),
+          if (hasPreview)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  preview!,
+                  const Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xB3000000),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(6, 4, 8, 4),
+                        child: _FullScreenHint(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(child: info),
         ],
       ),
     );
   }
+}
+
+/// Title, times, progress and description of the current programme, fitted
+/// to [height] in whole lines (nothing cut half-way).
+class _NowProgramme extends StatelessWidget {
+  const _NowProgramme({
+    required this.now,
+    required this.height,
+    required this.titleSize,
+  });
+
+  final model.ShortEPG? now;
+  final double height;
+  final double titleSize;
+
+  static const _lineHeight = 1.25;
+  static const _timesSize = 15.0;
+  static const _descSize = 15.0, _descHeight = 1.45;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = this.now;
+    final titleLine = titleSize * _lineHeight;
+    final titleStyle = AppTheme.body(
+      fontSize: titleSize,
+      fontWeight: FontWeight.w500,
+      height: _lineHeight,
+      color: now == null ? AppColors.textSecondary : AppColors.textPrimary,
+    );
+    if (now == null) {
+      if (height < titleLine) return const SizedBox.shrink();
+      return Text(
+        'Pas de guide pour cette chaîne',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: titleStyle,
+      );
+    }
+
+    // Times (one line) + gap + progress line.
+    const timesBlock = 4 + _timesSize * _lineHeight + 8 + 4;
+    final titleLines =
+        ((height - timesBlock) / titleLine).floor().clamp(0, 2).toInt();
+    final left = height - timesBlock - titleLines * titleLine;
+    final descLines = now.description.isEmpty
+        ? 0
+        : ((left - 14) / (_descSize * _descHeight)).floor().clamp(0, 5).toInt();
+
+    return ClipRect(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (titleLines > 0)
+              Text(
+                now.title,
+                maxLines: titleLines,
+                overflow: TextOverflow.ellipsis,
+                style: titleStyle,
+              ),
+            const SizedBox(height: 4),
+            Text(
+              [now.timeRange, now.remaining()].whereType<String>().join(' · '),
+              maxLines: 1,
+              style: AppTheme.body(
+                fontSize: _timesSize,
+                height: _lineHeight,
+                color: AppColors.textSecondary,
+                fontFeatures: AppTheme.tabular,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LiveLine(progress: now.progress, height: 4),
+            if (descLines > 0) ...[
+              const SizedBox(height: 14),
+              Text(
+                now.description,
+                maxLines: descLines,
+                overflow: TextOverflow.ellipsis,
+                style: AppTheme.body(
+                  fontSize: _descSize,
+                  height: _descHeight,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullScreenHint extends StatelessWidget {
+  const _FullScreenHint();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          KeyCap('OK'),
+          SizedBox(width: 8),
+          _Hint('Plein écran'),
+        ],
+      );
 }
 
 class _Hint extends StatelessWidget {

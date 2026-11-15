@@ -297,6 +297,8 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
             return;
           }
 
+          if (TvMenu.focusIfAway()) return; // TV: first up to the menu
+
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(

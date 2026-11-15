@@ -46,12 +46,12 @@ class AdaptiveGrid {
     }
   }
 
-  /// Posters: a 2:3 image plus [posterCaption] under it. Six per row on TV,
+  /// Posters: a 2:3 image plus [posterCaption] under it. Seven per row on TV,
   /// three on a phone, as many ~150 dp columns as fit on a tablet.
   static SliverGridDelegate posters(BuildContext context) {
     switch (FormFactors.of(context)) {
       case FormFactor.tv:
-        return const _PosterGridDelegate(count: 6, spacing: 16);
+        return const _PosterGridDelegate(count: 7, spacing: 16);
       case FormFactor.tablet:
         return const _PosterGridDelegate(minTileWidth: 150, spacing: 16);
       case FormFactor.phone:

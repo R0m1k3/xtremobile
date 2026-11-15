@@ -312,6 +312,8 @@ class _MobileMoviesTabState extends ConsumerState<MobileMoviesTab>
           }
 
           // Root View -> Show Exit Dialog
+          if (TvMenu.focusIfAway()) return; // TV: first up to the menu
+
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
