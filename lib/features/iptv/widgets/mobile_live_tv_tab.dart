@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:xtremobile/core/widgets/app_dialog.dart';
 import 'package:xtremobile/core/models/iptv_models.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
@@ -215,28 +216,14 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
     } else if (TvMenu.focusIfAway()) {
       // TV: the first Back goes up to the menu.
     } else {
-      final shouldExit = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Quitter l'application"),
-          content: const Text("Voulez-vous vraiment quitter l'application ?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              autofocus: true,
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Quitter',
-                style: TextStyle(color: AppColors.error),
-              ),
-            ),
-          ],
-        ),
+      final shouldExit = await showAppConfirm(
+        context,
+        title: "Quitter l'application",
+        message: "Voulez-vous vraiment quitter l'application ?",
+        confirmLabel: 'Quitter',
+        destructive: true,
       );
-      if (shouldExit == true) SystemNavigator.pop();
+      if (shouldExit) SystemNavigator.pop();
     }
   }
 

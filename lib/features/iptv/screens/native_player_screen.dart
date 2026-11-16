@@ -700,7 +700,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
               'Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
             ),
             duration: const Duration(seconds: 2),
-            backgroundColor: AppColors.success,
           ),
         );
       } else {
@@ -1552,7 +1551,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         SnackBar(
           content: Text('Format: $label'),
           duration: const Duration(seconds: 1),
-          backgroundColor: Colors.black87,
         ),
       );
     }
