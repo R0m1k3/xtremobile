@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:xtremobile/core/widgets/app_dialog.dart';
 import 'package:xtremobile/mobile/widgets/mobile_poster_card.dart';
 import 'package:xtremobile/mobile/widgets/mobile_category_card.dart';
 import 'package:xtremobile/mobile/widgets/adaptive_grid.dart';
@@ -299,26 +300,15 @@ class _MobileSeriesTabState extends ConsumerState<MobileSeriesTab>
 
           if (TvMenu.focusIfAway()) return; // TV: first up to the menu
 
-          final shouldExit = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text("Quitter l'application"),
-              content: const Text("Voulez-vous vraiment quitter l'application ?"),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  autofocus: true,
-                  child: const Text('Annuler'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Quitter', style: TextStyle(color: AppColors.error)),
-                ),
-              ],
-            ),
+          final shouldExit = await showAppConfirm(
+            context,
+            title: "Quitter l'application",
+            message: "Voulez-vous vraiment quitter l'application ?",
+            confirmLabel: 'Quitter',
+            destructive: true,
           );
 
-          if (shouldExit == true) {
+          if (shouldExit) {
             SystemNavigator.pop();
           }
         },

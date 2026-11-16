@@ -1,3 +1,5 @@
+import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/widgets/app_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,181 +80,140 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
     final passwordFocus = FocusNode();
     final buttonFocus = FocusNode();
 
-    showModalBottomSheet(
-      context: context,
+    showAppSheet(
+      context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: FocusTraversalGroup(
-          policy: OrderedTraversalPolicy(), // Ensure logical order
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              // Ensure scrolling when keyboard/focus moves
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.textTertiary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Title
-                  Text(
-                    isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Form fields
-                  _buildTextField(
-                    controller: nameController,
-                    label: 'Nom',
-                    hint: 'Ma Playlist IPTV',
-                    icon: Icons.label_outline,
-                    textAction: TextInputAction.next,
-                    onSubmitted: () =>
-                        FocusScope.of(context).requestFocus(dnsFocus),
-                    focusNode: nameFocus,
-                    nextFocus: dnsFocus,
-                  ),
-
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: dnsController,
-                    label: 'Serveur URL',
-                    hint: 'http://example.com:8080',
-                    icon: Icons.dns_outlined,
-                    keyboardType: TextInputType.url,
-                    textAction: TextInputAction.next,
-                    onSubmitted: () =>
-                        FocusScope.of(context).requestFocus(usernameFocus),
-                    focusNode: dnsFocus,
-                    nextFocus: usernameFocus,
-                    prevFocus: nameFocus,
-                  ),
-
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: usernameController,
-                    label: 'Nom d\'utilisateur',
-                    hint: 'username',
-                    icon: Icons.person_outline,
-                    textAction: TextInputAction.next,
-                    onSubmitted: () =>
-                        FocusScope.of(context).requestFocus(passwordFocus),
-                    focusNode: usernameFocus,
-                    nextFocus: passwordFocus,
-                    prevFocus: dnsFocus,
-                  ),
-
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: passwordController,
-                    label: 'Mot de passe',
-                    hint: '••••••••',
-                    icon: Icons.lock_outline,
-                    obscureText: true,
-                    textAction: TextInputAction.done,
-                    onSubmitted: () =>
-                        FocusScope.of(context).requestFocus(buttonFocus),
-                    focusNode: passwordFocus,
-                    nextFocus: buttonFocus,
-                    prevFocus: usernameFocus,
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Save button
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      focusNode: buttonFocus,
-                      onPressed: () async {
-                        if (nameController.text.isEmpty ||
-                            dnsController.text.isEmpty ||
-                            usernameController.text.isEmpty ||
-                            passwordController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Veuillez remplir tous les champs'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                          return;
-                        }
-
-                        // Auto-fix URL scheme
-                        String dns = dnsController.text.trim();
-                        if (!dns.startsWith('http://') &&
-                            !dns.startsWith('https://')) {
-                          dns = 'http://$dns';
-                        }
-
-                        if (isEditing) {
-                          await _playlistService.updatePlaylist(
-                            id: playlist.id,
-                            name: nameController.text.trim(),
-                            dns: dns,
-                            username: usernameController.text.trim(),
-                            password: passwordController.text.trim(),
-                          );
-                        } else {
-                          await _playlistService.createPlaylist(
-                            name: nameController.text.trim(),
-                            dns: dns,
-                            username: usernameController.text.trim(),
-                            password: passwordController.text.trim(),
-                          );
-                        }
-
-                        if (mounted) {
-                          Navigator.pop(context);
-                          _refreshPlaylists();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                isEditing
-                                    ? 'Playlist modifiée'
-                                    : 'Playlist ajoutée',
-                              ),
-                              backgroundColor: AppColors.success,
-                            ),
-                          );
-                        }
-                      },
-                      icon: Icon(isEditing ? Icons.save : Icons.add),
-                      label: Text(isEditing ? 'Enregistrer' : 'Ajouter'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+      title: isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
+      builder: (context) => FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(), // Ensure logical order
+        child: SingleChildScrollView(
+          // Ensure scrolling when keyboard/focus moves
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              // Form fields
+              _buildTextField(
+                controller: nameController,
+                label: 'Nom',
+                hint: 'Ma Playlist IPTV',
+                icon: Icons.label_outline,
+                textAction: TextInputAction.next,
+                onSubmitted: () =>
+                    FocusScope.of(context).requestFocus(dnsFocus),
+                focusNode: nameFocus,
+                nextFocus: dnsFocus,
               ),
-            ),
+
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: dnsController,
+                label: 'Serveur URL',
+                hint: 'http://example.com:8080',
+                icon: Icons.dns_outlined,
+                keyboardType: TextInputType.url,
+                textAction: TextInputAction.next,
+                onSubmitted: () =>
+                    FocusScope.of(context).requestFocus(usernameFocus),
+                focusNode: dnsFocus,
+                nextFocus: usernameFocus,
+                prevFocus: nameFocus,
+              ),
+
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: usernameController,
+                label: 'Nom d\'utilisateur',
+                hint: 'username',
+                icon: Icons.person_outline,
+                textAction: TextInputAction.next,
+                onSubmitted: () =>
+                    FocusScope.of(context).requestFocus(passwordFocus),
+                focusNode: usernameFocus,
+                nextFocus: passwordFocus,
+                prevFocus: dnsFocus,
+              ),
+
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: passwordController,
+                label: 'Mot de passe',
+                hint: '••••••••',
+                icon: Icons.lock_outline,
+                obscureText: true,
+                textAction: TextInputAction.done,
+                onSubmitted: () =>
+                    FocusScope.of(context).requestFocus(buttonFocus),
+                focusNode: passwordFocus,
+                nextFocus: buttonFocus,
+                prevFocus: usernameFocus,
+              ),
+
+              const SizedBox(height: 32),
+
+              // Save button
+              SizedBox(
+                width: double.infinity,
+                child: AppDialogButton(
+                  focusNode: buttonFocus,
+                  primary: true,
+                  label: isEditing ? 'Enregistrer' : 'Ajouter',
+                  onPressed: () async {
+                    if (nameController.text.isEmpty ||
+                        dnsController.text.isEmpty ||
+                        usernameController.text.isEmpty ||
+                        passwordController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Veuillez remplir tous les champs'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Auto-fix URL scheme
+                    String dns = dnsController.text.trim();
+                    if (!dns.startsWith('http://') &&
+                        !dns.startsWith('https://')) {
+                      dns = 'http://$dns';
+                    }
+
+                    if (isEditing) {
+                      await _playlistService.updatePlaylist(
+                        id: playlist.id,
+                        name: nameController.text.trim(),
+                        dns: dns,
+                        username: usernameController.text.trim(),
+                        password: passwordController.text.trim(),
+                      );
+                    } else {
+                      await _playlistService.createPlaylist(
+                        name: nameController.text.trim(),
+                        dns: dns,
+                        username: usernameController.text.trim(),
+                        password: passwordController.text.trim(),
+                      );
+                    }
+
+                    if (mounted) {
+                      Navigator.pop(context);
+                      _refreshPlaylists();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isEditing
+                                ? 'Playlist modifiée'
+                                : 'Playlist ajoutée',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ),
@@ -295,92 +256,48 @@ class _MobilePlaylistScreenState extends ConsumerState<MobilePlaylistScreen> {
   }
 
   void _showOptionsSheet(PlaylistConfig playlist) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textTertiary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.edit, color: AppColors.textPrimary),
-                title: const Text(
-                  'Modifier',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showPlaylistDialog(playlist: playlist);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: AppColors.error),
-                title: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: AppColors.error),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteConfirmation(playlist);
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(PlaylistConfig playlist) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Supprimer la playlist ?',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Text(
-          'Voulez-vous supprimer "${playlist.name}" ?',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              await _playlistService.deletePlaylist(playlist.id);
-              if (mounted) {
-                Navigator.pop(context);
-                _refreshPlaylists();
-              }
+    showAppSheet(
+      context,
+      title: playlist.name,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppDialogTile(
+            icon: Icons.edit_outlined,
+            label: 'Modifier',
+            autofocus: true,
+            onPressed: () {
+              Navigator.pop(context);
+              _showPlaylistDialog(playlist: playlist);
             },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Supprimer'),
+          ),
+          const SizedBox(height: 8),
+          AppDialogTile(
+            icon: Icons.delete_outline,
+            label: 'Supprimer',
+            destructive: true,
+            onPressed: () {
+              Navigator.pop(context);
+              _showDeleteConfirmation(playlist);
+            },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _showDeleteConfirmation(PlaylistConfig playlist) async {
+    final ok = await showAppConfirm(
+      context,
+      title: 'Supprimer la playlist ?',
+      message: 'Voulez-vous supprimer « ${playlist.name} » ?',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    );
+    if (!ok) return;
+    await _playlistService.deletePlaylist(playlist.id);
+    if (mounted) _refreshPlaylists();
   }
 
   @override
@@ -697,10 +614,11 @@ class _TVTextFieldState extends State<_TVTextField> {
             onTap: _activateInput,
             child: Container(
               decoration: BoxDecoration(
-                border: isFocused
-                    ? Border.all(color: AppColors.primary, width: 2)
-                    : null,
-                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isFocused ? AppColors.accent : Colors.transparent,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
               // Ignore standard focus traversal to child, only allow programatic focus
               child: ExcludeFocus(
@@ -720,26 +638,43 @@ class _TVTextFieldState extends State<_TVTextField> {
                     _navFocus.requestFocus();
                     widget.onSubmitted?.call();
                   },
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  cursorColor: AppColors.accent,
+                  style: AppTheme.body(fontSize: 16),
                   decoration: InputDecoration(
                     labelText: widget.label,
                     hintText: widget.hint,
                     prefixIcon: Icon(
                       widget.icon,
+                      color: isFocused ? AppColors.accent : AppColors.textMuted,
+                    ),
+                    labelStyle: AppTheme.body(
+                      fontSize: 15,
                       color: isFocused
-                          ? AppColors.primary
+                          ? AppColors.accent
                           : AppColors.textSecondary,
                     ),
-                    labelStyle: TextStyle(
+                    floatingLabelStyle: AppTheme.body(
+                      fontSize: 14,
                       color: isFocused
-                          ? AppColors.primary
+                          ? AppColors.accent
                           : AppColors.textSecondary,
                     ),
-                    hintStyle: const TextStyle(color: AppColors.textTertiary),
+                    hintStyle: AppTheme.body(
+                      fontSize: 15,
+                      color: AppColors.textMuted,
+                    ),
                     filled: true,
-                    fillColor: AppColors.surface,
+                    fillColor: AppColors.rail,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(

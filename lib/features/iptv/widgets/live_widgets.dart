@@ -424,8 +424,8 @@ class GroupRow extends StatelessWidget {
   }
 }
 
-/// Favourite group card (TV shelf, phone carousel): name, star, channel
-/// count and the logos of its first three channels. The group's channels are
+/// Favourite group card (TV grid, phone carousel): name, star and channel
+/// count — no channel logos, judged too busy by Michael. The group's channels are
 /// loaded through the cached category provider — a handful of favourites, so
 /// cheap, and it pre-warms the group for when it is opened.
 class FavoriteGroupCard extends ConsumerWidget {
@@ -435,8 +435,8 @@ class FavoriteGroupCard extends ConsumerWidget {
     required this.category,
     required this.onPressed,
     required this.onLongPress,
-    this.width = 245,
-    this.height = 126,
+    this.width = 236,
+    this.height = 88,
     this.nameLines = 1,
     this.autofocus = false,
   });
@@ -476,14 +476,13 @@ class FavoriteGroupCard extends ConsumerWidget {
         child: Builder(
           builder: (context) {
             final lit = TVFocusable.isFocused(context);
-            final logos = channels?.take(3).toList() ?? const [];
-            final channelCount = channels?.length ?? 0;
             return AnimatedContainer(
               duration: AppTheme.durationFocus,
               curve: AppTheme.curveFocus,
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               decoration: AppDecorations.tvCard(lit: lit),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -522,46 +521,6 @@ class FavoriteGroupCard extends ConsumerWidget {
                       fontFeatures: AppTheme.tabular,
                     ),
                   ),
-                  const Spacer(),
-                  if (logos.isNotEmpty)
-                    // As many logos as the card's width allows (the TV grid
-                    // narrows when the rail opens), the rest as "+N".
-                    LayoutBuilder(
-                      builder: (context, box) {
-                        const slot = 52.0 + 8;
-                        const moreWidth = 36.0;
-                        final fit = ((box.maxWidth - moreWidth) / slot)
-                            .floor()
-                            .clamp(1, logos.length);
-                        final more = channelCount - fit;
-                        return Row(
-                          children: [
-                            for (final c in logos.take(fit)) ...[
-                              ChannelLogo(
-                                url: c.streamIcon,
-                                name: c.name,
-                                width: 52,
-                                height: 32,
-                                inset: true,
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            if (more > 0)
-                              Text(
-                                '+$more',
-                                maxLines: 1,
-                                style: AppTheme.body(
-                                  fontSize: 14,
-                                  color: lit
-                                      ? AppColors.onFocusMuted
-                                      : AppColors.textMuted,
-                                  fontFeatures: AppTheme.tabular,
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
                 ],
               ),
             );
