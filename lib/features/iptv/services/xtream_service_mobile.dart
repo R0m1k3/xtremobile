@@ -342,6 +342,33 @@ class XtreamServiceMobile {
     }
   }
 
+  /// The programme that follows [current] in [listings] (the earliest one
+  /// starting at or after its end), for « À suivre ». Null when there is none.
+  static model.ShortEPG? _nextListing(
+    List<dynamic> listings,
+    Map<String, dynamic> current,
+    String streamId,
+  ) {
+    final end = DateTime.tryParse(current['end']?.toString() ?? '');
+    if (end == null) return null;
+    // A minute of slack: guides often chain 20:59:59 -> 21:00:00.
+    final from = end.subtract(const Duration(minutes: 1));
+    DateTime? best;
+    Map<String, dynamic>? next;
+    for (final item in listings) {
+      if (item is! Map) continue;
+      final start = DateTime.tryParse(item['start']?.toString() ?? '');
+      if (start == null || start.isBefore(from)) continue;
+      if (best == null || start.isBefore(best)) {
+        best = start;
+        next = Map<String, dynamic>.from(item);
+      }
+    }
+    if (next == null) return null;
+    final epg = model.ShortEPG.fromJson({...next, 'id': streamId});
+    return epg.title.isEmpty ? null : epg;
+  }
+
   /// Internal: Load EPG for a single stream
   /// NOTE: Xtream API get_short_epg only returns results for ONE stream_id at a time.
   /// Response format: {"epg_listings": [...]} where title/description are Base64 encoded.
@@ -395,10 +422,10 @@ class XtreamServiceMobile {
             // Fallback to first entry if no current program found
             current ??= Map<String, dynamic>.from(listings.first as Map);
 
-            result[streamId] = model.ShortEPG.fromJson({
-              ...current,
-              'id': streamId,
-            });
+            result[streamId] = model.ShortEPG.fromJson(
+              {...current, 'id': streamId},
+              next: _nextListing(listings, current, streamId),
+            );
           }
         }
       } catch (e) {

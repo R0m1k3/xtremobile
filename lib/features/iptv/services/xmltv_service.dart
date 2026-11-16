@@ -204,12 +204,31 @@ class XmltvService {
     );
     if (programme == null || programme.title.isEmpty) return null;
 
+    // The one after it (« À suivre »): what airs when this one ends.
+    final following = programmeFor(
+      epgChannelId: epgChannelId,
+      channelName: channelName,
+      at: programme.end,
+    );
+    final next = following == null ||
+            following.title.isEmpty ||
+            !following.start.isAfter(programme.start)
+        ? null
+        : model.ShortEPG(
+            id: streamId,
+            title: following.title,
+            start: _formatLocal(following.start),
+            end: _formatLocal(following.end),
+            description: following.description,
+          );
+
     return model.ShortEPG(
       id: streamId,
       title: programme.title,
       start: _formatLocal(programme.start),
       end: _formatLocal(programme.end),
       description: programme.description,
+      next: next,
     );
   }
 

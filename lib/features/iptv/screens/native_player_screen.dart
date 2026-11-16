@@ -5,17 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
+import 'package:xtremobile/core/theme/app_colors.dart';
+import 'package:xtremobile/core/theme/app_theme.dart';
+import 'package:xtremobile/core/utils/form_factor.dart';
+import 'package:xtremobile/core/widgets/app_dialog.dart';
+import 'package:xtremobile/features/iptv/widgets/live_widgets.dart';
+import 'package:xtremobile/features/iptv/widgets/player_osd.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:xtremobile/core/models/iptv_models.dart' as model;
 import 'package:xtremobile/core/models/playlist_config.dart';
 import 'package:xtremobile/features/iptv/services/xtream_service_mobile.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
-import 'package:xtremobile/core/theme/app_colors.dart';
 import 'package:xtremobile/features/iptv/screens/lite_player_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-
 
 /// Stream type enum for player
 // (Moved to global or imported from iptv_models if available)
@@ -36,6 +38,13 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
   final int? season;
   final int? episodeNum;
 
+  /// Every episode of the series, in viewing order (season, then episode):
+  /// enables « Épisode suivant ». Null for films and live TV.
+  final List<model.Episode>? episodes;
+
+  /// Name of the series, shown under the episode title.
+  final String? seriesName;
+
   // Experimental
   final bool forceDeinterlace;
 
@@ -52,6 +61,8 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
     this.seriesId,
     this.season,
     this.episodeNum,
+    this.episodes,
+    this.seriesName,
     this.forceDeinterlace = false,
   });
 
@@ -61,19 +72,38 @@ class NativePlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<NativePlayerScreen> createState() => _NativePlayerScreenState();
 }
 
+/// What the on-screen display shows (TV). Touch screens only use hidden /
+/// shown: [info] and [actions] both show their controls.
+enum _Osd {
+  /// Nothing over the picture.
+  hidden,
+
+  /// Live: the compact plate (zapping), no buttons, 4 s.
+  info,
+
+  /// Live: the plate with its row of buttons (OK). VOD: the plate, focus on
+  /// the bar (and the row of buttons when [_NativePlayerScreenState._vodRow]).
+  actions,
+}
+
 class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     with WidgetsBindingObserver {
   late final Player _player;
   late final VideoController _controller;
+
+  /// Player screens alive. A screen replacing another one (next episode,
+  /// deinterlace) starts before the old one is disposed: the wakelock is only
+  /// released when the last one goes.
+  static int _liveScreens = 0;
 
   // Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _prevFocusNode = FocusNode();
   final FocusNode _nextFocusNode = FocusNode();
   final FocusNode _sliderFocusNode = FocusNode();
-  final FocusNode _backFocusNode = FocusNode();
-  final FocusNode _audioFocusNode = FocusNode();
+  final FocusNode _formatFocusNode = FocusNode();
   final FocusNode _channelListButtonFocusNode = FocusNode();
+  final FocusNode _retryFocusNode = FocusNode();
 
   /// Focus D-pad de la chaîne active dans la sidebar : permet d'atterrir
   /// directement dessus à l'ouverture de la liste.
@@ -85,12 +115,47 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   String? _errorMessage;
   late int _currentIndex;
   XtreamServiceMobile? _xtreamService;
-  bool _showControls = true;
+  _Osd _osd = _Osd.actions;
+
+  /// VOD (TV): the row of buttons is open under the bar (▼).
+  bool _vodRow = false;
+  bool get _showControls => _osd != _Osd.hidden;
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  Duration _buffer = Duration.zero;
   final bool _isSeeking = false;
   bool _useSoftwareDecoder = false;
+
+  bool get _isLive => widget.streamType == model.StreamType.live;
+  bool get _hasChannels =>
+      widget.channels != null && widget.channels!.isNotEmpty;
+  bool get _isTv => FormFactors.isTv;
+
+  /// Film position for the plate: only its listeners rebuild, once per tick,
+  /// never the whole player.
+  final ValueNotifier<VodProgress> _progress =
+      ValueNotifier(const VodProgress());
+
+  /// `21:52`, changes once a minute.
+  final ValueNotifier<String> _clock = ValueNotifier('');
+
+  /// Short message at the top (« Reprise à 38:12 »).
+  final ValueNotifier<String?> _toast = ValueNotifier(null);
+  Timer? _toastTimer;
+
+  /// « 2 / 5 » while a reconnection is pending.
+  final ValueNotifier<String?> _reconnectLabel = ValueNotifier(null);
+
+  /// The player has been buffering for more than a second.
+  final ValueNotifier<bool> _bufferingVisible = ValueNotifier(false);
+  Timer? _bufferingTimer;
+
+  /// Zapping with the remote held down: the plate follows at once, the
+  /// stream only loads once the key rests (one connection per channel
+  /// skipped would hit 1-connection subscriptions).
+  Timer? _zapTimer;
+  DateTime? _lastZapAt;
 
   // [TiviMate] Channel List Sidebar
   bool _showChannelList = false;
@@ -112,7 +177,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   bool _isReleased = false;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
-  String _currentTime = '';
   bool _hasMarkedAsWatched = false;
   DateTime? _lastSaveTime;
 
@@ -122,51 +186,100 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Duration _lastKnownPosition = Duration.zero;
   DateTime? _lastPositionChangeTime;
 
+  /// (Re)starts the auto-hide: 4 s for the live zapping plate, 5 s
+  /// otherwise. Nothing hides while paused or loading.
   void _resetControlsTimer() {
     _controlsTimer?.cancel();
+    if (!_showControls) return;
     _startClock(); // Ensure clock runs when controls are shown
-    if (_showControls && _isPlaying) {
-      _controlsTimer = Timer(const Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() => _showControls = false);
-          _stopClock(); // Save CPU when hidden
-        }
-      });
+    // The bar was not updated while hidden (a paused film sends nothing).
+    if (!_isLive) _progress.value = _currentProgress;
+    if (_isPlaying) {
+      final delay = _isLive && _osd == _Osd.info
+          ? const Duration(seconds: 4)
+          : const Duration(seconds: 5);
+      _controlsTimer = Timer(delay, _hideControls);
     }
   }
 
+  void _hideControls() {
+    _controlsTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _osd = _Osd.hidden;
+      _vodRow = false;
+    });
+    _stopClock(); // Save CPU when hidden
+  }
+
+  /// Shows the controls (touch) or the default state (TV: live plate with
+  /// its buttons, VOD bar), and restarts the auto-hide.
   void _onUserInteraction() {
-    setState(() => _showControls = true);
-    _resetControlsTimer();
-  }
-
-  /// Dernier contrôle de l'OSD qui avait le focus télécommande.
-  ///
-  /// Quand l'OSD se masque (auto-hide 5s), ses FocusNodes sont démontés et le
-  /// focus part « on ne sait où » : à la réouverture l'utilisateur devait
-  /// re-naviguer depuis un point aléatoire jusqu'au bouton de zapping. On
-  /// mémorise donc le dernier bouton utilisé pour le re-focaliser d'office.
-  FocusNode? _lastFocusedControl;
-
-  void _noteFocus(FocusNode node) {
-    _lastFocusedControl = node;
-    _resetControlsTimer();
-  }
-
-  /// Réaffiche l'OSD en redonnant le focus au dernier contrôle utilisé
-  /// (Play/Pause par défaut) — un seul appui suffit alors pour re-zapper.
-  void _showControlsRestoringFocus() {
-    setState(() => _showControls = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_showControls) return;
-      final target = _lastFocusedControl ?? _playPauseFocusNode;
-      if (target.canRequestFocus) {
-        target.requestFocus();
+    if (_isTv) {
+      if (_isLive) {
+        if (!_showControls) _showLiveInfo();
+        _resetControlsTimer();
       } else {
-        _playPauseFocusNode.requestFocus();
+        _openVod(row: _vodRow);
+      }
+      return;
+    }
+    if (!_showControls) setState(() => _osd = _Osd.actions);
+    _resetControlsTimer();
+  }
+
+  /// Live: the compact plate (no buttons), as when zapping.
+  void _showLiveInfo() {
+    if (_osd != _Osd.info) setState(() => _osd = _Osd.info);
+    _resetControlsTimer();
+  }
+
+  /// Live: the plate with its buttons, focus always on « Chaînes » (OK + OK
+  /// must never pause the live stream).
+  void _openLiveActions() {
+    setState(() => _osd = _Osd.actions);
+    _focusAfterBuild(
+      _hasChannels ? _channelListButtonFocusNode : _formatFocusNode,
+    );
+    _resetControlsTimer();
+  }
+
+  /// VOD: the plate, focus on the bar; with [row], on the buttons.
+  void _openVod({bool row = false}) {
+    final wasShown = _showControls;
+    final rowChanged = row != _vodRow;
+    setState(() {
+      _osd = _Osd.actions;
+      _vodRow = row;
+    });
+    _progress.value = _currentProgress;
+    if (!wasShown || rowChanged) {
+      _focusAfterBuild(row ? _playPauseFocusNode : _sliderFocusNode);
+    }
+    _resetControlsTimer();
+  }
+
+  void _focusAfterBuild(FocusNode node) {
+    if (!_isTv) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && node.canRequestFocus && node.context != null) {
+        node.requestFocus();
       }
     });
-    _resetControlsTimer();
+  }
+
+  VodProgress get _currentProgress => VodProgress(
+        position: _position,
+        duration: _duration,
+        buffer: _buffer,
+      );
+
+  void _showToast(String text) {
+    _toastTimer?.cancel();
+    _toast.value = text;
+    _toastTimer = Timer(const Duration(seconds: 2), () {
+      _toast.value = null;
+    });
   }
 
   @override
@@ -179,7 +292,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
 
     // Enable wakelock to prevent screen from turning off during playback
+    _liveScreens++;
     WakelockPlus.enable();
+
+    // TV: the live stream opens on the compact plate (« Connexion… »), a
+    // film on its bar. Touch: the controls.
+    _osd = _isTv && _isLive ? _Osd.info : _Osd.actions;
+    if (_isTv && !_isLive) _focusAfterBuild(_sliderFocusNode);
 
     // Only start clock if setting is enabled (will check in build too, but timer can run)
     _startClock();
@@ -228,7 +347,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // cache + 5s de readahead suffisent à absorber la gigue réseau tout en
       // restant nettement plus près du live edge.
       (_player.platform as dynamic)?.setProperty('cache-secs', '3');
-      (_player.platform as dynamic)?.setProperty('demuxer-max-bytes', '60000000'); // 60MB RAM max
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-bytes', '60000000'); // 60MB RAM max
       (_player.platform as dynamic)?.setProperty('demuxer-readahead-secs', '5');
       (_player.platform as dynamic)?.setProperty('demuxer-thread', 'yes');
       // --- Plafond du buffer ARRIÈRE (stabilité longue durée) ---
@@ -237,7 +357,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // readahead il pousse le tas natif vers ~200 Mo et finit par déclencher
       // un kill mémoire Android après plusieurs heures. 8 Mo suffisent aux
       // resynchronisations internes du démuxeur.
-      (_player.platform as dynamic)?.setProperty('demuxer-max-back-bytes', '8000000');
+      (_player.platform as dynamic)
+          ?.setProperty('demuxer-max-back-bytes', '8000000');
       // Si le buffer se vide : courte pause (0.5s) puis reprise — freeze minimal, SANS rattrapage
       // 0.5s vs 1.5s : moins de gel visible, moins de PTS gap à rattraper
       (_player.platform as dynamic)?.setProperty('cache-pause', 'yes');
@@ -262,7 +383,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // --- Qualité image : JAMAIS de skip de frames sur du live TV ---
       (_player.platform as dynamic)?.setProperty('framedrop', 'no');
-
     } else {
       // VOD PROFILE: Radical Compatibility (Software Mode)
       // Pour VOD, on garde correct-pts:yes (précision de position nécessaire pour le seek)
@@ -270,7 +390,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       (_player.platform as dynamic)?.setProperty('correct-pts', 'yes');
       (_player.platform as dynamic)?.setProperty('video-sync', 'audio');
     }
-    
+
     // [Audio Fix] L'ancienne chaîne `af=lavrresample,format=channels=stereo:
     // sample_fmts=s16` mélangeait la syntaxe FFmpeg et mpv : `lavrresample`
     // n'existe plus dans les builds récents et `sample_fmts` n'est pas une
@@ -283,14 +403,21 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('audio-channels', 'stereo');
     (_player.platform as dynamic)?.setProperty('ao', 'audiotrack');
     (_player.platform as dynamic)?.setProperty('audio-pitch-correction', 'no');
-    (_player.platform as dynamic)?.setProperty('audio-buffer', '0.2'); // Live: buffer audio court (réduit le désync pendant les cache-pauses)
+    (_player.platform as dynamic)?.setProperty(
+      'audio-buffer',
+      '0.2',
+    ); // Live: buffer audio court (réduit le désync pendant les cache-pauses)
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
-    
+
     // --- Seeking & Sync globaux ---
-    (_player.platform as dynamic)?.setProperty('hr-seek', 'no');           // Seeking rapide (plus sûr pour IPTV)
+    (_player.platform as dynamic)
+        ?.setProperty('hr-seek', 'no'); // Seeking rapide (plus sûr pour IPTV)
     (_player.platform as dynamic)?.setProperty('hr-seek-framedrop', 'yes');
     (_player.platform as dynamic)?.setProperty('cache-unlink-files', 'yes');
-    (_player.platform as dynamic)?.setProperty('interpolation', 'no');     // Pas d'interpolation (trop lourd sur Android)
+    (_player.platform as dynamic)?.setProperty(
+      'interpolation',
+      'no',
+    ); // Pas d'interpolation (trop lourd sur Android)
 
     // --- Réseau & Timeouts ---
     (_player.platform as dynamic)?.setProperty('network-timeout', '120');
@@ -324,7 +451,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // --- Décodeur lavc : threads libres, sans fast-mode (qualité prioritaire) ---
     // vd-lavc-skiploopfilter SUPPRIMÉ (causait la pixelisation)
     // vd-lavc-fast SUPPRIMÉ (décodage imprécis = artefacts)
-    (_player.platform as dynamic)?.setProperty('vd-lavc-threads', '0');    // Threads auto (0 = détection auto)
+    (_player.platform as dynamic)?.setProperty(
+      'vd-lavc-threads',
+      '0',
+    ); // Threads auto (0 = détection auto)
 
     // Low-latency intentionally removed for stability
     /*
@@ -337,146 +467,199 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     (_player.platform as dynamic)?.setProperty('aid', 'auto');
     (_player.platform as dynamic)?.setProperty('alang', 'fr,fra,fre,en,eng');
     (_player.platform as dynamic)?.setProperty('volume', '100');
-    (_player.platform as dynamic)?.setProperty('mute', 'no'); 
+    (_player.platform as dynamic)?.setProperty('mute', 'no');
 
     debugPrint('MediaKitPlayer: Combined Live/VOD configuration applied');
 
     _controller = VideoController(_player);
 
     // Listen to player state
-    _playerSubscriptions.add(_player.stream.playing.listen((playing) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = playing;
-          if (playing) _errorMessage = null; // Clear error on successful play
-        });
-        if (playing) {
-          // Smooth Loading: Hide loading screen AFTER playback actually starts
-          // Faster hide for Live TV
-          final hideDelay = widget.streamType == model.StreamType.live ? 300 : 1000;
-          Future.delayed(Duration(milliseconds: hideDelay), () {
-            if (mounted && _isPlaying) {
-              setState(() => _isLoading = false);
+    _playerSubscriptions.add(
+      _player.stream.playing.listen((playing) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = playing;
+            if (playing) _errorMessage = null; // Clear error on successful play
+          });
+          if (playing) {
+            _reconnectLabel.value = null;
+            // Smooth Loading: Hide loading screen AFTER playback actually starts
+            // Faster hide for Live TV
+            final hideDelay =
+                widget.streamType == model.StreamType.live ? 300 : 1000;
+            Future.delayed(Duration(milliseconds: hideDelay), () {
+              if (mounted && _isPlaying) {
+                setState(() => _isLoading = false);
+              }
+            });
+            _resetControlsTimer(); // Start auto-hide timer
+          }
+        }
+      }),
+    );
+
+    _playerSubscriptions.add(
+      _player.stream.position.listen((position) {
+        if (mounted && !_isSeeking) {
+          // [v23.0] Track last position change time for time-based watchdog
+          if (position != _lastKnownPosition) {
+            _lastKnownPosition = position;
+            _lastPositionChangeTime = DateTime.now();
+          }
+
+          // Never rebuild the player for this: mpv emits it several times per
+          // second. Only the bar listens, and only while it is on screen.
+          _position = position;
+          if (_showControls && !_isLive) _progress.value = _currentProgress;
+
+          // Check if 80% of content watched (for VOD/Series only)
+          _checkAndMarkWatched(position);
+
+          // Auto-save position every 10 seconds (resilience against app kill/crash)
+          if (widget.streamType != model.StreamType.live &&
+              !_hasMarkedAsWatched) {
+            final now = DateTime.now();
+            if (_lastSaveTime == null ||
+                now.difference(_lastSaveTime!) > const Duration(seconds: 10)) {
+              _lastSaveTime = now;
+              // Don't save if < 30s or > 95%
+              if (position.inSeconds > 30 &&
+                  _duration.inSeconds > 0 &&
+                  position.inSeconds / _duration.inSeconds < 0.95) {
+                ref
+                    .read(mobileWatchHistoryProvider.notifier)
+                    .saveResumePosition(_contentId, position.inSeconds);
+              }
+            }
+          }
+        }
+      }),
+    );
+
+    _playerSubscriptions.add(
+      _player.stream.duration.listen((duration) {
+        if (mounted) {
+          _progress.value = VodProgress(
+            position: _position,
+            duration: duration,
+            buffer: _buffer,
+          );
+          setState(() {
+            _duration = duration;
+            // [V5.1 UI Fix] Force loading off as soon as metadata/duration is known
+            // backup to the 'playing' event for VOD visibility
+            if (duration.inSeconds > 0 && _isLoading) {
+              _isLoading = false;
             }
           });
-          _resetControlsTimer(); // Start auto-hide timer
         }
-      }
-    }));
+      }),
+    );
 
-    _playerSubscriptions.add(_player.stream.position.listen((position) {
-      if (mounted && !_isSeeking) {
-        // [v23.0] Track last position change time for time-based watchdog
-        if (position != _lastKnownPosition) {
-          _lastKnownPosition = position;
-          _lastPositionChangeTime = DateTime.now();
+    // Loaded part of a film (grey on the bar). Live: not shown.
+    _playerSubscriptions.add(
+      _player.stream.buffer.listen((buffer) {
+        _buffer = buffer;
+      }),
+    );
+
+    // « Mise en mémoire tampon… » only when it lasts: live cache pauses of
+    // half a second are normal and must not flash a pill.
+    _playerSubscriptions.add(
+      _player.stream.buffering.listen((buffering) {
+        _bufferingTimer?.cancel();
+        if (!buffering) {
+          _bufferingVisible.value = false;
+          return;
         }
-
-        // Only rebuild when the position is actually on screen. mpv emits this
-        // several times per second; rebuilding the whole player tree for a
-        // hidden readout burns CPU and GC for hours on a live channel.
-        if (_showControls) {
-          setState(() => _position = position);
-        } else {
-          _position = position;
-        }
-
-        // Check if 80% of content watched (for VOD/Series only)
-        _checkAndMarkWatched(position);
-
-        // Auto-save position every 10 seconds (resilience against app kill/crash)
-        if (widget.streamType != model.StreamType.live &&
-            !_hasMarkedAsWatched) {
-          final now = DateTime.now();
-          if (_lastSaveTime == null ||
-              now.difference(_lastSaveTime!) > const Duration(seconds: 10)) {
-            _lastSaveTime = now;
-            // Don't save if < 30s or > 95%
-            if (position.inSeconds > 30 &&
-                _duration.inSeconds > 0 &&
-                position.inSeconds / _duration.inSeconds < 0.95) {
-              ref
-                  .read(mobileWatchHistoryProvider.notifier)
-                  .saveResumePosition(_contentId, position.inSeconds);
-            }
-          }
-        }
-      }
-    }));
-
-    _playerSubscriptions.add(_player.stream.duration.listen((duration) {
-      if (mounted) {
-        setState(() {
-          _duration = duration;
-          // [V5.1 UI Fix] Force loading off as soon as metadata/duration is known
-          // backup to the 'playing' event for VOD visibility
-          if (duration.inSeconds > 0 && _isLoading) {
-            _isLoading = false;
-          }
+        _bufferingTimer = Timer(const Duration(milliseconds: 1200), () {
+          if (mounted) _bufferingVisible.value = true;
         });
-      }
-    }));
+      }),
+    );
 
-    _playerSubscriptions.add(_player.stream.width.listen((width) {
-      if (mounted && (width ?? 0) > 0 && _isLoading) {
-        debugPrint('MediaKitPlayer: Video width detected ($width), clearing loading overlay');
-        setState(() => _isLoading = false);
-      }
-    }));
+    // Audio / subtitle tracks: rebuild the buttons that show them (rare).
+    _playerSubscriptions.add(
+      _player.stream.tracks.listen((_) {
+        if (mounted) _refreshActiveTracks();
+      }),
+    );
+    _playerSubscriptions.add(
+      _player.stream.track.listen((_) {
+        if (mounted) _refreshActiveTracks();
+      }),
+    );
 
-    _playerSubscriptions.add(_player.stream.error.listen((error) async {
-      if (!mounted) return;
-      if (error.isEmpty) return;
+    _playerSubscriptions.add(
+      _player.stream.width.listen((width) {
+        if (mounted && (width ?? 0) > 0 && _isLoading) {
+          debugPrint(
+            'MediaKitPlayer: Video width detected ($width), clearing loading overlay',
+          );
+          setState(() => _isLoading = false);
+        }
+      }),
+    );
 
-      debugPrint('MediaKitPlayer Error Stream: $error');
+    _playerSubscriptions.add(
+      _player.stream.error.listen((error) async {
+        if (!mounted) return;
+        if (error.isEmpty) return;
 
-      // For LIVE TV: never reload the stream on errors — mpv handles recovery internally.
-      // Only show fatal errors that truly stop playback (detected by watchdog after 2min).
-      if (widget.streamType == model.StreamType.live) {
-        debugPrint('MediaKitPlayer: Live — ignoring error (mpv handles internally): $error');
-        return;
-      }
+        debugPrint('MediaKitPlayer Error Stream: $error');
 
-      // For VOD/Series: retry with software decoding on first error
-      if (!_useSoftwareDecoder) {
-        debugPrint(
-          'MediaKitPlayer: VOD error — retrying with Software Decoding...',
-        );
-        setState(() => _useSoftwareDecoder = true);
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) _loadStream();
-        return;
-      }
-
-      setState(() {
-        _errorMessage = error;
-        _isLoading = false;
-      });
-    }));
-
-    // Listen for stream completion
-    _playerSubscriptions.add(_player.stream.completed.listen((completed) {
-      if (completed && mounted) {
-        // For Live TV: do NOT reconnect immediately — let mpv handle it internally.
-        // Only reconnect after a long pause (handled by watchdog).
+        // For LIVE TV: never reload the stream on errors — mpv handles recovery internally.
+        // Only show fatal errors that truly stop playback (detected by watchdog after 2min).
         if (widget.streamType == model.StreamType.live) {
           debugPrint(
-            'MediaKitPlayer: Live stream completed signal — ignoring (mpv handles reconnect internally)',
+            'MediaKitPlayer: Live — ignoring error (mpv handles internally): $error',
           );
           return;
         }
-        // Logic for VOD/Series: Check if really finished or cut off
-        if (_duration.inSeconds > 0) {
-          final progress = _position.inSeconds / _duration.inSeconds;
-          if (progress < 0.95) {
+
+        // For VOD/Series: retry with software decoding on first error
+        if (!_useSoftwareDecoder) {
+          debugPrint(
+            'MediaKitPlayer: VOD error — retrying with Software Decoding...',
+          );
+          setState(() => _useSoftwareDecoder = true);
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) _loadStream();
+          return;
+        }
+
+        setState(() {
+          _errorMessage = error;
+          _isLoading = false;
+        });
+      }),
+    );
+
+    // Listen for stream completion
+    _playerSubscriptions.add(
+      _player.stream.completed.listen((completed) {
+        if (completed && mounted) {
+          // For Live TV: do NOT reconnect immediately — let mpv handle it internally.
+          // Only reconnect after a long pause (handled by watchdog).
+          if (widget.streamType == model.StreamType.live) {
             debugPrint(
-              'MediaKitPlayer: VOD stopped prematurely at ${(progress * 100).toStringAsFixed(1)}%, attempting reconnect...',
+              'MediaKitPlayer: Live stream completed signal — ignoring (mpv handles reconnect internally)',
             );
-            _attemptReconnect();
+            return;
+          }
+          // Logic for VOD/Series: Check if really finished or cut off
+          if (_duration.inSeconds > 0) {
+            final progress = _position.inSeconds / _duration.inSeconds;
+            if (progress < 0.95) {
+              debugPrint(
+                'MediaKitPlayer: VOD stopped prematurely at ${(progress * 100).toStringAsFixed(1)}%, attempting reconnect...',
+              );
+              _attemptReconnect();
+            }
           }
         }
-      }
-    }));
+      }),
+    );
 
     // Lock to landscape for video playback
     SystemChrome.setPreferredOrientations([
@@ -503,13 +686,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   void _updateTime() {
     if (!mounted) return;
-    final now = DateTime.now();
-    final formatted =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    // The clock ticks every second but only changes once a minute — rebuild
-    // only when the displayed value actually differs.
-    if (formatted == _currentTime) return;
-    setState(() => _currentTime = formatted);
+    // The clock ticks every second but only changes once a minute; the
+    // notifier only wakes its listeners (the plates) when the value differs.
+    _clock.value = formatClock(DateTime.now());
   }
 
   @override
@@ -547,6 +726,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   /// the network reader so no bandwidth is consumed in the background.
   void _releasePlayback() {
     if (_isReleased) return;
+    _stopPlayback();
+    WakelockPlus.disable();
+  }
+
+  /// Stops the stream for good (resume position saved) without touching the
+  /// wakelock: used before handing over to another player screen, so that
+  /// the subscription's single connection is free when it opens.
+  void _stopPlayback() {
+    if (_isReleased) return;
     _isReleased = true;
 
     // Kill the timers first: a watchdog firing mid-release would call
@@ -557,6 +745,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _epgTimer = null;
     _controlsTimer?.cancel();
     _controlsTimer = null;
+    _zapTimer?.cancel();
+    _zapTimer = null;
     _stopClock();
 
     if (widget.streamType != model.StreamType.live) {
@@ -564,7 +754,6 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
 
     _player.stop();
-    WakelockPlus.disable();
   }
 
   @override
@@ -575,8 +764,13 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     // Unregister keyboard handler
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
 
-    // Disable wakelock when leaving player
-    WakelockPlus.disable();
+    // Disable wakelock when leaving player (unless another player screen
+    // already took over: next episode, deinterlace)
+    _liveScreens--;
+    if (_liveScreens <= 0) {
+      _liveScreens = 0;
+      WakelockPlus.disable();
+    }
 
     // Save resume position before cleanup (only for VOD/Series).
     // Skipped when _releasePlayback already did it on backgrounding.
@@ -590,6 +784,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _liveWatchdog?.cancel();
     _channelListTimer?.cancel();
     _channelListScrollController.dispose();
+    _zapTimer?.cancel();
+    _toastTimer?.cancel();
+    _bufferingTimer?.cancel();
 
     // Detach from the player streams BEFORE disposing it, so no late event can
     // land on a deactivated element.
@@ -608,10 +805,16 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _prevFocusNode.dispose();
     _nextFocusNode.dispose();
     _sliderFocusNode.dispose();
-    _backFocusNode.dispose();
-    _audioFocusNode.dispose();
+    _formatFocusNode.dispose();
     _channelListButtonFocusNode.dispose();
+    _retryFocusNode.dispose();
     _channelListItemFocusNode.dispose();
+
+    _progress.dispose();
+    _clock.dispose();
+    _toast.dispose();
+    _reconnectLabel.dispose();
+    _bufferingVisible.dispose();
 
     // Restore normal orientation
     SystemChrome.setPreferredOrientations([
@@ -692,15 +895,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         _player.seek(Duration(seconds: positionSeconds));
 
         // Show visual notification
-        final minutes = positionSeconds ~/ 60;
-        final seconds = positionSeconds % 60;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Reprise à ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-            ),
-            duration: const Duration(seconds: 2),
-          ),
+        _showToast(
+          'Reprise à ${formatPlayerTime(Duration(seconds: positionSeconds))}',
         );
       } else {
         debugPrint(
@@ -715,6 +911,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _attemptReconnect() {
     if (!mounted || _isReleased) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
+      _reconnectLabel.value = null;
       setState(() {
         _errorMessage = 'Flux interrompu après plusieurs tentatives';
         _isLoading = false;
@@ -723,6 +920,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
 
     _reconnectAttempts++;
+    _reconnectLabel.value = '$_reconnectAttempts / $_maxReconnectAttempts';
     debugPrint(
       'MediaKitPlayer: Reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts',
     );
@@ -805,7 +1003,8 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
       // Si le player joue et la position avance : tout va bien, reset
       if (_isPlaying && _lastPositionChangeTime != null) {
-        final stallSecs = DateTime.now().difference(_lastPositionChangeTime!).inSeconds;
+        final stallSecs =
+            DateTime.now().difference(_lastPositionChangeTime!).inSeconds;
         if (stallSecs < 5) return; // Position avance normalement
       }
 
@@ -814,13 +1013,18 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
           ? DateTime.now().difference(_lastPositionChangeTime!).inSeconds
           : 9999;
 
-      debugPrint('MediaKitPlayer: Watchdog — position gelée depuis ${stallSecs}s');
+      debugPrint(
+        'MediaKitPlayer: Watchdog — position gelée depuis ${stallSecs}s',
+      );
 
       // Ne reconnecte QUE si vraiment gelé depuis > 60s (les cache-pauses sont < 5s)
       // Cela laisse mpv's reconnect interne (stream-lavf-o) gérer les coupures courtes
       if (stallSecs > 60) {
-        debugPrint('MediaKitPlayer: Watchdog — gel de 60s confirmé, reconnexion forcée');
-        _lastPositionChangeTime = DateTime.now(); // Éviter re-déclenchement immédiat
+        debugPrint(
+          'MediaKitPlayer: Watchdog — gel de 60s confirmé, reconnexion forcée',
+        );
+        _lastPositionChangeTime =
+            DateTime.now(); // Éviter re-déclenchement immédiat
         _attemptReconnect();
       }
     });
@@ -856,6 +1060,9 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   model.ShortEPG? _epg;
 
+  String get _currentStreamId =>
+      _hasChannels ? widget.channels![_currentIndex].streamId : widget.streamId;
+
   // ... (existing initState)
 
   Future<void> _loadStream({Duration? startAt}) async {
@@ -864,6 +1071,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // The app went to background while a (re)load was queued — do not bring
       // the stream back up behind the user.
       if (_isReleased || !mounted) return;
+      _zapTimer?.cancel();
 
       setState(() {
         if (_isFirstLoad) {
@@ -879,16 +1087,15 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // This ensures even if metadata/width is never reached, the UI opens
       Future.delayed(const Duration(seconds: 5), () {
         if (mounted && _isLoading) {
-          debugPrint('MediaKitPlayer: Loading Timeout reached, forcing Visibility');
+          debugPrint(
+            'MediaKitPlayer: Loading Timeout reached, forcing Visibility',
+          );
           setState(() => _isLoading = false);
         }
       });
 
       // Determine effective Stream ID
-      final currentStreamId =
-          widget.channels != null && widget.channels!.isNotEmpty
-              ? widget.channels![_currentIndex].streamId
-              : widget.streamId;
+      final currentStreamId = _currentStreamId;
 
       // Load EPG if Live TV (with periodic refresh every 5 min)
       if (widget.streamType == model.StreamType.live) {
@@ -1013,9 +1220,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   Future<void> _loadEpg(String streamId) async {
     try {
       // Use shared provider service so EPG cached by channel cards is reused instantly
-      final service = await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
+      final service =
+          await ref.read(mobileXtreamServiceProvider(widget.playlist).future);
       final epg = await service.getShortEPG(streamId);
-      if (mounted) {
+      // Zapping fast: a late answer for a channel left behind is dropped.
+      if (mounted && streamId == _currentStreamId) {
         setState(() => _epg = epg);
       }
     } catch (e) {
@@ -1023,33 +1232,49 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
   }
 
-  void _playNext() {
-    if (widget.channels == null || widget.channels!.isEmpty) return;
-    final nextIndex = (_currentIndex + 1) % widget.channels!.length;
-    _switchChannel(nextIndex);
-  }
+  void _playNext() => _zapBy(1);
 
-  void _playPrevious() {
-    if (widget.channels == null || widget.channels!.isEmpty) return;
-    final prevIndex =
-        (_currentIndex - 1 + widget.channels!.length) % widget.channels!.length;
-    _switchChannel(prevIndex);
+  void _playPrevious() => _zapBy(-1);
+
+  /// Next / previous channel. A single press loads at once; presses in
+  /// quick succession (or a held key) only move the plate, and the stream
+  /// loads once the remote has rested for 400 ms.
+  void _zapBy(int delta) {
+    if (!_hasChannels) return;
+    final count = widget.channels!.length;
+    final index = ((_currentIndex + delta) % count + count) % count;
+    final now = DateTime.now();
+    final rapid = _lastZapAt != null &&
+        now.difference(_lastZapAt!) < const Duration(milliseconds: 400);
+    _lastZapAt = now;
+    if (!rapid && !(_zapTimer?.isActive ?? false)) {
+      _switchChannel(index);
+      return;
+    }
+    _zapTimer?.cancel();
+    setState(() {
+      _currentIndex = index;
+      _epg = null;
+      _isReconnecting = true;
+      _showChannelList = false;
+      if (_osd == _Osd.hidden) _osd = _Osd.info;
+    });
+    _loadEpg(_currentStreamId);
+    _resetControlsTimer();
+    _zapTimer = Timer(const Duration(milliseconds: 400), () {
+      if (mounted && !_isReleased) _loadStream();
+    });
   }
 
   void _switchChannel(int index) {
+    _zapTimer?.cancel();
+    _channelListTimer?.cancel();
     setState(() {
       _currentIndex = index;
       _showChannelList = false; // close sidebar on switch
-      _showControls = true;     // show regular OSD
-    });
-    // Garde le focus sur le bouton de zap qui vient d'être pressé : l'appui
-    // suivant sur OK rezappe immédiatement, sans re-navigation dans l'OSD.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_showControls) return;
-      final target = _lastFocusedControl;
-      if (target != null && target.canRequestFocus && !target.hasFocus) {
-        target.requestFocus();
-      }
+      // TV: the compact plate (the row of buttons stays if it was open, focus
+      // on the button just pressed). Touch: the controls.
+      if (_osd == _Osd.hidden) _osd = _Osd.info;
     });
     _resetControlsTimer();
     _loadStream();
@@ -1057,8 +1282,18 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
 
   /// Open/close the channel list sidebar
   void _toggleChannelList() {
-    setState(() => _showChannelList = !_showChannelList);
-    if (_showChannelList) {
+    if (!_hasChannels) return;
+    final open = !_showChannelList;
+    setState(() {
+      _showChannelList = open;
+      // The list replaces the plate: one panel over the picture at a time.
+      if (open) {
+        _osd = _Osd.hidden;
+        _vodRow = false;
+      }
+    });
+    if (open) {
+      _controlsTimer?.cancel();
       _scrollToCurrentChannel();
       _restartChannelListTimer();
       // Focus direct sur la chaîne en cours : la télécommande navigue dans la
@@ -1081,6 +1316,11 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
   }
 
+  void _closeChannelList() {
+    _channelListTimer?.cancel();
+    if (_showChannelList) setState(() => _showChannelList = false);
+  }
+
   /// (Re)arme l'auto-fermeture de la sidebar. Relancé à chaque interaction
   /// (focus D-pad, scroll) pour ne pas fermer la liste sous les doigts.
   void _restartChannelListTimer() {
@@ -1094,7 +1334,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
   void _scrollToCurrentChannel() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_channelListScrollController.hasClients) return;
-      const itemHeight = 64.0;
+      const itemHeight = ChannelListPlate.itemExtent;
       final offset = (_currentIndex * itemHeight) -
           (_channelListScrollController.position.viewportDimension / 2) +
           (itemHeight / 2);
@@ -1121,35 +1361,278 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     _onUserInteraction();
   }
 
+  /// VOD: ±[seconds], from the last known position (presses add up before
+  /// mpv reports the new one).
+  void _seekBy(int seconds) {
+    var target = _position + Duration(seconds: seconds);
+    if (target < Duration.zero) target = Duration.zero;
+    if (_duration > Duration.zero && target >= _duration) return;
+    _position = target;
+    _player.seek(target);
+    _progress.value = _currentProgress;
+    _resetControlsTimer();
+  }
+
   void _toggleControls() {
     // Always show controls on tap, then start auto-hide timer
     if (!_showControls) {
-      // Reopen on the last focused control (falls back to Play/Pause)
-      _showControlsRestoringFocus();
+      _onUserInteraction();
       return;
     }
     _resetControlsTimer();
   }
 
-  /// Handle keyboard/remote control events
+  void _toggleStats() {
+    final current = ref.read(mobileSettingsProvider).showDebugStats;
+    ref.read(mobileSettingsProvider.notifier).toggleShowDebugStats(!current);
+    _resetControlsTimer();
+  }
+
+  /// Back to the Lite player (deinterlace forced for this channel).
+  void _disableDeinterlace() {
+    final streamId =
+        widget.channels?[_currentIndex].streamId ?? widget.streamId;
+    ref
+        .read(mobileSettingsProvider.notifier)
+        .toggleChannelDeinterlace(streamId);
+    // Free the connection before the other player opens it.
+    _stopPlayback();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LitePlayerScreen(
+          streamId: streamId,
+          title: widget.channels?[_currentIndex].name ?? widget.title,
+          playlist: widget.playlist,
+          streamType: widget.streamType,
+          channels: widget.channels,
+          initialIndex: _currentIndex,
+        ),
+      ),
+    );
+  }
+
+  // ─── Episodes ───────────────────────────────────────────────────────────────
+
+  int get _episodeIndex =>
+      widget.episodes?.indexWhere((e) => e.id == widget.streamId) ?? -1;
+
+  model.Episode? get _currentEpisode {
+    final i = _episodeIndex;
+    return i < 0 ? null : widget.episodes![i];
+  }
+
+  model.Episode? get _nextEpisode {
+    final i = _episodeIndex;
+    if (i < 0 || i + 1 >= widget.episodes!.length) return null;
+    return widget.episodes![i + 1];
+  }
+
+  /// Plays the next episode in place of this one (its resume position is
+  /// picked up as usual).
+  void _playNextEpisode() {
+    final next = _nextEpisode;
+    if (next == null) return;
+    _stopPlayback(); // saves this episode's position, frees the connection
+    final series = widget.seriesName ?? '';
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NativePlayerScreen(
+          streamId: next.id,
+          title: '$series S${next.season}E${next.episodeNum}'.trim(),
+          playlist: widget.playlist,
+          streamType: widget.streamType,
+          containerExtension: next.containerExtension,
+          seriesId: widget.seriesId,
+          season: int.tryParse(next.season),
+          episodeNum: next.episodeNum,
+          episodes: widget.episodes,
+          seriesName: widget.seriesName,
+        ),
+      ),
+    );
+  }
+
+  /// VOD plate: main title and the line beside it. Series: the episode title
+  /// when it says something, then « Série · S1 · É4 ».
+  (String, String?) get _vodTitles {
+    final series = widget.seriesName?.trim() ?? '';
+    if (widget.streamType != model.StreamType.series ||
+        series.isEmpty ||
+        widget.season == null ||
+        widget.episodeNum == null) {
+      return (widget.title, null);
+    }
+    final se = 'S${widget.season} · É${widget.episodeNum}';
+    final episodeTitle = _currentEpisode?.title.trim() ?? '';
+    final meaningful = episodeTitle.isNotEmpty &&
+        !episodeTitle.toLowerCase().contains(series.toLowerCase()) &&
+        !RegExp(r'^(episode|épisode|ep\.?|e)\s*\d+$', caseSensitive: false)
+            .hasMatch(episodeTitle);
+    return meaningful ? (episodeTitle, '$series · $se') : (series, se);
+  }
+
+  // ─── Tracks ─────────────────────────────────────────────────────────────────
+
+  /// mpv ids of the tracks really playing (`aid` / `sid`; media_kit only
+  /// knows them once set by hand).
+  String? _activeAudioId;
+  String? _activeSubtitleId;
+
+  List<AudioTrack> get _audioTracks => _player.state.tracks.audio
+      .where((t) => t.id != 'auto' && t.id != 'no')
+      .toList();
+
+  List<SubtitleTrack> get _subtitleTracks => _player.state.tracks.subtitle
+      .where((t) => t.id != 'auto' && t.id != 'no')
+      .toList();
+
+  Future<void> _refreshActiveTracks() async {
+    try {
+      final platform = _player.platform as dynamic;
+      final aid = await platform?.getProperty('aid') as String?;
+      final sid = await platform?.getProperty('sid') as String?;
+      if (!mounted) return;
+      if (aid != _activeAudioId || sid != _activeSubtitleId) {
+        setState(() {
+          _activeAudioId = aid;
+          _activeSubtitleId = sid;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _trackName(String? language, String? title, int index) =>
+      languageName(language) ??
+      (title != null && title.trim().isNotEmpty
+          ? title.trim()
+          : 'Piste ${index + 1}');
+
+  /// « Audio · Français · 1 sur 2 ».
+  String get _audioLabel {
+    final tracks = _audioTracks;
+    if (tracks.isEmpty) return 'Audio · aucune piste';
+    final i = tracks.indexWhere((t) => t.id == _activeAudioId);
+    if (i < 0) return 'Audio';
+    final name = _trackName(tracks[i].language, tracks[i].title, i);
+    return tracks.length > 1
+        ? 'Audio · $name · ${i + 1} sur ${tracks.length}'
+        : 'Audio · $name';
+  }
+
+  String get _subtitleValue {
+    final tracks = _subtitleTracks;
+    final i = tracks.indexWhere((t) => t.id == _activeSubtitleId);
+    if (i < 0) return 'désactivés';
+    return _trackName(tracks[i].language, tracks[i].title, i);
+  }
+
+  Future<void> _cycleAudioTrack() async {
+    final tracks = _audioTracks;
+    if (tracks.isEmpty) {
+      _showToast('Aucune piste audio détectée');
+      return;
+    }
+
+    final current = tracks.indexWhere((t) => t.id == _activeAudioId);
+    final nextTrack = tracks[(current + 1) % tracks.length];
+
+    await _player.setAudioTrack(nextTrack);
+    await _refreshActiveTracks();
+    _resetControlsTimer();
+
+    // TV: the lit button already shows it.
+    if (mounted && !_isTv) _showToast(_audioLabel);
+  }
+
+  /// Off → first track → … → last → off.
+  Future<void> _cycleSubtitleTrack() async {
+    final tracks = _subtitleTracks;
+    if (tracks.isEmpty) return;
+    final i = tracks.indexWhere((t) => t.id == _activeSubtitleId);
+    await _player.setSubtitleTrack(
+      i + 1 >= tracks.length ? SubtitleTrack.no() : tracks[i + 1],
+    );
+    await _refreshActiveTracks();
+    _resetControlsTimer();
+    if (mounted && !_isTv) _showToast('Sous-titres · $_subtitleValue');
+  }
+
+  // ─── Remote control ─────────────────────────────────────────────────────────
+
+  static bool _isSelectKey(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.space ||
+      key == LogicalKeyboardKey.enter ||
+      key == LogicalKeyboardKey.select ||
+      key == LogicalKeyboardKey.numpadEnter ||
+      key == LogicalKeyboardKey.gameButtonA;
+
+  /// Handle keyboard/remote control events.
+  ///
+  /// Runs before the focus system, which still receives the key afterwards:
+  /// returning false leaves it to the focused button; the plates swallow the
+  /// keys they must not see as navigation.
   bool _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
+    final isRepeat = event is KeyRepeatEvent;
+    if (event is! KeyDownEvent && !isRepeat) return false;
+    // A sheet or another screen on top: not ours.
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return false;
 
     try {
       final key = event.logicalKey;
+      final up = key == LogicalKeyboardKey.arrowUp;
+      final down = key == LogicalKeyboardKey.arrowDown;
+      final left = key == LogicalKeyboardKey.arrowLeft;
+      final right = key == LogicalKeyboardKey.arrowRight;
+      final back =
+          key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack;
 
-      // Sidebar ouverte : Back/Menu la ferment, le reste part au système de
-      // Focus (navigation + OK sur un item). On relance juste l'auto-fermeture.
+      // Held keys: zapping (live) and seeking (VOD, plate hidden) follow.
+      if (isRepeat) {
+        if (_isLive &&
+            _hasChannels &&
+            _errorMessage == null &&
+            !_showChannelList &&
+            (up || down)) {
+          _zapBy(up ? -1 : 1);
+          return true;
+        }
+        if (!_isLive &&
+            !_showControls &&
+            _errorMessage == null &&
+            (left || right)) {
+          _seekBy(left ? -10 : 10);
+          _openVod();
+          return true;
+        }
+        return false;
+      }
+
+      // Sidebar ouverte : Back/Menu la ferment (◀ aussi, voir la liste), le
+      // reste part au système de Focus (navigation + OK sur un item). On
+      // relance juste l'auto-fermeture.
       if (_showChannelList) {
-        if (key == LogicalKeyboardKey.escape ||
-            key == LogicalKeyboardKey.goBack ||
+        if (back ||
             key == LogicalKeyboardKey.contextMenu ||
             key == LogicalKeyboardKey.keyM) {
-          _channelListTimer?.cancel();
-          setState(() => _showChannelList = false);
+          _closeChannelList();
           return true;
         }
         _restartChannelListTimer();
+        return false;
+      }
+
+      // Error plate: its buttons take ◀ ▶ OK; Back leaves; ▲▼ still zap.
+      if (_errorMessage != null) {
+        if (back) {
+          Navigator.of(context).pop();
+          return true;
+        }
+        if (_isLive && _hasChannels && (up || down)) {
+          _zapBy(up ? -1 : 1);
+          return true;
+        }
         return false;
       }
 
@@ -1167,101 +1650,84 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
         return true;
       }
 
-      // Space / Enter / Select / Toggle
-      if (key == LogicalKeyboardKey.space ||
-          key == LogicalKeyboardKey.enter ||
-          key == LogicalKeyboardKey.select ||
-          key == LogicalKeyboardKey.numpadEnter ||
-          key == LogicalKeyboardKey.gameButtonA ||
-          key == LogicalKeyboardKey.mediaPlayPause) {
-        if (!_showControls) {
-          // Live : OK réaffiche seulement l'OSD (focus restauré sur le dernier
-          // bouton utilisé) — surtout ne PAS mettre le direct en pause.
-          if (widget.streamType == model.StreamType.live &&
-              key != LogicalKeyboardKey.mediaPlayPause) {
-            _showControlsRestoringFocus();
-            return true;
-          }
-          // VOD : comportement historique — toggle play/pause + OSD
-          _togglePlayPause();
-          _toggleControls();
-          return true;
-        }
-        // If controls are visible, let Focus system handle button press
-        return false;
-      }
-
-      // Debug Toggle: Long Press Key 'D' or 0 (if mapped) - Simplified to just a secret key combo?
-      // Let's use a long-press logic on Select in _handleKeyEvent?
-      // Actually, handling long press in key down is hard.
-      // We'll add a 'Debug' button in the settings or just map Key '0' if remote has it.
-      // Debug Toggle: Long Press Key 'D' or 0 (if mapped)
-      if (key == LogicalKeyboardKey.digit0) {
-        final current = ref.read(mobileSettingsProvider).showDebugStats;
-        ref
-            .read(mobileSettingsProvider.notifier)
-            .toggleShowDebugStats(!current);
+      if (key == LogicalKeyboardKey.mediaPlayPause) {
+        _togglePlayPause();
         return true;
       }
 
-      // Left Arrow - Show controls or navigate, seek in VOD when hidden
-      if (key == LogicalKeyboardKey.arrowLeft) {
+      // OK
+      if (_isSelectKey(key)) {
         if (!_showControls) {
-          if (widget.streamType != model.StreamType.live) {
-            final newPos = _position - const Duration(seconds: 10);
-            _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
-            _onUserInteraction();
+          if (_isLive) {
+            // Live: the buttons, focus on « Chaînes » — never a pause.
+            _openLiveActions();
           } else {
-            _showControlsRestoringFocus();
+            // VOD: pause / play and the plate, focus on the bar.
+            _togglePlayPause();
+            _openVod();
           }
           return true;
         }
-        return false; // Let Focus handle navigation
+        if (_isLive && _osd == _Osd.info) {
+          _openLiveActions();
+          return true;
+        }
+        _resetControlsTimer();
+        return false; // the focused button or the bar
       }
 
-      // Right Arrow - Show controls or navigate, seek in VOD when hidden
-      if (key == LogicalKeyboardKey.arrowRight) {
+      // Infos techniques
+      if (key == LogicalKeyboardKey.digit0) {
+        _toggleStats();
+        return true;
+      }
+
+      // ◀ ▶: live, the compact plate; VOD, ±10 s with the bar.
+      if (left || right) {
         if (!_showControls) {
-          if (widget.streamType != model.StreamType.live) {
-            final newPos = _position + const Duration(seconds: 10);
-            if (newPos < _duration) {
-              _player.seek(newPos);
-            }
-            _onUserInteraction();
+          if (_isLive) {
+            _showLiveInfo();
           } else {
-            _showControlsRestoringFocus();
+            _seekBy(left ? -10 : 10);
+            _openVod();
           }
           return true;
         }
-        return false; // Let Focus handle navigation
+        _resetControlsTimer();
+        if (_isLive && _osd == _Osd.info) return true;
+        return false; // move along the row / seek on the bar
       }
 
-      // Up/Down Arrow - Show controls or navigate UI, NO zapping
-      if (key == LogicalKeyboardKey.arrowUp ||
-          key == LogicalKeyboardKey.arrowDown) {
-        if (!_showControls) {
-          _showControlsRestoringFocus();
+      // ▲ ▼: live, zapping (the focus does not move); VOD, the plate.
+      if (up || down) {
+        if (_isLive && _hasChannels) {
+          _zapBy(up ? -1 : 1);
           return true;
         }
-        return false; // Let Focus handle navigation
+        if (!_showControls) {
+          if (_isLive) {
+            _showLiveInfo();
+          } else {
+            _openVod();
+          }
+          return true;
+        }
+        _resetControlsTimer();
+        return false;
       }
 
       // Channel Down = Previous Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelDown) {
-        if (widget.streamType == model.StreamType.live &&
-            widget.channels != null) {
+        if (_isLive && _hasChannels) {
           _playPrevious();
-          _onUserInteraction();
           return true;
         }
       }
 
       // Channel Up = Next Channel (inverted as requested)
       if (key == LogicalKeyboardKey.channelUp) {
-        if (widget.streamType == model.StreamType.live &&
-            widget.channels != null) {
+        if (_isLive && _hasChannels) {
           _playNext();
-          _onUserInteraction();
           return true;
         }
       }
@@ -1269,8 +1735,7 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       // Menu key or 'M' → toggle channel list sidebar
       if (key == LogicalKeyboardKey.contextMenu ||
           key == LogicalKeyboardKey.keyM) {
-        if (widget.streamType == model.StreamType.live &&
-            widget.channels != null) {
+        if (_isLive && _hasChannels) {
           _toggleChannelList();
           return true;
         }
@@ -1283,11 +1748,10 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
       }
 
       // Escape / Back - Exit player
-      if (key == LogicalKeyboardKey.escape ||
-          key == LogicalKeyboardKey.goBack) {
+      if (back) {
         // If controls are visible, close them first
         if (_showControls) {
-          setState(() => _showControls = false);
+          _hideControls();
         } else {
           Navigator.of(context).pop();
         }
@@ -1299,223 +1763,734 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     return false;
   }
 
-  Future<void> _cycleAudioTrack() async {
-    final tracks = _player.state.tracks.audio;
-    if (tracks.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Aucune piste audio détectée'),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
-      return;
-    }
-
-    final current = _player.state.track.audio;
-    final currentIndex = tracks.indexOf(current);
-    final nextIndex = (currentIndex + 1) % tracks.length;
-    final nextTrack = tracks[nextIndex];
-
-    await _player.setAudioTrack(nextTrack);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Audio: ${nextTrack.language ?? "inconnu"} (${nextTrack.title ?? nextTrack.id})',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+  /// Live plate with its buttons: ▲▼ zap (handled above), the focus stays.
+  KeyEventResult _swallowUpDown(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    return key == LogicalKeyboardKey.arrowUp ||
+            key == LogicalKeyboardKey.arrowDown
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored;
   }
+
+  /// VOD bar: ◀ ▶ ±10 s, OK pause / play, ▼ the buttons.
+  KeyEventResult _onBarKey(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    final down = event is KeyDownEvent;
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      if (down || event is KeyRepeatEvent) {
+        _seekBy(key == LogicalKeyboardKey.arrowLeft ? -10 : 10);
+      }
+      return KeyEventResult.handled;
+    }
+    if (_isSelectKey(key)) {
+      if (down) _togglePlayPause();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (down) _openVod(row: true);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) return KeyEventResult.handled;
+    return KeyEventResult.ignored;
+  }
+
+  /// VOD buttons: ▲ back to the bar.
+  KeyEventResult _onVodRowKey(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (event is KeyDownEvent) _openVod();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) return KeyEventResult.handled;
+    return KeyEventResult.ignored;
+  }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.channels != null && widget.channels!.isNotEmpty
-        ? widget.channels![_currentIndex].name
-        : widget.title;
+    final aspectMode =
+        ref.watch(mobileSettingsProvider.select((s) => s.aspectRatioMode));
+    final tv = _isTv;
 
     return Theme(
       data: ThemeData.dark(),
       child: Scaffold(
-        backgroundColor: Colors.black, // [V5.2 Fix] Enforce black background globally
+        backgroundColor:
+            Colors.black, // [V5.2 Fix] Enforce black background globally
         body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (_showChannelList) {
-            setState(() => _showChannelList = false);
-          } else {
-            _toggleControls();
-          }
-        },
-        onPanDown: (_) => _onUserInteraction(),
-        onPanUpdate: (_) => _onUserInteraction(),
-        // Swipe from right edge → open channel list
-        onHorizontalDragEnd: (details) {
-          if (widget.streamType == model.StreamType.live &&
-              widget.channels != null &&
-              details.primaryVelocity != null &&
-              details.primaryVelocity! < -300) {
-            _toggleChannelList();
-          }
-        },
-        child: Stack(
-          children: [
-            // Video Player
-            if (_errorMessage != null)
-              _buildErrorView()
-            else
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (_showChannelList) {
+              _closeChannelList();
+            } else {
+              _toggleControls();
+            }
+          },
+          onPanDown: (_) => _onUserInteraction(),
+          onPanUpdate: (_) => _onUserInteraction(),
+          // Swipe from right edge → open channel list
+          onHorizontalDragEnd: (details) {
+            if (_isLive &&
+                _hasChannels &&
+                details.primaryVelocity != null &&
+                details.primaryVelocity! < -300) {
+              _toggleChannelList();
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // The video stays, even on error: the last picture remains
+              // under the error plate.
               Center(
                 child: Video(
                   controller: _controller,
                   controls: NoVideoControls, // We use our own custom controls
-                  fit: _getBoxFit(
-                    ref.watch(mobileSettingsProvider).aspectRatioMode,
-                  ),
+                  fit: _getBoxFit(aspectMode),
                 ),
               ),
 
-            // Loading Overlay — black only on FIRST load
-            if (_isLoading && _errorMessage == null)
-              Container(
-                // True black, not the warm ink: this sits over the video surface.
-                color: Colors.black,
-                child: _buildLoadingView(),
-              ),
+              // First load: nothing to show yet.
+              if (_isLoading && _errorMessage == null)
+                const ColoredBox(color: Colors.black),
 
-            // Silent reconnect spinner (does NOT black out the video)
-            if (_isReconnecting && !_isLoading)
+              if (_errorMessage == null)
+                ...(tv ? _buildTvOsd(aspectMode) : _buildTouchOsd(aspectMode)),
+
+              if (_errorMessage != null) _buildErrorPlate(tv),
+
+              // [TiviMate] Channel list sidebar
+              if (_showChannelList && _isLive && _hasChannels)
+                _buildChannelList(tv),
+
+              // Infos techniques (top left) - isolated to prevent rebuilds
               Positioned(
-                top: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.onSurface70,
-                    ),
-                  ),
+                top: tv ? 32 : (_showControls ? 68 : 12),
+                left: tv ? 48 : 44,
+                child: StatsOverlayWidget(
+                  player: _player,
+                  formatLabel: _formatLabel(aspectMode),
                 ),
               ),
 
-            // Custom controls overlay
-            if (_showControls && _errorMessage == null)
-              _buildControlsOverlay(title),
+              _buildStatusPill(tv),
+              _buildToast(tv),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Top bar (always visible when controls are shown)
-            if (_showControls)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: const BoxDecoration(
-                      color: Colors
-                          .black54, // Flat color instead of Gradient for performance
-                    ),
+  LiveOsdInfo _liveInfo(String clock) {
+    final ch = _hasChannels ? widget.channels![_currentIndex] : null;
+    return LiveOsdInfo.from(
+      channel: ch,
+      fallbackName: widget.title,
+      number: _channelNumber,
+      epg: _epg,
+      clock: clock,
+      connecting: _isLoading || _isReconnecting,
+    );
+  }
+
+  String get _channelNumber {
+    if (!_hasChannels) return '';
+    final ch = widget.channels![_currentIndex];
+    return ch.num.isNotEmpty ? ch.num : '${_currentIndex + 1}';
+  }
+
+  /// Buttons separated by 10 dp: the lit halo (8 dp, ×1.06) stays clear of
+  /// its neighbours.
+  static List<Widget> _spaced(List<Widget> items) => [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0 &&
+              items[i] is! OsdSeparator &&
+              items[i - 1] is! OsdSeparator)
+            const SizedBox(width: 10),
+          if (items[i] is OsdSeparator) const SizedBox(width: 6),
+          items[i],
+          if (items[i] is OsdSeparator) const SizedBox(width: 6),
+        ],
+      ];
+
+  List<Widget> _buildTvOsd(String aspectMode) {
+    if (!_showControls) return const [];
+    final statsOn =
+        ref.watch(mobileSettingsProvider.select((s) => s.showDebugStats));
+    final statsButton = OsdButton(
+      key: const ValueKey('osd-stats'),
+      icon: Icons.ssid_chart_rounded,
+      label: statsOn ? 'Infos techniques · affichées' : 'Infos techniques',
+      onPressed: _toggleStats,
+      onFocus: _resetControlsTimer,
+    );
+    final audioButton = OsdButton(
+      key: const ValueKey('osd-audio'),
+      icon: Icons.graphic_eq_rounded,
+      label: _audioLabel,
+      onPressed: _cycleAudioTrack,
+      onFocus: _resetControlsTimer,
+    );
+    final subtitleButton = _subtitleTracks.isEmpty
+        ? null
+        : OsdButton(
+            key: const ValueKey('osd-subtitles'),
+            icon: Icons.subtitles_outlined,
+            label: 'Sous-titres · $_subtitleValue',
+            onPressed: _cycleSubtitleTrack,
+            onFocus: _resetControlsTimer,
+          );
+    final formatButton = OsdButton(
+      key: const ValueKey('osd-format'),
+      icon: Icons.fit_screen_outlined,
+      label: 'Format · ${_formatLabel(aspectMode)}',
+      focusNode: _formatFocusNode,
+      onPressed: () => _cycleAspectRatio(announce: false),
+      onFocus: _resetControlsTimer,
+    );
+    final playPause = OsdButton(
+      key: const ValueKey('osd-play'),
+      icon: _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+      label: _isPlaying ? 'Pause' : 'Lecture',
+      focusNode: _playPauseFocusNode,
+      onPressed: _togglePlayPause,
+      onFocus: _resetControlsTimer,
+      iconSize: 22,
+    );
+
+    if (_isLive) {
+      final withActions = _osd == _Osd.actions;
+      final width = MediaQuery.sizeOf(context).width - 96;
+      Widget? row;
+      if (withActions) {
+        final next = _epg?.next;
+        final nextStart = next?.startTime;
+        row = Row(
+          children: [
+            ..._spaced([
+              if (_hasChannels)
+                OsdButton(
+                  key: const ValueKey('osd-prev'),
+                  icon: Icons.skip_previous_rounded,
+                  label: 'Chaîne précédente',
+                  focusNode: _prevFocusNode,
+                  onPressed: _playPrevious,
+                  onFocus: _resetControlsTimer,
+                  iconSize: 22,
+                ),
+              playPause,
+              if (_hasChannels)
+                OsdButton(
+                  key: const ValueKey('osd-next'),
+                  icon: Icons.skip_next_rounded,
+                  label: 'Chaîne suivante',
+                  focusNode: _nextFocusNode,
+                  onPressed: _playNext,
+                  onFocus: _resetControlsTimer,
+                  iconSize: 22,
+                ),
+              const OsdSeparator(),
+              if (_hasChannels)
+                OsdButton(
+                  key: const ValueKey('osd-channels'),
+                  icon: Icons.playlist_play_rounded,
+                  label: 'Chaînes',
+                  focusNode: _channelListButtonFocusNode,
+                  onPressed: _toggleChannelList,
+                  onFocus: _resetControlsTimer,
+                  iconSize: 22,
+                ),
+              audioButton,
+              if (subtitleButton != null) subtitleButton,
+              formatButton,
+              if (widget.forceDeinterlace)
+                OsdButton(
+                  key: const ValueKey('osd-deinterlace'),
+                  icon: Icons.table_rows_outlined,
+                  label: 'Désentrelacement',
+                  onPressed: _disableDeinterlace,
+                  onFocus: _resetControlsTimer,
+                ),
+              statsButton,
+            ]),
+            Expanded(
+              child: next == null || nextStart == null || next.title.isEmpty
+                  ? const SizedBox.shrink()
+                  : OsdUpNext(time: formatClock(nextStart), title: next.title),
+            ),
+          ],
+        );
+      }
+      return [
+        Positioned(
+          left: 48,
+          bottom: 32,
+          right: withActions ? 48 : null,
+          width: withActions ? null : (width < 680 ? width : 680),
+          child: Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            onKeyEvent: withActions ? _swallowUpDown : null,
+            child: ValueListenableBuilder<String>(
+              valueListenable: _clock,
+              builder: (context, clock, _) =>
+                  LivePlate(info: _liveInfo(clock), actions: row),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    // VOD
+    final (title, subtitle) = _vodTitles;
+    final nextEpisode = _nextEpisode;
+    return [
+      Positioned(
+        left: 48,
+        right: 48,
+        bottom: 32,
+        child: ListenableBuilder(
+          listenable: _sliderFocusNode,
+          builder: (context, _) => VodPlate(
+            title: title,
+            subtitle: subtitle,
+            progress: _progress,
+            barLit: _sliderFocusNode.hasFocus,
+            barWrapper: (child) => Focus(
+              focusNode: _sliderFocusNode,
+              onKeyEvent: _onBarKey,
+              child: child,
+            ),
+            actions: !_vodRow
+                ? null
+                : Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    onKeyEvent: _onVodRowKey,
                     child: Row(
                       children: [
-                        // Main Back Button
-                        // Main Back Button
-                        TVFocusable(
-                          focusNode: _backFocusNode,
-                          onPressed: () => Navigator.pop(context),
-                          onFocus: _resetControlsTimer,
-                          borderRadius: BorderRadius.circular(50),
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: AppColors.onSurface,
-                            ),
-                            onPressed: () => Navigator.pop(context),
+                        ..._spaced([
+                          OsdButton(
+                            key: const ValueKey('osd-back10'),
+                            icon: Icons.replay_10_rounded,
+                            label: '−10 s',
+                            focusNode: _prevFocusNode,
+                            onPressed: () => _seekBy(-10),
+                            onFocus: _resetControlsTimer,
+                            iconSize: 22,
                           ),
-                        ),
-                        // Hidden Debug Trigger (Invisible InkWell next to back button)
-                        InkWell(
-                          onLongPress: () {
-                            final current =
-                                ref.read(mobileSettingsProvider).showDebugStats;
-                            ref
-                                .read(mobileSettingsProvider.notifier)
-                                .toggleShowDebugStats(!current);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Debug Mode: ${!current ? "ON" : "OFF"}',
-                                ),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                          child: const SizedBox(width: 20, height: 40),
-                        ),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                title,
-                                style: const TextStyle(
-                                  color: AppColors.onSurface,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (widget.streamType == model.StreamType.live)
-                                Text(
-                                  _currentTime,
-                                  style: const TextStyle(
-                                    color: AppColors.onSurface70,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                            ],
+                          playPause,
+                          OsdButton(
+                            key: const ValueKey('osd-fwd10'),
+                            icon: Icons.forward_10_rounded,
+                            label: '+10 s',
+                            focusNode: _nextFocusNode,
+                            onPressed: () => _seekBy(10),
+                            onFocus: _resetControlsTimer,
+                            iconSize: 22,
                           ),
-                        ),
-                        // Removed top-right arrows as requested
-                        const SizedBox(width: 48), // Spacer for balance
+                          const OsdSeparator(),
+                          audioButton,
+                          if (subtitleButton != null) subtitleButton,
+                          formatButton,
+                          statsButton,
+                        ]),
+                        const Spacer(),
+                        if (nextEpisode != null)
+                          OsdButton(
+                            key: const ValueKey('osd-next-episode'),
+                            icon: Icons.skip_next_rounded,
+                            label: 'Épisode suivant · '
+                                'S${nextEpisode.season} É${nextEpisode.episodeNum}',
+                            onPressed: _playNextEpisode,
+                            onFocus: _resetControlsTimer,
+                            iconSize: 22,
+                          ),
                       ],
                     ),
                   ),
-                ),
-              ),
-
-            // [TiviMate] Channel list sidebar
-            if (_showChannelList &&
-                widget.streamType == model.StreamType.live &&
-                widget.channels != null &&
-                widget.channels!.isNotEmpty)
-              _buildChannelListSidebar(),
-
-            // Stats Overlay (Top Left) - Isolated to prevent main rebuilds
-            Positioned(
-              top: 80,
-              left: 16,
-              child: StatsOverlayWidget(player: _player),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    ];
+  }
+
+  /// Touch: two pills at the top, three round buttons in the middle, a
+  /// plate at the bottom. No veil over the picture.
+  List<Widget> _buildTouchOsd(String aspectMode) {
+    if (!_showControls) return const [];
+    final pad = MediaQuery.paddingOf(context);
+    final left = pad.left > 44 ? pad.left : 44.0;
+    final right = pad.right > 44 ? pad.right : 44.0;
+    final top = pad.top > 12 ? pad.top : 12.0;
+    final bottom = pad.bottom > 12 ? pad.bottom : 12.0;
+
+    String topTitle;
+    if (_isLive) {
+      final ch = _hasChannels ? widget.channels![_currentIndex] : null;
+      final name = ch?.name ?? widget.title;
+      topTitle = _channelNumber.isEmpty ? name : '$_channelNumber · $name';
+    } else {
+      final (title, _) = _vodTitles;
+      topTitle = widget.streamType == model.StreamType.series &&
+              widget.season != null &&
+              widget.episodeNum != null &&
+              (widget.seriesName?.isNotEmpty ?? false)
+          ? '$title · S${widget.season} · É${widget.episodeNum}'
+          : title;
+    }
+
+    final topBar = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: TouchPill(
+              padding: const EdgeInsets.fromLTRB(4, 0, 16, 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TouchIconButton(
+                    icon: Icons.arrow_back_rounded,
+                    tooltip: 'Retour',
+                    width: 36,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      topTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.body(
+                        fontSize: 15,
+                        height: 1.33,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        TouchPill(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_isLive)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 6, 0),
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: _clock,
+                    builder: (context, clock, _) => Text(
+                      clock,
+                      style: AppTheme.body(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                        fontFeatures: AppTheme.tabular,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_isLive && _hasChannels)
+                TouchIconButton(
+                  icon: Icons.playlist_play_rounded,
+                  tooltip: 'Chaînes',
+                  onPressed: _toggleChannelList,
+                ),
+              TouchIconButton(
+                icon: Icons.graphic_eq_rounded,
+                tooltip: 'Audio',
+                onPressed: _cycleAudioTrack,
+              ),
+              if (!_isLive && _subtitleTracks.isNotEmpty)
+                TouchIconButton(
+                  icon: Icons.subtitles_outlined,
+                  tooltip: 'Sous-titres',
+                  onPressed: _cycleSubtitleTrack,
+                ),
+              TouchIconButton(
+                icon: Icons.fit_screen_outlined,
+                tooltip: 'Format',
+                onPressed: _cycleAspectRatio,
+              ),
+              TouchIconButton(
+                icon: Icons.more_horiz_rounded,
+                tooltip: 'Plus',
+                onPressed: _showMoreSheet,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final middle = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TouchCircleButton(
+          icon: _isLive ? Icons.skip_previous_rounded : Icons.replay_10_rounded,
+          tooltip: _isLive ? 'Chaîne précédente' : '−10 s',
+          onPressed: _isLive ? _playPrevious : () => _seekBy(-10),
+          iconSize: 22,
+        ),
+        const SizedBox(width: 40),
+        TouchCircleButton(
+          icon: _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          tooltip: _isPlaying ? 'Pause' : 'Lecture',
+          onPressed: _togglePlayPause,
+          size: 56,
+          iconSize: 26,
+        ),
+        const SizedBox(width: 40),
+        TouchCircleButton(
+          icon: _isLive ? Icons.skip_next_rounded : Icons.forward_10_rounded,
+          tooltip: _isLive ? 'Chaîne suivante' : '+10 s',
+          onPressed: _isLive ? _playNext : () => _seekBy(10),
+          iconSize: 22,
+        ),
+      ],
+    );
+
+    return [
+      Positioned(top: top, left: left, right: right, child: topBar),
+      if (!_isLive || _hasChannels) Center(child: middle),
+      if (_isLive && !_hasChannels)
+        Center(
+          child: TouchCircleButton(
+            icon: _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            tooltip: _isPlaying ? 'Pause' : 'Lecture',
+            onPressed: _togglePlayPause,
+            size: 56,
+            iconSize: 26,
+          ),
+        ),
+      Positioned(
+        left: left,
+        right: right,
+        bottom: bottom,
+        child: _isLive
+            ? ValueListenableBuilder<String>(
+                valueListenable: _clock,
+                builder: (context, clock, _) =>
+                    PhoneLivePlate(info: _liveInfo(clock)),
+              )
+            : PhoneVodPlate(
+                progress: _progress,
+                onSeek: (target) {
+                  _position = target;
+                  _player.seek(target);
+                  _progress.value = _currentProgress;
+                  _resetControlsTimer();
+                },
+                onInteraction: _resetControlsTimer,
+                onNextEpisode: _nextEpisode == null ? null : _playNextEpisode,
+              ),
+      ),
+    ];
+  }
+
+  /// ⋯ on touch screens: what has no room in the top pill.
+  Future<void> _showMoreSheet() async {
+    _controlsTimer?.cancel();
+    final statsOn = ref.read(mobileSettingsProvider).showDebugStats;
+    final next = _nextEpisode;
+    await showAppSheet<void>(
+      context,
+      title: 'Options',
+      builder: (sheetContext) {
+        void run(VoidCallback action) {
+          Navigator.pop(sheetContext);
+          action();
+        }
+
+        final tiles = <Widget>[
+          if (_isLive && _subtitleTracks.isNotEmpty)
+            AppDialogTile(
+              icon: Icons.subtitles_outlined,
+              label: 'Sous-titres',
+              value: _subtitleValue,
+              onPressed: () => run(_cycleSubtitleTrack),
+            ),
+          AppDialogTile(
+            icon: Icons.ssid_chart_rounded,
+            label: 'Infos techniques',
+            value: statsOn ? 'Affichées' : 'Masquées',
+            onPressed: () => run(_toggleStats),
+          ),
+          if (widget.forceDeinterlace)
+            AppDialogTile(
+              icon: Icons.table_rows_outlined,
+              label: 'Désentrelacement',
+              value: 'Activé · revenir au lecteur Lite',
+              onPressed: () => run(_disableDeinterlace),
+            ),
+          if (!_isLive && next != null)
+            AppDialogTile(
+              icon: Icons.skip_next_rounded,
+              label: 'Épisode suivant',
+              value: 'S${next.season} · É${next.episodeNum}',
+              onPressed: () => run(_playNextEpisode),
+            ),
+        ];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < tiles.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              tiles[i],
+            ],
+          ],
+        );
+      },
+    );
+    if (mounted) _resetControlsTimer();
+  }
+
+  Widget _buildErrorPlate(bool tv) {
+    final e = describePlayerError(
+      _errorMessage!,
+      isLive: _isLive,
+      prefix: _channelNumber,
+    );
+    final plate = ErrorPlate(
+      title: e.title,
+      detail: e.detail,
+      actions: [
+        OsdButton(
+          key: const ValueKey('error-retry'),
+          icon: Icons.refresh_rounded,
+          label: 'Réessayer',
+          alwaysLabel: true,
+          autofocus: tv,
+          focusNode: _retryFocusNode,
+          onPressed: () {
+            _reconnectAttempts = 0;
+            _loadStream();
+          },
+        ),
+        if (_isLive && _hasChannels)
+          OsdButton(
+            key: const ValueKey('error-next'),
+            icon: Icons.skip_next_rounded,
+            label: 'Chaîne suivante',
+            alwaysLabel: true,
+            onPressed: _playNext,
+          ),
+        OsdButton(
+          key: const ValueKey('error-back'),
+          icon: Icons.arrow_back_rounded,
+          label: 'Retour',
+          alwaysLabel: true,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+    if (tv) {
+      return Positioned(left: 48, right: 48, bottom: 32, child: plate);
+    }
+    final pad = MediaQuery.paddingOf(context);
+    return Positioned(
+      left: pad.left > 44 ? pad.left : 44,
+      right: pad.right > 44 ? pad.right : 44,
+      bottom: pad.bottom > 12 ? pad.bottom : 12,
+      child: plate,
+    );
+  }
+
+  Widget _buildChannelList(bool tv) {
+    final pad = MediaQuery.paddingOf(context);
+    return Positioned(
+      top: tv ? 32 : (pad.top > 12 ? pad.top : 12),
+      bottom: tv ? 32 : (pad.bottom > 12 ? pad.bottom : 12),
+      right: tv ? 48 : (pad.right > 44 ? pad.right : 44),
+      width: 280,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        // ◀ closes the list (it sits on the right); ▶ goes nowhere.
+        onKeyEvent: (node, event) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.arrowLeft) {
+            if (event is KeyDownEvent) _closeChannelList();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowRight) {
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          // A tap on the list's header must not close it.
+          behavior: HitTestBehavior.opaque,
+          onTap: _restartChannelListTimer,
+          child: ChannelListPlate(
+            playlist: widget.playlist,
+            channels: widget.channels!,
+            currentIndex: _currentIndex,
+            currentFocusNode: _channelListItemFocusNode,
+            controller: _channelListScrollController,
+            onSelect: _switchChannel,
+            onActivity: _restartChannelListTimer,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// « Reconnexion 2 / 5 », « Connexion… » (when no plate says it), and
+  /// « Mise en mémoire tampon… » when buffering lasts.
+  Widget _buildStatusPill(bool tv) {
+    return Positioned(
+      top: tv ? 32 : (_showControls ? 68 : 12),
+      right: tv ? 48 : 44,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_reconnectLabel, _bufferingVisible]),
+        builder: (context, _) {
+          if (_errorMessage != null || _showChannelList) {
+            return const SizedBox.shrink();
+          }
+          final reconnect = _reconnectLabel.value;
+          if (reconnect != null) {
+            return OsdStatusPill(text: 'Reconnexion', detail: reconnect);
+          }
+          final connecting = _isLoading || _isReconnecting;
+          if (connecting && !(_isLive && _showControls)) {
+            return OsdStatusPill(
+              text: _isLive ? 'Connexion…' : 'Chargement…',
+            );
+          }
+          if (!connecting && _bufferingVisible.value) {
+            return const OsdStatusPill(text: 'Mise en mémoire tampon…');
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
+
+  Widget _buildToast(bool tv) {
+    return Positioned(
+      top: tv ? 32 : (_showControls ? 68 : 12),
+      left: 0,
+      right: 0,
+      child: Center(
+        child: ValueListenableBuilder<String?>(
+          valueListenable: _toast,
+          builder: (context, text, _) =>
+              text == null ? const SizedBox.shrink() : PlayerToast(text: text),
+        ),
+      ),
+    );
+  }
 
   BoxFit _getBoxFit(String mode) {
     switch (mode) {
@@ -1529,882 +2504,51 @@ class _NativePlayerScreenState extends ConsumerState<NativePlayerScreen>
     }
   }
 
-  void _cycleAspectRatio() {
+  static String _formatLabel(String mode) => switch (mode) {
+        'cover' => 'Zoom',
+        'fill' => 'Étirer',
+        _ => 'Original',
+      };
+
+  /// Original → Zoom → Étirer. [announce]: a toast says the new format (key
+  /// A / 1, touch); on TV the lit button already shows it.
+  void _cycleAspectRatio({bool announce = true}) {
     final current = ref.read(mobileSettingsProvider).aspectRatioMode;
     String next;
-    String label;
     if (current == 'contain') {
       next = 'cover';
-      label = 'Zoom (Cover)';
     } else if (current == 'cover') {
       next = 'fill';
-      label = 'Étirer (Fill)';
     } else {
       next = 'contain';
-      label = 'Original (Contain)';
     }
 
     ref.read(mobileSettingsProvider.notifier).setAspectRatioMode(next);
+    _resetControlsTimer();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Format: $label'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
-  }
-
-  Widget _buildUnifiedOSD(String title) {
-    return Positioned(
-      bottom: 20,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.onSurface12),
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // EPG Info (Left)
-              Expanded(child: _buildEPGBox(title)),
-              const SizedBox(width: 24),
-              // Controls Continuity (Right)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Prev Channel
-                  TVFocusable(
-                    focusNode: _prevFocusNode,
-                    onPressed: _playPrevious,
-                    onFocus: () => _noteFocus(_prevFocusNode),
-                    child: const Icon(
-                      Icons.skip_previous,
-                      color: AppColors.onSurface,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Play/Pause
-                  TVFocusable(
-                    focusNode: _playPauseFocusNode,
-                    onPressed: _togglePlayPause,
-                    onFocus: () => _noteFocus(_playPauseFocusNode),
-                    child: Icon(
-                      _isPlaying
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_filled,
-                      color: AppColors.onSurface,
-                      size: 56,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Next Channel
-                  TVFocusable(
-                    focusNode: _nextFocusNode,
-                    onPressed: _playNext,
-                    onFocus: () => _noteFocus(_nextFocusNode),
-                    child: const Icon(
-                      Icons.skip_next,
-                      color: AppColors.onSurface,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-
-                  // Channel list sidebar (liste des chaînes de la catégorie)
-                  if (widget.channels != null && widget.channels!.isNotEmpty)
-                    TVFocusable(
-                      focusNode: _channelListButtonFocusNode,
-                      onPressed: _toggleChannelList,
-                      onFocus: () => _noteFocus(_channelListButtonFocusNode),
-                      child: const Icon(
-                        Icons.playlist_play_rounded,
-                        color: AppColors.onSurface,
-                        size: 36,
-                      ),
-                    ),
-
-                  // Disable Deinterlace Button
-                  if (widget.forceDeinterlace) ...[
-                    const SizedBox(width: 16),
-                    TVFocusable(
-                      onPressed: () {
-                        final streamId =
-                            widget.channels?[_currentIndex].streamId ??
-                                widget.streamId;
-                        ref
-                            .read(mobileSettingsProvider.notifier)
-                            .toggleChannelDeinterlace(streamId);
-
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => LitePlayerScreen(
-                              streamId: streamId,
-                              title: widget.channels?[_currentIndex].name ??
-                                  widget.title,
-                              playlist: widget.playlist,
-                              streamType: widget.streamType,
-                              channels: widget.channels,
-                              initialIndex: _currentIndex,
-                            ),
-                          ),
-                        );
-                      },
-                      onFocus: _resetControlsTimer,
-                      child: const Icon(
-                        Icons.grid_off,
-                        color: AppColors.onSurface,
-                        size: 32,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEPGBox(String title) {
-    final rawNow = _epg?.nowPlaying ?? '';
-    String nowPlaying = rawNow.isNotEmpty ? rawNow : "Pas d'infos EPG";
-    final epgProgress = _epg?.progress ?? 0.0;
-
-    // Format start / end time for display
-    String startTime = '';
-    String endTime = '';
-    if (_epg != null && _epg!.start.isNotEmpty && _epg!.end.isNotEmpty) {
-      try {
-        final s = DateTime.parse(_epg!.start).toLocal();
-        final e = DateTime.parse(_epg!.end).toLocal();
-        startTime =
-            '${s.hour.toString().padLeft(2, '0')}:${s.minute.toString().padLeft(2, '0')}';
-        endTime =
-            '${e.hour.toString().padLeft(2, '0')}:${e.minute.toString().padLeft(2, '0')}';
-      } catch (_) {}
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            if (widget.channels != null &&
-                widget.channels![_currentIndex].streamIcon.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(right: 12),
-                width: 40,
-                height: 40,
-                child: CachedNetworkImage(
-                  imageUrl: widget.channels![_currentIndex].streamIcon,
-                  fit: BoxFit.contain,
-                  errorWidget: (_, __, ___) =>
-                      const Icon(Icons.tv, color: AppColors.onSurface38),
-                ),
-              ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppColors.onSurface70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    nowPlaying,
-                    style: const TextStyle(
-                      color: AppColors.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // EPG Progress Bar
-                  if (startTime.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Text(
-                          startTime,
-                          style: const TextStyle(
-                              color: AppColors.onSurface54, fontSize: 11),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                              value: epgProgress.clamp(0.0, 1.0),
-                              minHeight: 4,
-                              backgroundColor: AppColors.onSurface24,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          endTime,
-                          style: const TextStyle(
-                              color: AppColors.onSurface54, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControlsOverlay(String title) {
-    if (widget.streamType == model.StreamType.live) {
-      return _buildUnifiedOSD(title);
-    }
-    return _buildVodControlsOverlay();
-  }
-
-  /*
-  /// [TiviMate] Zapping OSD — brief overlay on channel switch (like TiviMate)
-  Widget _buildZappingOSD() {
-    final ch = widget.channels![_currentIndex];
-    final chNum = _currentIndex + 1;
-    final nowPlaying = _epg?.nowPlaying ?? '';
-    final epgProgress = _epg?.progress ?? 0.0;
-
-    return Positioned(
-      bottom: 24,
-      left: 24,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 360),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.82),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.onSurface12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Channel logo
-              if (ch.streamIcon.isNotEmpty)
-                Container(
-                  width: 52,
-                  height: 52,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: AppColors.onSurface12,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: ch.streamIcon,
-                      fit: BoxFit.contain,
-                      errorWidget: (_, __, ___) =>
-                          const Icon(Icons.tv, color: AppColors.onSurface38, size: 32),
-                    ),
-                  ),
-                )
-              else
-                Container(
-                  width: 52,
-                  height: 52,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: AppColors.onSurface12,
-                  ),
-                  child: const Icon(Icons.tv, color: AppColors.onSurface38, size: 32),
-                ),
-
-              // Channel info
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: const AppColors.primaryFill,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'CH $chNum',
-                            style: const TextStyle(
-                              color: AppColors.onSurface,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Flexible(
-                          child: Text(
-                            ch.name,
-                            style: const TextStyle(
-                              color: AppColors.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_isReconnecting || _isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: SizedBox(
-                          height: 3,
-                          child: LinearProgressIndicator(
-                            backgroundColor: AppColors.onSurface24,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.primary),
-                          ),
-                        ),
-                      )
-                    else if (nowPlaying.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        nowPlaying,
-                        style: const TextStyle(
-                          color: AppColors.onSurface70,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: epgProgress.clamp(0.0, 1.0),
-                          minHeight: 3,
-                          backgroundColor: AppColors.onSurface24,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.primary),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  */
-
-  /// [TiviMate] Channel list sidebar — slide-in panel on the right
-  Widget _buildChannelListSidebar() {
-    final channels = widget.channels!;
-    return Positioned(
-      top: 0,
-      bottom: 0,
-      right: 0,
-      child: Container(
-        width: 280,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
-            colors: [Color(0xE6000000), Color(0x99000000)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.onSurface12),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.list, color: AppColors.onSurface70, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Chaînes',
-                        style: TextStyle(
-                          color: AppColors.onSurface,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _showChannelList = false),
-                      child: const Icon(Icons.close,
-                          color: AppColors.onSurface54, size: 18),
-                    ),
-                  ],
-                ),
-              ),
-              // Channel list
-              Expanded(
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (_) {
-                    _restartChannelListTimer();
-                    return false;
-                  },
-                  child: ListView.builder(
-                  controller: _channelListScrollController,
-                  itemCount: channels.length,
-                  itemExtent: 64.0,
-                  itemBuilder: (context, index) {
-                    final ch = channels[index];
-                    final isActive = index == _currentIndex;
-                    return TVFocusable(
-                      // Le focusNode externe n'est posé que sur la chaîne
-                      // active ; la clé force un remontage quand isActive
-                      // change (TVFocusable ne gère pas didUpdateWidget).
-                      key: ValueKey('sidebar-ch-$index-$isActive'),
-                      focusNode: isActive ? _channelListItemFocusNode : null,
-                      scale: 1.0,
-                      borderRadius: BorderRadius.zero,
-                      onFocus: _restartChannelListTimer,
-                      onPressed: () {
-                        _channelListTimer?.cancel();
-                        _switchChannel(index);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? AppColors.primaryFill.withValues(alpha: 0.6)
-                              : Colors.transparent,
-                          border: isActive
-                              ? const Border(
-                                  left: BorderSide(
-                                    color: AppColors.primary,
-                                    width: 3,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            // Logo
-                            Container(
-                              width: 40,
-                              height: 40,
-                              margin: const EdgeInsets.only(right: 10),
-                              decoration: BoxDecoration(
-                                color: AppColors.onSurface12,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: ch.streamIcon.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: CachedNetworkImage(
-                                        imageUrl: ch.streamIcon,
-                                        fit: BoxFit.contain,
-                                        errorWidget: (_, __, ___) =>
-                                            const Icon(Icons.tv,
-                                                color: AppColors.onSurface38,
-                                                size: 20),
-                                      ),
-                                    )
-                                  : const Icon(Icons.tv,
-                                      color: AppColors.onSurface38, size: 20),
-                            ),
-                            // Name + num
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    ch.name,
-                                    style: TextStyle(
-                                      color: isActive
-                                          ? AppColors.onSurface
-                                          : AppColors.onSurface70,
-                                      fontSize: 13,
-                                      fontWeight: isActive
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    'CH ${index + 1}',
-                                    style: const TextStyle(
-                                      color: AppColors.onSurface38,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Active indicator
-                            if (isActive)
-                              const Icon(
-                                Icons.play_arrow,
-                                color: AppColors.primary,
-                                size: 18,
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVodControlsOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.4),
-        child: Stack(
-          children: [
-            // Bottom Controls (VOD - Centered)
-            Positioned(
-              bottom: 80,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Prev 10s
-                    TVFocusable(
-                      focusNode: _prevFocusNode,
-                      onPressed: () async {
-                        final pos = await _player.stream.position.first;
-                        _player.seek(pos - const Duration(seconds: 10));
-                        _resetControlsTimer();
-                      },
-                      onFocus: () => _noteFocus(_prevFocusNode),
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.replay_10,
-                          color: AppColors.onSurface,
-                          size: 48,
-                        ),
-                        onPressed: () async {
-                          final pos = await _player.stream.position.first;
-                          _player.seek(pos - const Duration(seconds: 10));
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(width: 32),
-
-                    // Play/Pause
-                    TVFocusable(
-                      focusNode: _playPauseFocusNode,
-                      onPressed: _togglePlayPause,
-                      onFocus: () => _noteFocus(_playPauseFocusNode),
-                      scale: 1.1,
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        iconSize: 72,
-                        icon: Icon(
-                          _isPlaying
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_filled,
-                          color: AppColors.onSurface,
-                        ),
-                        onPressed: _togglePlayPause,
-                      ),
-                    ),
-
-                    const SizedBox(width: 32),
-
-                    // Next 10s
-                    TVFocusable(
-                      focusNode: _nextFocusNode,
-                      onPressed: () async {
-                        final pos = await _player.stream.position.first;
-                        _player.seek(pos + const Duration(seconds: 10));
-                        _resetControlsTimer();
-                      },
-                      onFocus: () => _noteFocus(_nextFocusNode),
-                      borderRadius: BorderRadius.circular(50),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.forward_10,
-                          color: AppColors.onSurface,
-                          size: 48,
-                        ),
-                        onPressed: () async {
-                          final pos = await _player.stream.position.first;
-                          _player.seek(pos + const Duration(seconds: 10));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Progress Bar / Time (Bottom)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.transparent, Colors.black87],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          _formatDuration(_position),
-                          style: const TextStyle(
-                            color: AppColors.onSurface,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Expanded(
-                          child: Focus(
-                            focusNode: _sliderFocusNode,
-                            descendantsAreFocusable: false,
-                            onKeyEvent: (node, event) {
-                              if (event is! KeyDownEvent) {
-                                return KeyEventResult.ignored;
-                              }
-
-                              if (event.logicalKey ==
-                                  LogicalKeyboardKey.arrowUp) {
-                                _playPauseFocusNode.requestFocus();
-                                return KeyEventResult.handled;
-                              }
-
-                              if (event.logicalKey ==
-                                  LogicalKeyboardKey.arrowLeft) {
-                                final newPos =
-                                    _position - const Duration(seconds: 10);
-                                _player.seek(
-                                  newPos < Duration.zero
-                                      ? Duration.zero
-                                      : newPos,
-                                );
-                                _resetControlsTimer();
-                                return KeyEventResult.handled;
-                              }
-
-                              if (event.logicalKey ==
-                                  LogicalKeyboardKey.arrowRight) {
-                                final newPos =
-                                    _position + const Duration(seconds: 10);
-                                if (newPos < _duration) _player.seek(newPos);
-                                _resetControlsTimer();
-                                return KeyEventResult.handled;
-                              }
-
-                              return KeyEventResult.ignored;
-                            },
-                            child: Slider(
-                              value: _position.inSeconds
-                                  .toDouble()
-                                  .clamp(0, _duration.inSeconds.toDouble()),
-                              min: 0.0,
-                              max: _duration.inSeconds.toDouble(),
-                              onChanged: (value) {
-                                _player.seek(Duration(seconds: value.toInt()));
-                                _resetControlsTimer();
-                              },
-                              activeColor: AppColors.primary,
-                              inactiveColor: AppColors.onSurface24,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _formatDuration(_duration),
-                          style: const TextStyle(
-                            color: AppColors.onSurface,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingView() {
-    // During first load of a live channel: show logo + name for better UX
-    final isLive = widget.streamType == model.StreamType.live;
-    final hasChannel = isLive &&
-        widget.channels != null &&
-        widget.channels!.isNotEmpty;
-    final ch = hasChannel ? widget.channels![_currentIndex] : null;
-
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Channel logo during live TV first load
-          if (ch != null && ch.streamIcon.isNotEmpty)
-            Container(
-              width: 72,
-              height: 72,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: AppColors.onSurface12,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: ch.streamIcon,
-                  fit: BoxFit.contain,
-                  errorWidget: (_, __, ___) =>
-                      const Icon(Icons.tv, color: AppColors.onSurface38, size: 40),
-                ),
-              ),
-            ),
-          const CircularProgressIndicator(color: AppColors.primary),
-          const SizedBox(height: 16),
-          Text(
-            ch != null ? ch.name : 'Chargement...',
-            style: const TextStyle(
-              color: AppColors.onSurface70,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-          const SizedBox(height: 16),
-          const Text(
-            'Erreur de lecture',
-            style: TextStyle(color: AppColors.onSurface, fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              _errorMessage ?? 'Une erreur inconnue est survenue',
-              style: const TextStyle(color: AppColors.onSurface70),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Retour'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.onSurface,
-                  foregroundColor: AppColors.onPrimaryFixed,
-                ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: _loadStream,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Réessayer'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimaryFixed,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    if (announce && mounted) _showToast('Format · ${_formatLabel(next)}');
   }
 }
 
-/// Isolated Stats Widget to prevent rebuilding the entire Video Player on every update
+/// Infos techniques (top left): decoder, buffer, picture, format. Polled
+/// once a second while shown, isolated from the player's rebuilds.
 class StatsOverlayWidget extends ConsumerStatefulWidget {
   final Player player;
-  const StatsOverlayWidget({super.key, required this.player});
+  final String formatLabel;
+  const StatsOverlayWidget({
+    super.key,
+    required this.player,
+    required this.formatLabel,
+  });
 
   @override
   ConsumerState<StatsOverlayWidget> createState() => _StatsOverlayWidgetState();
 }
 
 class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
-  Duration _buffer = Duration.zero;
-  String _decoder = 'Unknown';
+  String _decoder = '…';
+  String _buffer = '…';
+  String _picture = '…';
 
   // Throttling updates
   Timer? _updateTimer;
@@ -2415,15 +2559,51 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
     // Use a periodic timer to poll/update stats instead of listening to every single frequent event
     // This reduces UI thread load significantly on low-end devices
     _updateTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
-      if (mounted) {
-        setState(() {
-          _buffer = widget.player.state.buffer;
-          // Accessing nested prop safely just in case
-          final track = widget.player.state.track.video;
-          _decoder = track.decoder ?? 'Auto';
-        });
-      }
+      if (mounted && ref.read(mobileSettingsProvider).showDebugStats) _poll();
     });
+  }
+
+  Future<void> _poll() async {
+    final state = widget.player.state;
+    String hw = '', cache = '', fps = '';
+    try {
+      final platform = widget.player.platform as dynamic;
+      hw = (await platform?.getProperty('hwdec-current') as String?) ?? '';
+      cache =
+          (await platform?.getProperty('demuxer-cache-duration') as String?) ??
+              '';
+      fps = (await platform?.getProperty('container-fps') as String?) ?? '';
+    } catch (_) {}
+    if (!mounted) return;
+
+    final codec = state.track.video.codec ?? state.track.video.decoder;
+    final decoder = hw.isNotEmpty && hw != 'no'
+        ? '$hw (matériel)'
+        : codec == null || codec.isEmpty
+            ? 'logiciel'
+            : 'logiciel · $codec';
+
+    final cacheSecs = double.tryParse(cache);
+    final ahead = state.buffer - state.position;
+    final seconds = cacheSecs ??
+        (ahead > Duration.zero ? ahead.inMilliseconds / 1000 : 0.0);
+    final buffer = '${seconds.toStringAsFixed(1).replaceAll('.', ',')} s';
+
+    final w = state.width, h = state.height;
+    final rate = double.tryParse(fps);
+    var picture = w != null && h != null && w > 0 ? '$w × $h' : '—';
+    if (rate != null && rate > 0) {
+      picture +=
+          ' · ${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2).replaceAll('.', ',')} i/s';
+    }
+
+    if (decoder != _decoder || buffer != _buffer || picture != _picture) {
+      setState(() {
+        _decoder = decoder;
+        _buffer = buffer;
+        _picture = picture;
+      });
+    }
   }
 
   @override
@@ -2434,40 +2614,16 @@ class _StatsOverlayWidgetState extends ConsumerState<StatsOverlayWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (!ref.watch(mobileSettingsProvider).showDebugStats) {
+    if (!ref.watch(mobileSettingsProvider.select((s) => s.showDebugStats))) {
       return const SizedBox.shrink();
     }
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.success.withOpacity(0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'STATS FOR NERDS 🤓',
-            style: TextStyle(
-              color: AppColors.success,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Buffer: ${_buffer.inSeconds}s',
-            style: const TextStyle(color: AppColors.onSurface, fontSize: 12),
-          ),
-          Text(
-            'Decoder: $_decoder',
-            style: const TextStyle(color: AppColors.onSurface, fontSize: 12),
-          ),
-        ],
-      ),
+    return StatsPlate(
+      rows: [
+        ('Décodeur', _decoder),
+        ('Tampon', _buffer),
+        ('Image', _picture),
+        ('Format', widget.formatLabel),
+      ],
     );
   }
 }
