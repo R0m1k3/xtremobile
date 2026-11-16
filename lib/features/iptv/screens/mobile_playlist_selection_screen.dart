@@ -7,6 +7,7 @@ import '../../../../core/models/playlist_config.dart';
 import '../../../../mobile/widgets/tv_focusable.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../mobile/theme/mobile_theme.dart';
 
 final playlistsProvider = FutureProvider<List<PlaylistConfig>>((ref) async {
@@ -46,8 +47,8 @@ class _MobilePlaylistSelectionScreenState
 
   Future<void> _showPlaylistDialog({PlaylistConfig? playlist}) async {
     final isEditing = playlist != null;
-    await showDialog(
-      context: context,
+    await showAppDialog(
+      context,
       builder: (context) => _PlaylistEditDialog(
         isEditing: isEditing,
         playlist: playlist,
@@ -169,7 +170,8 @@ class _MobilePlaylistSelectionScreenState
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add, color: AppColors.onSurface, size: 20),
+                              Icon(Icons.add,
+                                  color: AppColors.onSurface, size: 20),
                               SizedBox(width: 10),
                               Text(
                                 'Ajouter une Playlist',
@@ -226,7 +228,8 @@ class _MobilePlaylistSelectionScreenState
 class _PlaylistEditDialog extends StatefulWidget {
   final bool isEditing;
   final PlaylistConfig? playlist;
-  final Future<void> Function(String name, String dns, String username, String password) onSave;
+  final Future<void> Function(
+      String name, String dns, String username, String password) onSave;
   final Future<void> Function()? onDelete;
 
   const _PlaylistEditDialog({
@@ -263,44 +266,13 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
     bool obscure = false,
     TextInputType keyboardType = TextInputType.text,
   }) async {
-    final controller = TextEditingController(text: currentValue);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text(label, style: const TextStyle(color: AppColors.onSurface)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          obscureText: obscure,
-          keyboardType: keyboardType,
-          textInputAction: TextInputAction.done,
-          style: const TextStyle(color: AppColors.onSurface),
-          decoration: const InputDecoration(
-            labelStyle: TextStyle(color: AppColors.onSurface70),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.onSurface24),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.onSurface),
-            ),
-          ),
-          onSubmitted: (val) => Navigator.pop(ctx, val),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            autofocus: false,
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    final result = await showAppTextInput(
+      context,
+      title: label,
+      initialValue: currentValue,
+      obscure: obscure,
+      keyboardType: keyboardType,
     );
-    controller.dispose();
     if (result != null) {
       onSaved(result);
     }
@@ -312,6 +284,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
     required String value,
     required VoidCallback onTap,
     bool obscure = false,
+    bool autofocus = false,
   }) {
     final displayValue = obscure && value.isNotEmpty
         ? '•' * value.length.clamp(1, 12)
@@ -321,63 +294,25 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: TVFocusable(
+      child: AppDialogTile(
+        icon: icon,
+        label: label,
+        value: displayValue,
+        valueIsPlaceholder: value.isEmpty,
+        trailing: Icons.edit_outlined,
+        autofocus: autofocus,
         onPressed: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.onSurface.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.primary, size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        color: AppColors.onSurface70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      displayValue,
-                      style: TextStyle(
-                        color: value.isEmpty ? AppColors.onSurface38 : AppColors.onSurface,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.edit, color: AppColors.onSurface38, size: 18),
-            ],
-          ),
-        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      title: Text(
-        widget.isEditing ? 'Modifier la Playlist' : 'Ajouter une Playlist',
-        style: GoogleFonts.inter(color: AppColors.onSurface),
-      ),
+    return AppDialog(
+      title: widget.isEditing ? 'Modifier la playlist' : 'Ajouter une playlist',
+      width: 520,
       content: SizedBox(
-        width: 480,
+        width: double.infinity,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -385,6 +320,7 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
               icon: Icons.label_outline,
               label: 'Nom',
               value: _name,
+              autofocus: true,
               onTap: () => _editField(
                 label: 'Nom',
                 currentValue: _name,
@@ -429,47 +365,30 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
       ),
       actions: [
         if (widget.onDelete != null)
-          TVFocusable(
+          AppDialogButton(
+            label: 'Supprimer',
+            destructive: true,
             onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppColors.surface,
-                  title: const Text('Confirmer', style: TextStyle(color: AppColors.onSurface)),
-                  content: const Text('Supprimer cette playlist ?', style: TextStyle(color: AppColors.onSurface70)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Annuler'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                      child: const Text('Supprimer'),
-                    ),
-                  ],
-                ),
+              final confirm = await showAppConfirm(
+                context,
+                title: 'Supprimer la playlist ?',
+                message: 'Cette playlist sera retirée de l\'application.',
+                confirmLabel: 'Supprimer',
+                destructive: true,
               );
-              if (confirm == true) {
+              if (confirm) {
                 await widget.onDelete!();
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            borderRadius: BorderRadius.circular(8),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text('Supprimer', style: TextStyle(color: AppColors.error)),
-            ),
           ),
-        TVFocusable(
+        AppDialogButton(
+          label: 'Annuler',
           onPressed: () => Navigator.pop(context),
-          borderRadius: BorderRadius.circular(8),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Text('Annuler', style: TextStyle(color: AppColors.onSurface70)),
-          ),
         ),
-        TVFocusable(
+        AppDialogButton(
+          label: _isSaving ? 'Enregistrement…' : 'Enregistrer',
+          primary: true,
           onPressed: _isSaving || _name.isEmpty || _dns.isEmpty
               ? null
               : () async {
@@ -477,23 +396,6 @@ class _PlaylistEditDialogState extends State<_PlaylistEditDialog> {
                   await widget.onSave(_name, _dns, _username, _password);
                   if (context.mounted) Navigator.pop(context);
                 },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: _name.isEmpty || _dns.isEmpty
-                  ? AppColors.onSurface12
-                  : AppColors.primary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _isSaving ? '...' : 'Enregistrer',
-              style: const TextStyle(
-                color: AppColors.onSurface,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
         ),
       ],
     );

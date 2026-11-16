@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 // import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
+import 'package:xtremobile/core/widgets/app_dialog.dart';
 import 'package:xtremobile/mobile/providers/mobile_settings_providers.dart';
 import 'package:xtremobile/mobile/providers/mobile_xtream_providers.dart';
 import 'package:xtremobile/mobile/widgets/tv_focusable.dart';
@@ -346,7 +347,6 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
           const SnackBar(
             content:
                 Text('Chaînes, films, séries et EPG en cours de rechargement'),
-            backgroundColor: AppColors.success,
             duration: Duration(seconds: 3),
           ),
         );
@@ -355,7 +355,8 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Erreur: $e'), backgroundColor: AppColors.error),
+            content: Text('Erreur : $e'),
+          ),
         );
       }
     } finally {
@@ -631,51 +632,20 @@ class _MobileSettingsTabState extends ConsumerState<MobileSettingsTab> {
     );
   }
 
-  void _showKeyboardDialog(
+  Future<void> _showKeyboardDialog(
     String label,
     TextEditingController controller,
     ValueChanged<String> onChanged,
-  ) {
-    final tempController = TextEditingController(text: controller.text);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).colorScheme.surface,
-        title: Text(
-          'Filtres $label',
-          style: TextStyle(color: AppDecorations.textPrimary(ctx)),
-        ),
-        content: TextField(
-          controller: tempController,
-          autofocus: true,
-          style: TextStyle(color: AppDecorations.textPrimary(ctx)),
-          decoration: InputDecoration(
-            hintText: 'Séparez par des virgules',
-            hintStyle: TextStyle(color: AppDecorations.textSecondary(ctx)),
-            filled: true,
-            fillColor: Theme.of(ctx).scaffoldBackgroundColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              controller.text = tempController.text;
-              onChanged(tempController.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Sauvegarder'),
-          ),
-        ],
-      ),
+  ) async {
+    final value = await showAppTextInput(
+      context,
+      title: 'Filtres $label',
+      initialValue: controller.text,
+      hint: 'Séparez par des virgules',
+      confirmLabel: 'Sauvegarder',
     );
+    if (value == null || !mounted) return;
+    controller.text = value;
+    onChanged(value);
   }
 }
