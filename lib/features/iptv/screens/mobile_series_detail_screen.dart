@@ -305,6 +305,19 @@ class _MobileSeriesDetailScreenState
     );
   }
 
+  /// Every episode of the series, season after season, in order.
+  List<model.Episode> _allEpisodesInOrder() {
+    final seasons =
+        _seriesInfo?.episodes ?? const <String, List<model.Episode>>{};
+    final keys = seasons.keys.toList()
+      ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    return [
+      for (final key in keys)
+        ...([...seasons[key]!]
+          ..sort((a, b) => a.episodeNum.compareTo(b.episodeNum))),
+    ];
+  }
+
   Widget _buildEpisodeTile(model.Episode episode) {
     final watchHistory = ref.watch(mobileWatchHistoryProvider);
     final episodeKey = MobileWatchHistory.episodeKey(
@@ -344,6 +357,9 @@ class _MobileSeriesDetailScreenState
               seriesId: widget.series.seriesId,
               season: int.tryParse(episode.season.toString()),
               episodeNum: episode.episodeNum,
+              // Every episode in viewing order: « Épisode suivant ».
+              episodes: _allEpisodesInOrder(),
+              seriesName: widget.series.name,
               // Pass explicit initial position for resume
               initialPosition:
                   resumePos > 0 ? Duration(seconds: resumePos) : null,

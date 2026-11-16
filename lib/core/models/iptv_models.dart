@@ -312,15 +312,19 @@ class ShortEPG {
   final String end;
   final String description;
 
+  /// The programme after this one, when the guide gives it (« À suivre »).
+  final ShortEPG? next;
+
   const ShortEPG({
     required this.id,
     required this.title,
     required this.start,
     required this.end,
     this.description = '',
+    this.next,
   });
 
-  factory ShortEPG.fromJson(Map<String, dynamic> json) {
+  factory ShortEPG.fromJson(Map<String, dynamic> json, {ShortEPG? next}) {
     // Xtream API encodes title and description in Base64
     String decodeBase64(String? value) {
       if (value == null || value.isEmpty) return '';
@@ -338,6 +342,7 @@ class ShortEPG {
       start: json['start']?.toString() ?? '',
       end: json['end']?.toString() ?? '',
       description: decodeBase64(json['description']?.toString()),
+      next: next,
     );
   }
 
@@ -361,6 +366,7 @@ class ShortEPG {
   /// Get current program title
   String get nowPlaying => title;
 
-  /// Get next program info (mocked or from data if available)
-  String get nextPlaying => "Next Program";
+  /// Title of the next programme, or null when the guide does not give it.
+  String? get nextPlaying =>
+      next == null || next!.title.isEmpty ? null : next!.title;
 }
