@@ -454,7 +454,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                mainAxisExtent: 140,
+                mainAxisExtent: 104,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
               ),
@@ -722,7 +722,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 120,
+                height: 88,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -735,7 +735,7 @@ class _MobileLiveTVTabState extends ConsumerState<MobileLiveTVTab>
                       playlist: widget.playlist,
                       category: category,
                       width: 236,
-                      height: 120,
+                      height: 88,
                       onPressed: () => _openGroup(category),
                       onLongPress: () => _toggleFavoriteCategory(category),
                     );
